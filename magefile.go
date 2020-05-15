@@ -42,7 +42,9 @@ func (Prepare) InstallGoLint() error {
 
 // Update generates client/server code based on proto definition.
 func Update() error {
+	defer mg.SerialDeps(Format.All)
 	return sh.RunV("protoc", "--go_out=plugins=grpc:.", "elastic-agent-client.proto")
+
 }
 
 // All format automatically all the codes.
