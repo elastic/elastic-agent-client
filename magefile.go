@@ -44,7 +44,6 @@ func (Prepare) InstallGoLint() error {
 func Update() error {
 	defer mg.SerialDeps(Format.All)
 	return sh.RunV("protoc", "--go_out=plugins=grpc:.", "elastic-agent-client.proto")
-
 }
 
 // All format automatically all the codes.
