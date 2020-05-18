@@ -2,25 +2,105 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-
 syntax = "proto3";
-package elasticagentclient;
 
-message ConfigRequest {
-    string config = 1;
+package proto;
+
+option cc_enable_arenas = true;
+option go_package = "pkg/proto;proto";
+
+// A status observed message is streamed from the application to Elastic Agent.
+//
+// This message contains the currently applied `config_state_idx` (0 in the case of initial start, 1 is the first
+// applied config index) along with the status of the application. In the case that the sent `config_state_idx`
+// doesn't match the expected `config_state_idx` that Elastic Agent expects, the application is always marked as
+// `CONFIGURING`.
+message StateObserved {
+    // Status codes for the current state.
+    enum Status {
+        // Application is starting.
+        STARTING = 0;
+        // Application is currently configuring.
+        CONFIGURING = 1;
+        // Application is in healthy state.
+        HEALTHY = 2;
+        // Application is working but in a degraded state.
+        DEGRADED = 3;
+        // Application is failing completely.
+        FAILED = 4;
+        // Application is stopping.
+        STOPPING = 5;
+    }
+    // Token that is used to unique identify the application to agent. When agent started this
+    // application it would have provided it this token.
+    string token = 1;
+    // Current index of the applied configuration.
+    uint64 config_state_idx = 2;
+    // Status code.
+    Status status = 3;
+    // Message for the health status.
+    string message = 4;
 }
 
-message ConfigResponse {
+// A state expected message is streamed from the Elastic Agent to the application informing the application
+// what Elastic Agent expects the applications state to be.
+message StateExpected {
+    enum State {
+        // Expects that the application is running.
+        RUNNING = 0;
+        // Expects that the application is stopping.
+        STOPPING = 1;
+    }
+    // Expected state of the application.
+    State state = 1;
+    // Index of the either current configuration or new configuration provided.
+    uint64 config_state_idx = 2;
+    // Resulting configuration. (If the application already has the current `config_state_idx` this
+    // with be empty.)
+    string config = 3;
 }
 
-message StatusRequest{
+// A action request is streamed from the Elastic Agent to the application so an action can be performed
+// by the connected application.
+message ActionRequest {
+    // Token that is used to unique identify the application to agent. When agent started this
+    // application it would have provided it this token.
+    string token = 1;
+    // Unique ID of the action.
+    string id = 2;
+    // Name of the action.
+    string name = 3;
+    // JSON encoded parameters for the action.
+    bytes params = 4;
 }
 
-message StatusResponse {
-    string Status = 1;
+// A action response is streamed from the application back to the Elastic Agent to provide a result to
+// an action request.
+message ActionResponse {
+    // Status result of the action.
+    enum Status {
+        // Action was successful.
+        SUCCESS = 0;
+        // Action has failed.
+        FAILED = 1;
+    }
+    // Unique ID of the action.
+    string id = 1;
+    // Status of the action.
+    Status status = 2;
+    // JSON encoded result for the action.
+    bytes result = 3;
 }
 
-service Configurator {
-    rpc Config(ConfigRequest) returns (ConfigResponse) {}
-    rpc Status(StatusRequest) returns (StatusResponse) {}
+service ElasticAgent {
+    // Called by the client to provide the Elastic Agent the state of the application.
+    //
+    // A `StateObserved` must be streamed at least every 30 seconds or it will result in the
+    // application be automatically marked as FAILED, and after 60 seconds it will be force killed and
+    // restarted.
+    rpc Checkin(stream StateObserved) returns (stream StateExpected);
+
+    // Called by the client on connection to the GRPC allowing the Elastic Agent to stream action
+    // requests to the application and the application stream back responses to those requests.
+    rpc Actions(stream ActionResponse) returns (stream ActionRequest);
 }
