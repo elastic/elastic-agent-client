@@ -61,6 +61,7 @@ func (Format) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	return combineErr(
 		sh.RunV("go-licenser", "-license", "Elastic"),
+		sh.RunV("go-licenser", "-license", "Elastic", "-ext", ".proto"),
 	)
 }
 
