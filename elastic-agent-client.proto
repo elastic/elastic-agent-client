@@ -56,25 +56,22 @@ message StateExpected {
     // Index of the either current configuration or new configuration provided.
     uint64 config_state_idx = 2;
     // Resulting configuration. (If the application already has the current `config_state_idx` this
-    // with be empty.)
+    // will be empty.)
     string config = 3;
 }
 
 // A action request is streamed from the Elastic Agent to the application so an action can be performed
 // by the connected application.
 message ActionRequest {
-    // Token that is used to unique identify the application to agent. When agent started this
-    // application it would have provided it this token.
-    string token = 1;
     // Unique ID of the action.
-    string id = 2;
+    string id = 1;
     // Name of the action.
-    string name = 3;
+    string name = 2;
     // JSON encoded parameters for the action.
-    bytes params = 4;
+    bytes params = 3;
 }
 
-// A action response is streamed from the application back to the Elastic Agent to provide a result to
+// An action response is streamed from the application back to the Elastic Agent to provide a result to
 // an action request.
 message ActionResponse {
     // Status result of the action.
