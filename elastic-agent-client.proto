@@ -81,12 +81,15 @@ message ActionResponse {
         // Action has failed.
         FAILED = 1;
     }
+    // Token that is used to unique identify the application to agent. When agent started this
+    // application it would have provided it this token.
+    string token = 1;
     // Unique ID of the action.
-    string id = 1;
+    string id = 2;
     // Status of the action.
-    Status status = 2;
+    Status status = 3;
     // JSON encoded result for the action.
-    bytes result = 3;
+    bytes result = 4;
 }
 
 service ElasticAgent {
