@@ -89,12 +89,12 @@ type Client struct {
 	observed        proto.StateObserved_Status
 	observedMessage string
 
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	client proto.ElasticAgentClient
-	cfgLock   sync.RWMutex
-	obsLock   sync.RWMutex
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	client  proto.ElasticAgentClient
+	cfgLock sync.RWMutex
+	obsLock sync.RWMutex
 
 	// overridden in tests to make fast
 	minCheckTimeout time.Duration
