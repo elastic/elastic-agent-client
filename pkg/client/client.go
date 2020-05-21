@@ -208,7 +208,7 @@ func (c *Client) startCheckin() {
 				}
 			}()
 
-			// action responses
+			// observed state check-ins
 			go func() {
 				defer wg.Done()
 
