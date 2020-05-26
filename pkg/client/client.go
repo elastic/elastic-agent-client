@@ -20,6 +20,12 @@ import (
 // CheckinMinimumTimeout is the amount of time the client must send a new checkin even if the status has not changed.
 const CheckinMinimumTimeout = time.Second * 30
 
+// InitialConfigIdx is the initial configuration index the client starts with. 0 represents no config state.
+const InitialConfigIdx = 0
+
+// ActionResponseInitID is the initial ID sent to Agent on first connect.
+const ActionResponseInitID = "init"
+
 // ActionErrUndefined is returned to Elastic Agent as result to an action request
 // when the request action is not registered in the client.
 var ActionErrUndefined = utils.JSONMustMarshal(map[string]string{
@@ -108,7 +114,7 @@ func New(target string, token string, impl StateInterface, actions []Action, opt
 		token:           token,
 		impl:            impl,
 		actions:         actionMap,
-		cfgIdx:          0, // 0 is initial, no config state
+		cfgIdx:          InitialConfigIdx,
 		expected:        proto.StateExpected_RUNNING,
 		observed:        proto.StateObserved_STARTING,
 		observedMessage: "Starting",
@@ -118,9 +124,7 @@ func New(target string, token string, impl StateInterface, actions []Action, opt
 
 // Start starts the connection to Elastic Agent.
 func (c *Client) Start(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
-	c.ctx = ctx
-	c.cancel = cancel
+	c.ctx, c.cancel = context.WithCancel(ctx)
 	conn, err := grpc.DialContext(ctx, c.target, c.opts...)
 	if err != nil {
 		return err
@@ -149,7 +153,13 @@ func (c *Client) Status(status proto.StateObserved_Status, message string) {
 	c.obsLock.Unlock()
 }
 
-// startCheckin starts the go rountines to send and receive check-ins
+// startCheckin starts the go routines to send and receive check-ins
+//
+// This starts 3 go routines to manage the check-in bi-directional stream. The first
+// go routine starts the stream then starts one go routine to receive messages and
+// another go routine to send messages. The first go routine then blocks waiting on
+// the receive and send to finish, then restarts the stream or exits if the context
+// has been cancelled.
 func (c *Client) startCheckin() {
 	c.wg.Add(1)
 
@@ -163,19 +173,20 @@ func (c *Client) startCheckin() {
 			default:
 			}
 
-			checkinClient, err := c.client.Checkin(c.ctx)
+			checkinCtx, checkinCancel := context.WithCancel(c.ctx)
+			checkinClient, err := c.client.Checkin(checkinCtx)
 			if err != nil {
 				c.impl.OnError(err)
 				continue
 			}
 
-			var wg sync.WaitGroup
-			wg.Add(2)
+			var checkinWG sync.WaitGroup
 			done := make(chan bool)
 
 			// expected state check-ins
+			checkinWG.Add(1)
 			go func() {
-				defer wg.Done()
+				defer checkinWG.Done()
 				for {
 					expected, err := checkinClient.Recv()
 					if err != nil {
@@ -209,8 +220,9 @@ func (c *Client) startCheckin() {
 			}()
 
 			// observed state check-ins
+			checkinWG.Add(1)
 			go func() {
-				defer wg.Done()
+				defer checkinWG.Done()
 
 				var lastSent time.Time
 				var lastSentCfgIdx uint64
@@ -226,12 +238,13 @@ func (c *Client) startCheckin() {
 					c.cfgLock.RLock()
 					cfgIdx := c.cfgIdx
 					c.cfgLock.RUnlock()
+
 					c.obsLock.RLock()
 					observed := c.observed
 					observedMsg := c.observedMessage
 					c.obsLock.RUnlock()
 
-					sendMessage := func() {
+					sendMessage := func() error {
 						err := checkinClient.Send(&proto.StateObserved{
 							Token:          c.token,
 							ConfigStateIdx: cfgIdx,
@@ -240,29 +253,37 @@ func (c *Client) startCheckin() {
 						})
 						if err != nil {
 							c.impl.OnError(err)
-							return
+							checkinCancel()
+							return err
 						}
 						lastSent = time.Now()
 						lastSentCfgIdx = cfgIdx
 						lastSentStatus = observed
 						lastSentMessage = observedMsg
+						return nil
 					}
 
 					// On start keep trying to send the initial check-in.
 					if lastSent.IsZero() {
-						sendMessage()
+						if sendMessage() != nil {
+							return
+						}
 						continue
 					}
 
 					// Send new status when it has changed.
 					if lastSentCfgIdx != cfgIdx || lastSentStatus != observed || lastSentMessage != observedMsg {
-						sendMessage()
+						if sendMessage() != nil {
+							return
+						}
 						continue
 					}
 
 					// Send when more than 30 seconds has passed without any status change.
 					if time.Now().Sub(lastSent) >= c.minCheckTimeout {
-						sendMessage()
+						if sendMessage() != nil {
+							return
+						}
 						continue
 					}
 				}
@@ -270,16 +291,22 @@ func (c *Client) startCheckin() {
 
 			// wait for both send and recv go routines to stop before
 			// starting a new stream.
-			wg.Wait()
+			checkinWG.Wait()
 		}
 	}()
 }
 
-// startActions starts the go rountines to send and receive actions
+// startActions starts the go routines to send and receive actions
+//
+// This starts 3 go routines to manage the actions bi-directional stream. The first
+// go routine starts the stream then starts one go routine to receive messages and
+// another go routine to send messages. The first go routine then blocks waiting on
+// the receive and send to finish, then restarts the stream or exits if the context
+// has been cancelled.
 func (c *Client) startActions() {
 	c.wg.Add(1)
 
-	// results our held outside of the retry loop, because on re-connect
+	// results are held outside of the retry loop, because on re-connect
 	// we still want to send the responses that either failed or haven't been
 	// sent back to the agent.
 	actionResults := make(chan *proto.ActionResponse, 100)
@@ -293,28 +320,20 @@ func (c *Client) startActions() {
 			default:
 			}
 
-			actionsClient, err := c.client.Actions(c.ctx)
+			actionsCtx, actionsCancel := context.WithCancel(c.ctx)
+			actionsClient, err := c.client.Actions(actionsCtx)
 			if err != nil {
 				c.impl.OnError(err)
 				continue
 			}
 
-			// initial connection of stream must send the token so
-			// the Elastic Agent knows this clients token.
-			actionResults <- &proto.ActionResponse{
-				Token:  c.token,
-				Id:     "init",
-				Status: proto.ActionResponse_SUCCESS,
-				Result: []byte("{}"),
-			}
-
-			var wg sync.WaitGroup
-			wg.Add(2)
+			var actionsWG sync.WaitGroup
 			done := make(chan bool)
 
 			// action requests
+			actionsWG.Add(1)
 			go func() {
-				defer wg.Done()
+				defer actionsWG.Done()
 				for {
 					action, err := actionsClient.Recv()
 					if err != nil {
@@ -385,8 +404,24 @@ func (c *Client) startActions() {
 			}()
 
 			// action responses
+			actionsWG.Add(1)
 			go func() {
-				defer wg.Done()
+				defer actionsWG.Done()
+
+				// initial connection of stream must send the token so
+				// the Elastic Agent knows this clients token.
+				err := actionsClient.Send(&proto.ActionResponse{
+					Token:  c.token,
+					Id:     ActionResponseInitID,
+					Status: proto.ActionResponse_SUCCESS,
+					Result: []byte("{}"),
+				})
+				if err != nil {
+					c.impl.OnError(err)
+					actionsCancel()
+					return
+				}
+
 				for {
 					select {
 					case <-done:
@@ -397,6 +432,8 @@ func (c *Client) startActions() {
 							// failed to send, add back to response to try again
 							actionResults <- res
 							c.impl.OnError(err)
+							actionsCancel()
+							return
 						}
 					}
 				}
@@ -404,7 +441,7 @@ func (c *Client) startActions() {
 
 			// wait for both send and recv go routines to stop before
 			// starting a new stream.
-			wg.Wait()
+			actionsWG.Wait()
 		}
 	}()
 }
