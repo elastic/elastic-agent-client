@@ -378,7 +378,7 @@ func (a *AddAction) Execute(params map[string]interface{}) (map[string]interface
 }
 
 type StubClientImpl struct {
-	Lock sync.Mutex
+	Lock   sync.Mutex
 	Config string
 	Stop   bool
 	Error  error
@@ -426,13 +426,13 @@ type StubServer struct {
 	sentActions map[string]*performAction
 }
 
-func (s *StubServer) Start() error {
+func (s *StubServer) Start(opt ...grpc.ServerOption) error {
 	lis, err := net.Listen("tcp", ":0")
 	if err != nil {
 		return err
 	}
 	s.Port = lis.Addr().(*net.TCPAddr).Port
-	s.server = grpc.NewServer()
+	s.server = grpc.NewServer(opt...)
 	proto.RegisterElasticAgentServer(s.server, s)
 	go func() {
 		s.server.Serve(lis)

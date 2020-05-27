@@ -9,6 +9,22 @@ package proto;
 option cc_enable_arenas = true;
 option go_package = "pkg/proto;proto";
 
+// Connection information sent to the application on startup so it knows how to connected back to the Elastic Agent.
+//
+// This is normally sent through stdin and should never be sent across a network un-encrypted.
+message ConnInfo {
+    // GRPC connection address.
+    string addr = 1;
+    // Token that the application should send as the unique identifier when connecting over the GRPC.
+    string token = 2;
+    // CA certificate.
+    bytes ca_cert = 3;
+    // Peer certificate.
+    bytes peer_cert = 4;
+    // Peer private key.
+    bytes peer_key = 5;
+}
+
 // A status observed message is streamed from the application to Elastic Agent.
 //
 // This message contains the currently applied `config_state_idx` (0 in the case of initial start, 1 is the first
