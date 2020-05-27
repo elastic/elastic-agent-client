@@ -104,7 +104,7 @@ func TestNewFromReader_Connects(t *testing.T) {
 		defer m.Unlock()
 
 		if !gotValid {
-			return fmt.Errorf("server never recieved valid token")
+			return fmt.Errorf("server never received valid token")
 		}
 		return nil
 	}))
