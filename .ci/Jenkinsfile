@@ -23,6 +23,7 @@ pipeline {
   }
   stages {
     stage('Checkout') {
+      options { skipDefaultCheckout() }
       steps {
         pipelineManager([ cancelPreviousRunningBuilds: [ when: 'PR' ] ])
         deleteDir()
@@ -40,6 +41,7 @@ pipeline {
       environment{
         HOME = "${WORKSPACE}/${BASE_DIR}"
       }
+      options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
@@ -58,6 +60,7 @@ pipeline {
       environment{
         HOME = "${WORKSPACE}/${BASE_DIR}"
       }
+      options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
@@ -76,6 +79,7 @@ pipeline {
       environment{
         HOME = "${WORKSPACE}/${BASE_DIR}"
       }
+      options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
