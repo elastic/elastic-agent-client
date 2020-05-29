@@ -34,14 +34,13 @@ pipeline {
     stage('Lint') {
       agent {
         dockerfile {
-          filename 'Dockerfile'
-          dir '.ci/jenkins-go-agent'
+          dir ".ci/jenkins-go-agent"
         }
       }
       environment{
-        HOME = "${WORKSPACE}/${BASE_DIR}"
+        HOME = "${env.WORKSPACE}/${env.BASE_DIR}"
+        GOPATH = "${env.WORKSPACE}"
       }
-      options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
@@ -53,14 +52,13 @@ pipeline {
     stage('Update') {
       agent {
         dockerfile {
-          filename 'Dockerfile'
-          dir '.ci/jenkins-go-agent'
+          dir ".ci/jenkins-go-agent"
         }
       }
       environment{
-        HOME = "${WORKSPACE}/${BASE_DIR}"
+        HOME = "${env.WORKSPACE}/${env.BASE_DIR}"
+        GOPATH = "${env.WORKSPACE}"
       }
-      options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
@@ -72,14 +70,13 @@ pipeline {
     stage('Test') {
       agent {
         dockerfile {
-          filename 'Dockerfile'
-          dir '.ci/jenkins-go-agent'
+          dir ".ci/jenkins-go-agent"
         }
       }
       environment{
-        HOME = "${WORKSPACE}/${BASE_DIR}"
+        HOME = "${env.WORKSPACE}/${env.BASE_DIR}"
+        GOPATH = "${env.WORKSPACE}"
       }
-      options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
@@ -92,7 +89,7 @@ pipeline {
         always {
           junit(allowEmptyResults: true,
             keepLongStdio: true,
-            testResults: "${BASE_DIR}/**/junit*.xml")
+            testResults: "${BASE_DIR}/junit*.xml")
         }
       }
     }
