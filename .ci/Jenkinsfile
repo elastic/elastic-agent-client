@@ -22,76 +22,49 @@ pipeline {
     issueCommentTrigger('(?i).*(?:jenkins\\W+)?run\\W+(?:the\\W+)?tests(?:\\W+please)?.*')
   }
   stages {
-    stage('Tell me you do not run docker command in the master') {
-        agent {
-            docker { image 'maven:3-alpine' }
-        }
-        steps {
-            sh 'mvn --version'
-        }
-    }
     stage('Checkout') {
       options { skipDefaultCheckout() }
       steps {
         pipelineManager([ cancelPreviousRunningBuilds: [ when: 'PR' ] ])
         deleteDir()
         gitCheckout(basedir: "${BASE_DIR}")
-        sh 'command -v docker'
         stash allowEmpty: true, name: 'source', useDefaultExcludes: false
       }
     }
     stage('Lint') {
-      agent {
-        dockerfile {
-          dir ".ci/jenkins-go-agent"
-        }
-      }
-      environment{
-        HOME = "${env.WORKSPACE}/${env.BASE_DIR}"
-        GOPATH = "${env.WORKSPACE}"
-      }
+      options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
-        dir("${BASE_DIR}"){
-          sh(label: 'Checks formatting / linting',script: 'mage -debug check:all')
+        insideGo{
+          dir("${BASE_DIR}"){
+            sh(label: 'Checks formatting / linting',script: 'mage -debug check:all')
+          }
         }
       }
     }
     stage('Update') {
-      agent {
-        dockerfile {
-          dir ".ci/jenkins-go-agent"
-        }
-      }
-      environment{
-        HOME = "${env.WORKSPACE}/${env.BASE_DIR}"
-        GOPATH = "${env.WORKSPACE}"
-      }
+      options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
-        dir("${BASE_DIR}"){
-          sh(label: 'Checks formatting / linting',script: 'mage -debug update')
+        insideGo{
+          dir("${BASE_DIR}"){
+            sh(label: 'Checks formatting / linting',script: 'mage -debug update')
+          }
         }
       }
     }
     stage('Test') {
-      agent {
-        dockerfile {
-          dir ".ci/jenkins-go-agent"
-        }
-      }
-      environment{
-        HOME = "${env.WORKSPACE}/${env.BASE_DIR}"
-        GOPATH = "${env.WORKSPACE}"
-      }
+      options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
-        dir("${BASE_DIR}"){
-          sh(label: 'Unit test', script: 'go test ./... 2>&1 | tee test_results.txt')
-          sh(label: 'Convert test results', script: 'go-junit-report < test_results.txt > junit.xml')
+        insideGo{
+          dir("${BASE_DIR}"){
+            sh(label: 'Unit test', script: 'go test ./... 2>&1 | tee test_results.txt')
+            sh(label: 'Convert test results', script: 'go-junit-report < test_results.txt > junit.xml')
+          }
         }
       }
       post {
@@ -106,6 +79,18 @@ pipeline {
   post {
     cleanup {
       notifyBuildResult(prComment: true)
+    }
+  }
+}
+
+def insideGo(Closure body){
+  def goAgent = docker.build("go-agent", ".ci/jenkins-go-agent")
+  goAgent.inside(){
+    withEnv([
+      HOME = "${env.WORKSPACE}/${env.BASE_DIR}",
+      GOPATH = "${env.WORKSPACE}"
+    ]) {
+      body()
     }
   }
 }
