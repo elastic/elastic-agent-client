@@ -32,67 +32,46 @@ pipeline {
       }
     }
     stage('Lint') {
-      agent {
-        dockerfile {
-          filename 'Dockerfile'
-          dir '.ci/jenkins-go-agent'
-        }
-      }
-      environment{
-        HOME = "${WORKSPACE}/${BASE_DIR}"
-      }
       options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
-        dir("${BASE_DIR}"){
-          sh(label: 'Checks formatting / linting',script: 'mage -debug check:all')
+        insideGo{
+          dir("${BASE_DIR}"){
+            sh(label: 'Checks formatting / linting',script: 'mage -debug check:all')
+          }
         }
       }
     }
     stage('Update') {
-      agent {
-        dockerfile {
-          filename 'Dockerfile'
-          dir '.ci/jenkins-go-agent'
-        }
-      }
-      environment{
-        HOME = "${WORKSPACE}/${BASE_DIR}"
-      }
       options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
-        dir("${BASE_DIR}"){
-          sh(label: 'Checks formatting / linting',script: 'mage -debug update')
+        insideGo{
+          dir("${BASE_DIR}"){
+            sh(label: 'Checks formatting / linting',script: 'mage -debug update')
+          }
         }
       }
     }
     stage('Test') {
-      agent {
-        dockerfile {
-          filename 'Dockerfile'
-          dir '.ci/jenkins-go-agent'
-        }
-      }
-      environment{
-        HOME = "${WORKSPACE}/${BASE_DIR}"
-      }
       options { skipDefaultCheckout() }
       steps {
         deleteDir()
         unstash 'source'
-        dir("${BASE_DIR}"){
-          sh(label: 'Unit test', script: 'go test ./... 2>&1 | tee test_results.txt')
-          sh(label: 'Convert test results', script: 'go-junit-report < test_results.txt > junit.xml')
+        insideGo{
+          dir("${BASE_DIR}"){
+            sh(label: 'Unit test', script: 'go test ./... 2>&1 | tee test_results.txt')
+            sh(label: 'Convert test results', script: 'go-junit-report < test_results.txt > junit.xml')
+          }
         }
       }
       post {
         always {
           junit(allowEmptyResults: true,
             keepLongStdio: true,
-            testResults: "${BASE_DIR}/**/junit*.xml")
+            testResults: "${BASE_DIR}/junit*.xml")
         }
       }
     }
@@ -100,6 +79,22 @@ pipeline {
   post {
     cleanup {
       notifyBuildResult(prComment: true)
+    }
+  }
+}
+
+def insideGo(Closure body){
+  def goAgent
+  retry(2) {
+    sleep randomNumber(min: 2, max: 5)
+    goAgent = docker.build("go-agent", "${BASE_DIR}/.ci/jenkins-go-agent")
+  }
+  goAgent.inside(){
+    withEnv([
+      "HOME=${env.WORKSPACE}/${env.BASE_DIR}",
+      "GOPATH=${env.WORKSPACE}"
+    ]) {
+      body()
     }
   }
 }
