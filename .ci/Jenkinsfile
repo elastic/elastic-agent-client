@@ -28,6 +28,7 @@ pipeline {
         pipelineManager([ cancelPreviousRunningBuilds: [ when: 'PR' ] ])
         deleteDir()
         gitCheckout(basedir: "${BASE_DIR}")
+        sh 'command -v docker'
         stash allowEmpty: true, name: 'source', useDefaultExcludes: false
       }
     }
