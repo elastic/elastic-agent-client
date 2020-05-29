@@ -84,7 +84,11 @@ pipeline {
 }
 
 def insideGo(Closure body){
-  def goAgent = docker.build("go-agent", "${BASE_DIR}/.ci/jenkins-go-agent")
+  def goAgent
+  retry(2) {
+    sleep randomNumber(min: 2, max: 5)
+    goAgent = docker.build("go-agent", "${BASE_DIR}/.ci/jenkins-go-agent")
+  }
   goAgent.inside(){
     withEnv([
       "HOME=${env.WORKSPACE}/${env.BASE_DIR}",
