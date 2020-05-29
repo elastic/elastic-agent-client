@@ -84,11 +84,12 @@ func TestNewFromReader_Connects(t *testing.T) {
 	defer srv.Stop()
 
 	connInfo := &proto.ConnInfo{
-		Addr:     fmt.Sprintf(":%d", srv.Port),
-		Token:    token,
-		CaCert:   ca.caPEM,
-		PeerCert: peer.Crt,
-		PeerKey:  peer.Key,
+		Addr:       fmt.Sprintf(":%d", srv.Port),
+		ServerName: "localhost",
+		Token:      token,
+		CaCert:     ca.caPEM,
+		PeerCert:   peer.Crt,
+		PeerKey:    peer.Key,
 	}
 	connInfoBytes, err := protobuf.Marshal(connInfo)
 	require.NoError(t, err)

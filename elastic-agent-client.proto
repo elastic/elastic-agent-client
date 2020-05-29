@@ -15,14 +15,16 @@ option go_package = "pkg/proto;proto";
 message ConnInfo {
     // GRPC connection address.
     string addr = 1;
+    // Server name to use when connecting over TLS.
+    string server_name = 2;
     // Token that the application should send as the unique identifier when connecting over the GRPC.
-    string token = 2;
+    string token = 3;
     // CA certificate.
-    bytes ca_cert = 3;
+    bytes ca_cert = 4;
     // Peer certificate.
-    bytes peer_cert = 4;
+    bytes peer_cert = 5;
     // Peer private key.
-    bytes peer_key = 5;
+    bytes peer_key = 6;
 }
 
 // A status observed message is streamed from the application to Elastic Agent.
