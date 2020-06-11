@@ -86,7 +86,7 @@ type Client interface {
 	Status(status proto.StateObserved_Status, message string)
 }
 
-// Client manages the state and communication to the Elastic Agent.
+// client manages the state and communication to the Elastic Agent.
 type client struct {
 	target          string
 	opts            []grpc.DialOption
