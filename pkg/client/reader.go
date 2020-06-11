@@ -18,7 +18,7 @@ import (
 )
 
 // NewFromReader creates a new client reading the connection information from the io.Reader.
-func NewFromReader(reader io.Reader, impl StateInterface, actions ...Action) (*Client, error) {
+func NewFromReader(reader io.Reader, impl StateInterface, actions ...Action) (Client, error) {
 	connInfo := &proto.ConnInfo{}
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {

@@ -77,7 +77,17 @@ type StateInterface interface {
 }
 
 // Client manages the state and communication to the Elastic Agent.
-type Client struct {
+type Client interface {
+	// Start starts the client.
+	Start(ctx context.Context) error
+	// Stop stops the client.
+	Stop()
+	// Status updates the status and sents it to the Elastic Agent.
+	Status(status proto.StateObserved_Status, message string)
+}
+
+// Client manages the state and communication to the Elastic Agent.
+type client struct {
 	target          string
 	opts            []grpc.DialOption
 	token           string
@@ -101,14 +111,14 @@ type Client struct {
 }
 
 // New creates a client connection to Elastic Agent.
-func New(target string, token string, impl StateInterface, actions []Action, opts ...grpc.DialOption) *Client {
+func New(target string, token string, impl StateInterface, actions []Action, opts ...grpc.DialOption) Client {
 	actionMap := map[string]Action{}
 	if actions != nil {
 		for _, act := range actions {
 			actionMap[act.Name()] = act
 		}
 	}
-	return &Client{
+	return &client{
 		target:          target,
 		opts:            opts,
 		token:           token,
@@ -123,7 +133,7 @@ func New(target string, token string, impl StateInterface, actions []Action, opt
 }
 
 // Start starts the connection to Elastic Agent.
-func (c *Client) Start(ctx context.Context) error {
+func (c *client) Start(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	conn, err := grpc.DialContext(ctx, c.target, c.opts...)
 	if err != nil {
@@ -136,7 +146,7 @@ func (c *Client) Start(ctx context.Context) error {
 }
 
 // Stop stops the connection to Elastic Agent.
-func (c *Client) Stop() {
+func (c *client) Stop() {
 	if c.cancel != nil {
 		c.cancel()
 		c.wg.Wait()
@@ -146,7 +156,7 @@ func (c *Client) Stop() {
 }
 
 // Status updates the current status of the client in the Elastic Agent.
-func (c *Client) Status(status proto.StateObserved_Status, message string) {
+func (c *client) Status(status proto.StateObserved_Status, message string) {
 	c.obsLock.Lock()
 	c.observed = status
 	c.observedMessage = message
@@ -160,7 +170,7 @@ func (c *Client) Status(status proto.StateObserved_Status, message string) {
 // another go routine to send messages. The first go routine then blocks waiting on
 // the receive and send to finish, then restarts the stream or exits if the context
 // has been cancelled.
-func (c *Client) startCheckin() {
+func (c *client) startCheckin() {
 	c.wg.Add(1)
 
 	go func() {
@@ -303,7 +313,7 @@ func (c *Client) startCheckin() {
 // another go routine to send messages. The first go routine then blocks waiting on
 // the receive and send to finish, then restarts the stream or exits if the context
 // has been cancelled.
-func (c *Client) startActions() {
+func (c *client) startActions() {
 	c.wg.Add(1)
 
 	// results are held outside of the retry loop, because on re-connect
