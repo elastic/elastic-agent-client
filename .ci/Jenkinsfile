@@ -62,7 +62,7 @@ pipeline {
         unstash 'source'
         insideGo{
           dir("${BASE_DIR}"){
-            sh(label: 'Unit test', script: 'go test ./... 2>&1 | tee test_results.txt')
+            sh(label: 'Unit test', script: 'go test -race ./... 2>&1 | tee test_results.txt')
             sh(label: 'Convert test results', script: 'go-junit-report < test_results.txt > junit.xml')
           }
         }
