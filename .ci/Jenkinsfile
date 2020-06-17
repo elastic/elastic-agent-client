@@ -49,9 +49,12 @@ pipeline {
         cleanup()
         withMageEnv(pkgs: [
           "golang.org/x/lint/golint",
-          "github.com/golang/protobuf/proto",
-          "github.com/golang/protobuf/protoc-gen-go"
+          "google.golang.org/protobuf",
           ]){
+          sh '''
+          curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.12.3/protoc-3.12.3-linux-x86_64.zip
+          unzup protoc.zip
+          '''
           dir("${BASE_DIR}"){
             sh(label: 'Checks formatting / linting',script: 'mage -debug update')
           }
