@@ -36,7 +36,7 @@ pipeline {
       options { skipDefaultCheckout() }
       steps {
         cleanup()
-        withMageEnv{
+        withMageEnv(){
           dir("${BASE_DIR}"){
             sh(label: 'Checks formatting / linting',script: 'mage -debug check:all')
           }
@@ -47,7 +47,11 @@ pipeline {
       options { skipDefaultCheckout() }
       steps {
         cleanup()
-        withMageEnv{
+        withMageEnv(pkgs: [
+          "golang.org/x/lint/golint",
+          "github.com/golang/protobuf/proto",
+          "github.com/golang/protobuf/protoc-gen-go"
+          ]){
           dir("${BASE_DIR}"){
             sh(label: 'Checks formatting / linting',script: 'mage -debug update')
           }
@@ -58,7 +62,7 @@ pipeline {
       options { skipDefaultCheckout() }
       steps {
         cleanup()
-        withMageEnv{
+        withMageEnv(){
           dir("${BASE_DIR}"){
             sh(label: 'Unit test', script: 'go test -race ./...|tee tests-report.txt')
           }
