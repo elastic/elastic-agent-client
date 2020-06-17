@@ -49,7 +49,7 @@ pipeline {
         cleanup()
         withMageEnv(pkgs: [
           "golang.org/x/lint/golint",
-          "google.golang.org/protobuf",
+          "github.com/golang/protobuf",
           ]){
           sh '''
           curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.12.3/protoc-3.12.3-linux-x86_64.zip
