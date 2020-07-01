@@ -7,6 +7,7 @@ pipeline {
   environment {
     BASE_DIR="src/github.com/elastic/elastic-agent-client"
     PIPELINE_LOG_LEVEL='INFO'
+    GO_VERSION = '1.13.12'
   }
   options {
     timeout(time: 1, unit: 'HOURS')
@@ -34,9 +35,8 @@ pipeline {
     stage('Lint') {
       options { skipDefaultCheckout() }
       steps {
-        deleteDir()
-        unstash 'source'
-        insideGo{
+        cleanup()
+        withMageEnv(){
           dir("${BASE_DIR}"){
             sh(label: 'Checks formatting / linting',script: 'mage -debug check:all')
           }
@@ -46,9 +46,16 @@ pipeline {
     stage('Update') {
       options { skipDefaultCheckout() }
       steps {
-        deleteDir()
-        unstash 'source'
-        insideGo{
+        cleanup()
+        withMageEnv(pkgs: [
+          "golang.org/x/lint/golint",
+          "github.com/golang/protobuf/proto",
+          "github.com/golang/protobuf/protoc-gen-go",
+          ]){
+          sh '''
+          curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.12.3/protoc-3.12.3-linux-x86_64.zip
+          unzip protoc.zip
+          '''
           dir("${BASE_DIR}"){
             sh(label: 'Checks formatting / linting',script: 'mage -debug update')
           }
@@ -58,20 +65,19 @@ pipeline {
     stage('Test') {
       options { skipDefaultCheckout() }
       steps {
-        deleteDir()
-        unstash 'source'
-        insideGo{
+        cleanup()
+        withMageEnv(){
           dir("${BASE_DIR}"){
-            sh(label: 'Unit test', script: 'go test -race ./... 2>&1 | tee test_results.txt')
-            sh(label: 'Convert test results', script: 'go-junit-report < test_results.txt > junit.xml')
+            sh(label: 'Unit test', script: 'go test -race ./...|tee tests-report.txt')
           }
         }
       }
       post {
         always {
-          junit(allowEmptyResults: true,
-            keepLongStdio: true,
-            testResults: "${BASE_DIR}/junit*.xml")
+          convertGoTestResults(
+            input: "${BASE_DIR}/tests-report.txt",
+            output: "${BASE_DIR}/junit-report.xml"
+          )
         }
       }
     }
@@ -83,18 +89,9 @@ pipeline {
   }
 }
 
-def insideGo(Closure body){
-  def goAgent
-  retry(2) {
-    sleep randomNumber(min: 2, max: 5)
-    goAgent = docker.build("go-agent", "${BASE_DIR}/.ci/jenkins-go-agent")
+def cleanup(){
+  dir("${BASE_DIR}"){
+    deleteDir()
   }
-  goAgent.inside(){
-    withEnv([
-      "HOME=${env.WORKSPACE}/${env.BASE_DIR}",
-      "GOPATH=${env.WORKSPACE}"
-    ]) {
-      body()
-    }
-  }
+  unstash 'source'
 }
