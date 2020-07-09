@@ -41,6 +41,22 @@ func TestClient_DialError(t *testing.T) {
 	defer invalidClient.Stop()
 }
 
+func TestClient_Status(t *testing.T) {
+	c := New(":0", "invalid_token", &StubClientImpl{}, nil).(*client)
+	c.Status(proto.StateObserved_HEALTHY, "Running", map[string]interface{}{
+		"ensure": "that",
+		"order": "does",
+		"not": "matter",
+	})
+	setStr := c.observedPayload
+	c.Status(proto.StateObserved_HEALTHY, "Other", map[string]interface{}{
+		"not": "matter",
+		"ensure": "that",
+		"order": "does",
+	})
+	assert.Equal(t, setStr, c.observedPayload)
+}
+
 func TestClient_Checkin_With_Token(t *testing.T) {
 	var m sync.Mutex
 	token := "expected_token"
