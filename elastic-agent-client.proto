@@ -58,6 +58,8 @@ message StateObserved {
     Status status = 3;
     // Message for the health status.
     string message = 4;
+    // JSON encoded payload for the status.
+    string payload = 5;
 }
 
 // A state expected message is streamed from the Elastic Agent to the application informing the application
