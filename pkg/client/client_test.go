@@ -41,6 +41,22 @@ func TestClient_DialError(t *testing.T) {
 	defer invalidClient.Stop()
 }
 
+func TestClient_Status(t *testing.T) {
+	c := New(":0", "invalid_token", &StubClientImpl{}, nil).(*client)
+	c.Status(proto.StateObserved_HEALTHY, "Running", map[string]interface{}{
+		"ensure": "that",
+		"order": "does",
+		"not": "matter",
+	})
+	setStr := c.observedPayload
+	c.Status(proto.StateObserved_HEALTHY, "Other", map[string]interface{}{
+		"not": "matter",
+		"ensure": "that",
+		"order": "does",
+	})
+	assert.Equal(t, setStr, c.observedPayload)
+}
+
 func TestClient_Checkin_With_Token(t *testing.T) {
 	var m sync.Mutex
 	token := "expected_token"
@@ -117,6 +133,7 @@ func TestClient_Checkin_Status(t *testing.T) {
 	connected := false
 	status := proto.StateObserved_STARTING
 	message := ""
+	payload := ""
 	healthyCount := 0
 	srv := StubServer{
 		CheckinImpl: func(observed *proto.StateObserved) *proto.StateExpected {
@@ -134,6 +151,7 @@ func TestClient_Checkin_Status(t *testing.T) {
 				} else if observed.ConfigStateIdx == 1 {
 					status = observed.Status
 					message = observed.Message
+					payload = observed.Payload
 					if status == proto.StateObserved_HEALTHY {
 						healthyCount++
 					}
@@ -170,7 +188,7 @@ func TestClient_Checkin_Status(t *testing.T) {
 		}
 		return nil
 	}))
-	client.Status(proto.StateObserved_CONFIGURING, "Configuring")
+	client.Status(proto.StateObserved_CONFIGURING, "Configuring", nil)
 	require.NoError(t, waitFor(func() error {
 		m.Lock()
 		defer m.Unlock()
@@ -182,7 +200,9 @@ func TestClient_Checkin_Status(t *testing.T) {
 	}))
 	require.Equal(t, proto.StateObserved_CONFIGURING, status)
 	require.Equal(t, "Configuring", message)
-	client.Status(proto.StateObserved_HEALTHY, "Running")
+	client.Status(proto.StateObserved_HEALTHY, "Running", map[string]interface{}{
+		"payload": "sent",
+	})
 
 	// wait for at least 5 check-ins of healthy
 	assert.NoError(t, waitFor(func() error {
@@ -194,6 +214,10 @@ func TestClient_Checkin_Status(t *testing.T) {
 		}
 		return nil
 	}))
+
+	require.Equal(t, proto.StateObserved_HEALTHY, status)
+	require.Equal(t, "Running", message)
+	require.Equal(t, `{"payload":"sent"}`, payload)
 }
 
 func TestClient_Checkin_Stop(t *testing.T) {
@@ -261,7 +285,7 @@ func TestClient_Checkin_Stop(t *testing.T) {
 		}
 		return nil
 	}))
-	client.Status(proto.StateObserved_STOPPING, "Shutting down")
+	client.Status(proto.StateObserved_STOPPING, "Shutting down", nil)
 	// wait for server to receive stopping
 	assert.NoError(t, waitFor(func() error {
 		m.Lock()
@@ -432,10 +456,11 @@ func (s *StubServer) Start(opt ...grpc.ServerOption) error {
 		return err
 	}
 	s.Port = lis.Addr().(*net.TCPAddr).Port
-	s.server = grpc.NewServer(opt...)
+	srv := grpc.NewServer(opt...)
+	s.server = srv
 	proto.RegisterElasticAgentServer(s.server, s)
 	go func() {
-		s.server.Serve(lis)
+		srv.Serve(lis)
 	}()
 	return nil
 }

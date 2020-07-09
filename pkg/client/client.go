@@ -83,7 +83,7 @@ type Client interface {
 	// Stop stops the client.
 	Stop()
 	// Status updates the status and sents it to the Elastic Agent.
-	Status(status proto.StateObserved_Status, message string)
+	Status(status proto.StateObserved_Status, message string, payload map[string]interface{}) error
 }
 
 // client manages the state and communication to the Elastic Agent.
@@ -98,6 +98,7 @@ type client struct {
 	expected        proto.StateExpected_State
 	observed        proto.StateObserved_Status
 	observedMessage string
+	observedPayload string
 
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -156,11 +157,21 @@ func (c *client) Stop() {
 }
 
 // Status updates the current status of the client in the Elastic Agent.
-func (c *client) Status(status proto.StateObserved_Status, message string) {
+func (c *client) Status(status proto.StateObserved_Status, message string, payload map[string]interface{}) error {
+	payloadStr := ""
+	if payload != nil {
+		payloadBytes, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		payloadStr = string(payloadBytes)
+	}
 	c.obsLock.Lock()
 	c.observed = status
 	c.observedMessage = message
+	c.observedPayload = payloadStr
 	c.obsLock.Unlock()
+	return nil
 }
 
 // startCheckin starts the go routines to send and receive check-ins
@@ -238,6 +249,7 @@ func (c *client) startCheckin() {
 				var lastSentCfgIdx uint64
 				var lastSentStatus proto.StateObserved_Status
 				var lastSentMessage string
+				var lastSentPayload string
 				for {
 					select {
 					case <-done:
@@ -252,6 +264,7 @@ func (c *client) startCheckin() {
 					c.obsLock.RLock()
 					observed := c.observed
 					observedMsg := c.observedMessage
+					observedPayload := c.observedPayload
 					c.obsLock.RUnlock()
 
 					sendMessage := func() error {
@@ -260,6 +273,7 @@ func (c *client) startCheckin() {
 							ConfigStateIdx: cfgIdx,
 							Status:         observed,
 							Message:        observedMsg,
+							Payload: 		observedPayload,
 						})
 						if err != nil {
 							c.impl.OnError(err)
@@ -270,6 +284,7 @@ func (c *client) startCheckin() {
 						lastSentCfgIdx = cfgIdx
 						lastSentStatus = observed
 						lastSentMessage = observedMsg
+						lastSentPayload = observedPayload
 						return nil
 					}
 
@@ -282,7 +297,7 @@ func (c *client) startCheckin() {
 					}
 
 					// Send new status when it has changed.
-					if lastSentCfgIdx != cfgIdx || lastSentStatus != observed || lastSentMessage != observedMsg {
+					if lastSentCfgIdx != cfgIdx || lastSentStatus != observed || lastSentMessage != observedMsg || lastSentPayload != observedPayload {
 						if sendMessage() != nil {
 							return
 						}
