@@ -456,10 +456,11 @@ func (s *StubServer) Start(opt ...grpc.ServerOption) error {
 		return err
 	}
 	s.Port = lis.Addr().(*net.TCPAddr).Port
-	s.server = grpc.NewServer(opt...)
+	srv := grpc.NewServer(opt...)
+	s.server = srv
 	proto.RegisterElasticAgentServer(s.server, s)
 	go func() {
-		s.server.Serve(lis)
+		srv.Serve(lis)
 	}()
 	return nil
 }
