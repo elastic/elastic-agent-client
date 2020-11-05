@@ -1,6 +1,6 @@
 ---
 - job:
-    name: Beats/elastic-agent-client
+    name: Ingest-manager/elastic-agent-client
     display-name: Elastic Agent Client
     description: Jenkins pipeline for the Elastic Agent Client project
     view: Beats
