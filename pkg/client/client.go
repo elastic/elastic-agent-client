@@ -57,7 +57,7 @@ type Action interface {
 	Name() string
 
 	// Execute performs the action.
-	Execute(map[string]interface{}) (map[string]interface{}, error)
+	Execute(context.Context, map[string]interface{}) (map[string]interface{}, error)
 }
 
 // StateInterface defines how to handle config and stop requests.
@@ -84,6 +84,11 @@ type Client interface {
 	Stop()
 	// Status updates the status and sents it to the Elastic Agent.
 	Status(status proto.StateObserved_Status, message string, payload map[string]interface{}) error
+
+	// RegisterAction registers action handler with the client
+	RegisterAction(action Action)
+	// UnregisterAction unregisters action handler with the client
+	UnregisterAction(action Action)
 }
 
 // client manages the state and communication to the Elastic Agent.
@@ -93,6 +98,7 @@ type client struct {
 	token           string
 	impl            StateInterface
 	actions         map[string]Action
+	amx             sync.RWMutex
 	cfgIdx          uint64
 	cfg             string
 	expected        proto.StateExpected_State
@@ -131,6 +137,18 @@ func New(target string, token string, impl StateInterface, actions []Action, opt
 		observedMessage: "Starting",
 		minCheckTimeout: CheckinMinimumTimeout,
 	}
+}
+
+func (c *client) RegisterAction(action Action) {
+	c.amx.Lock()
+	c.actions[action.Name()] = action
+	c.amx.Unlock()
+}
+
+func (c *client) UnregisterAction(action Action) {
+	c.amx.Lock()
+	delete(c.actions, action.Name())
+	c.amx.Unlock()
 }
 
 // Start starts the connection to Elastic Agent.
@@ -273,7 +291,7 @@ func (c *client) startCheckin() {
 							ConfigStateIdx: cfgIdx,
 							Status:         observed,
 							Message:        observedMsg,
-							Payload: 		observedPayload,
+							Payload:        observedPayload,
 						})
 						if err != nil {
 							c.impl.OnError(err)
@@ -369,7 +387,9 @@ func (c *client) startActions() {
 						return
 					}
 
+					c.amx.RLock()
 					actionImpl, ok := c.actions[action.Name]
+					c.amx.RUnlock()
 					if !ok {
 						actionResults <- &proto.ActionResponse{
 							Token:  c.token,
@@ -394,7 +414,7 @@ func (c *client) startActions() {
 
 					// perform the action
 					go func() {
-						res, err := actionImpl.Execute(params)
+						res, err := actionImpl.Execute(c.ctx, params)
 						if err != nil {
 							actionResults <- &proto.ActionResponse{
 								Token:  c.token,
