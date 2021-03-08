@@ -8,11 +8,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gofrs/uuid"
 	"net"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gofrs/uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,14 +46,14 @@ func TestClient_Status(t *testing.T) {
 	c := New(":0", "invalid_token", &StubClientImpl{}, nil).(*client)
 	c.Status(proto.StateObserved_HEALTHY, "Running", map[string]interface{}{
 		"ensure": "that",
-		"order": "does",
-		"not": "matter",
+		"order":  "does",
+		"not":    "matter",
 	})
 	setStr := c.observedPayload
 	c.Status(proto.StateObserved_HEALTHY, "Other", map[string]interface{}{
-		"not": "matter",
+		"not":    "matter",
 		"ensure": "that",
-		"order": "does",
+		"order":  "does",
 	})
 	assert.Equal(t, setStr, c.observedPayload)
 }
@@ -379,7 +380,7 @@ func (a *AddAction) Name() string {
 	return "add"
 }
 
-func (a *AddAction) Execute(params map[string]interface{}) (map[string]interface{}, error) {
+func (a *AddAction) Execute(ctx context.Context, params map[string]interface{}) (map[string]interface{}, error) {
 	numbersRaw, ok := params["numbers"]
 	if !ok {
 		return nil, fmt.Errorf("missing numbers parameter")
