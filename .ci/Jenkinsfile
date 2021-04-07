@@ -3,7 +3,7 @@
 @Library('apm@current') _
 
 pipeline {
-  agent { label 'ubuntu && immutable' }
+  agent { label 'ubuntu-20' }
   environment {
     BASE_DIR="src/github.com/elastic/elastic-agent-client"
     PIPELINE_LOG_LEVEL='INFO'
