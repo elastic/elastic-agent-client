@@ -211,138 +211,142 @@ func (c *client) startCheckin() {
 			default:
 			}
 
-			checkinCtx, checkinCancel := context.WithCancel(c.ctx)
-			checkinClient, err := c.client.Checkin(checkinCtx)
+			c.checkinRoundTrip()
+		}
+	}()
+}
+
+func (c *client) checkinRoundTrip() {
+	checkinCtx, checkinCancel := context.WithCancel(c.ctx)
+	defer checkinCancel()
+
+	checkinClient, err := c.client.Checkin(checkinCtx)
+	if err != nil {
+		c.impl.OnError(err)
+		return
+	}
+
+	var checkinWG sync.WaitGroup
+	done := make(chan bool)
+
+	// expected state check-ins
+	checkinWG.Add(1)
+	go func() {
+		defer checkinWG.Done()
+		for {
+			expected, err := checkinClient.Recv()
 			if err != nil {
-				checkinCancel()
-				c.impl.OnError(err)
+				if err != io.EOF {
+					c.impl.OnError(err)
+				}
+				close(done)
+				return
+			}
+
+			if c.expected == proto.StateExpected_STOPPING {
+				// in stopping state, do nothing with any other expected states
+				continue
+			}
+			if expected.State == proto.StateExpected_STOPPING {
+				// Elastic Agent is requesting us to stop.
+				c.expected = expected.State
+				c.impl.OnStop()
+				continue
+			}
+			if expected.ConfigStateIdx != c.cfgIdx {
+				// Elastic Agent is requesting us to update config.
+				c.cfgLock.Lock()
+				c.cfgIdx = expected.ConfigStateIdx
+				c.cfg = expected.Config
+				c.cfgLock.Unlock()
+				c.impl.OnConfig(expected.Config)
+				continue
+			}
+		}
+	}()
+
+	// observed state check-ins
+	checkinWG.Add(1)
+	go func() {
+		defer checkinWG.Done()
+
+		var lastSent time.Time
+		var lastSentCfgIdx uint64
+		var lastSentStatus proto.StateObserved_Status
+		var lastSentMessage string
+		var lastSentPayload string
+		for {
+			t := time.NewTimer(500 * time.Millisecond)
+			select {
+			case <-done:
+				if !t.Stop() {
+					<-t.C
+				}
+				return
+			case <-t.C:
+			}
+
+			c.cfgLock.RLock()
+			cfgIdx := c.cfgIdx
+			c.cfgLock.RUnlock()
+
+			c.obsLock.RLock()
+			observed := c.observed
+			observedMsg := c.observedMessage
+			observedPayload := c.observedPayload
+			c.obsLock.RUnlock()
+
+			sendMessage := func() error {
+				err := checkinClient.Send(&proto.StateObserved{
+					Token:          c.token,
+					ConfigStateIdx: cfgIdx,
+					Status:         observed,
+					Message:        observedMsg,
+					Payload:        observedPayload,
+				})
+				if err != nil {
+					c.impl.OnError(err)
+					checkinCancel()
+					return err
+				}
+				lastSent = time.Now()
+				lastSentCfgIdx = cfgIdx
+				lastSentStatus = observed
+				lastSentMessage = observedMsg
+				lastSentPayload = observedPayload
+				return nil
+			}
+
+			// On start keep trying to send the initial check-in.
+			if lastSent.IsZero() {
+				if sendMessage() != nil {
+					return
+				}
 				continue
 			}
 
-			var checkinWG sync.WaitGroup
-			done := make(chan bool)
-
-			// expected state check-ins
-			checkinWG.Add(1)
-			go func() {
-				defer checkinWG.Done()
-				for {
-					expected, err := checkinClient.Recv()
-					if err != nil {
-						if err != io.EOF {
-							c.impl.OnError(err)
-						}
-						close(done)
-						return
-					}
-
-					if c.expected == proto.StateExpected_STOPPING {
-						// in stopping state, do nothing with any other expected states
-						continue
-					}
-					if expected.State == proto.StateExpected_STOPPING {
-						// Elastic Agent is requesting us to stop.
-						c.expected = expected.State
-						c.impl.OnStop()
-						continue
-					}
-					if expected.ConfigStateIdx != c.cfgIdx {
-						// Elastic Agent is requesting us to update config.
-						c.cfgLock.Lock()
-						c.cfgIdx = expected.ConfigStateIdx
-						c.cfg = expected.Config
-						c.cfgLock.Unlock()
-						c.impl.OnConfig(expected.Config)
-						continue
-					}
+			// Send new status when it has changed.
+			if lastSentCfgIdx != cfgIdx || lastSentStatus != observed || lastSentMessage != observedMsg || lastSentPayload != observedPayload {
+				if sendMessage() != nil {
+					return
 				}
-			}()
+				continue
+			}
 
-			// observed state check-ins
-			checkinWG.Add(1)
-			go func() {
-				defer checkinWG.Done()
-
-				var lastSent time.Time
-				var lastSentCfgIdx uint64
-				var lastSentStatus proto.StateObserved_Status
-				var lastSentMessage string
-				var lastSentPayload string
-				for {
-					t := time.NewTimer(500 * time.Millisecond)
-					select {
-					case <-done:
-						if !t.Stop() {
-							<-t.C
-						}
-						return
-					case <-t.C:
-					}
-
-					c.cfgLock.RLock()
-					cfgIdx := c.cfgIdx
-					c.cfgLock.RUnlock()
-
-					c.obsLock.RLock()
-					observed := c.observed
-					observedMsg := c.observedMessage
-					observedPayload := c.observedPayload
-					c.obsLock.RUnlock()
-
-					sendMessage := func() error {
-						err := checkinClient.Send(&proto.StateObserved{
-							Token:          c.token,
-							ConfigStateIdx: cfgIdx,
-							Status:         observed,
-							Message:        observedMsg,
-							Payload:        observedPayload,
-						})
-						if err != nil {
-							c.impl.OnError(err)
-							checkinCancel()
-							return err
-						}
-						lastSent = time.Now()
-						lastSentCfgIdx = cfgIdx
-						lastSentStatus = observed
-						lastSentMessage = observedMsg
-						lastSentPayload = observedPayload
-						return nil
-					}
-
-					// On start keep trying to send the initial check-in.
-					if lastSent.IsZero() {
-						if sendMessage() != nil {
-							return
-						}
-						continue
-					}
-
-					// Send new status when it has changed.
-					if lastSentCfgIdx != cfgIdx || lastSentStatus != observed || lastSentMessage != observedMsg || lastSentPayload != observedPayload {
-						if sendMessage() != nil {
-							return
-						}
-						continue
-					}
-
-					// Send when more than 30 seconds has passed without any status change.
-					if time.Since(lastSent) >= c.minCheckTimeout {
-						if sendMessage() != nil {
-							return
-						}
-						continue
-					}
+			// Send when more than 30 seconds has passed without any status change.
+			if time.Since(lastSent) >= c.minCheckTimeout {
+				if sendMessage() != nil {
+					return
 				}
-			}()
-
-			// wait for both send and recv go routines to stop before
-			// starting a new stream.
-			checkinWG.Wait()
-			checkinClient.CloseSend()
-			checkinCancel()
+				continue
+			}
 		}
 	}()
+
+	// wait for both send and recv go routines to stop before
+	// starting a new stream.
+	checkinWG.Wait()
+	checkinClient.CloseSend()
 }
 
 // startActions starts the go routines to send and receive actions
@@ -369,133 +373,136 @@ func (c *client) startActions() {
 			default:
 			}
 
-			actionsCtx, actionsCancel := context.WithCancel(c.ctx)
-			actionsClient, err := c.client.Actions(actionsCtx)
+			c.actionRoundTrip(actionResults)
+		}
+	}()
+}
+
+func (c *client) actionRoundTrip(actionResults chan *proto.ActionResponse) {
+	actionsCtx, actionsCancel := context.WithCancel(c.ctx)
+	defer actionsCancel()
+	actionsClient, err := c.client.Actions(actionsCtx)
+	if err != nil {
+		c.impl.OnError(err)
+		return
+	}
+
+	var actionsWG sync.WaitGroup
+	done := make(chan bool)
+
+	// action requests
+	actionsWG.Add(1)
+	go func() {
+		defer actionsWG.Done()
+		for {
+			action, err := actionsClient.Recv()
 			if err != nil {
-				actionsCancel()
-				c.impl.OnError(err)
+				if err != io.EOF {
+					c.impl.OnError(err)
+				}
+				close(done)
+				return
+			}
+
+			c.amx.RLock()
+			actionImpl, ok := c.actions[action.Name]
+			c.amx.RUnlock()
+			if !ok {
+				actionResults <- &proto.ActionResponse{
+					Token:  c.token,
+					Id:     action.Id,
+					Status: proto.ActionResponse_FAILED,
+					Result: ActionErrUndefined,
+				}
 				continue
 			}
 
-			var actionsWG sync.WaitGroup
-			done := make(chan bool)
+			var params map[string]interface{}
+			err = json.Unmarshal(action.Params, &params)
+			if err != nil {
+				actionResults <- &proto.ActionResponse{
+					Token:  c.token,
+					Id:     action.Id,
+					Status: proto.ActionResponse_FAILED,
+					Result: ActionErrUnmarshableParams,
+				}
+				continue
+			}
 
-			// action requests
-			actionsWG.Add(1)
+			// perform the action
 			go func() {
-				defer actionsWG.Done()
-				for {
-					action, err := actionsClient.Recv()
-					if err != nil {
-						if err != io.EOF {
-							c.impl.OnError(err)
-						}
-						close(done)
-						return
+				res, err := actionImpl.Execute(c.ctx, params)
+				if err != nil {
+					actionResults <- &proto.ActionResponse{
+						Token:  c.token,
+						Id:     action.Id,
+						Status: proto.ActionResponse_FAILED,
+						Result: utils.JSONMustMarshal(map[string]string{
+							"error": err.Error(),
+						}),
 					}
-
-					c.amx.RLock()
-					actionImpl, ok := c.actions[action.Name]
-					c.amx.RUnlock()
-					if !ok {
-						actionResults <- &proto.ActionResponse{
-							Token:  c.token,
-							Id:     action.Id,
-							Status: proto.ActionResponse_FAILED,
-							Result: ActionErrUndefined,
-						}
-						continue
+					return
+				}
+				resBytes, err := json.Marshal(res)
+				if err != nil {
+					// client-side error, should have been marshal-able
+					c.impl.OnError(err)
+					actionResults <- &proto.ActionResponse{
+						Token:  c.token,
+						Id:     action.Id,
+						Status: proto.ActionResponse_FAILED,
+						Result: ActionErrUnmarshableResult,
 					}
-
-					var params map[string]interface{}
-					err = json.Unmarshal(action.Params, &params)
-					if err != nil {
-						actionResults <- &proto.ActionResponse{
-							Token:  c.token,
-							Id:     action.Id,
-							Status: proto.ActionResponse_FAILED,
-							Result: ActionErrUnmarshableParams,
-						}
-						continue
-					}
-
-					// perform the action
-					go func() {
-						res, err := actionImpl.Execute(c.ctx, params)
-						if err != nil {
-							actionResults <- &proto.ActionResponse{
-								Token:  c.token,
-								Id:     action.Id,
-								Status: proto.ActionResponse_FAILED,
-								Result: utils.JSONMustMarshal(map[string]string{
-									"error": err.Error(),
-								}),
-							}
-							return
-						}
-						resBytes, err := json.Marshal(res)
-						if err != nil {
-							// client-side error, should have been marshal-able
-							c.impl.OnError(err)
-							actionResults <- &proto.ActionResponse{
-								Token:  c.token,
-								Id:     action.Id,
-								Status: proto.ActionResponse_FAILED,
-								Result: ActionErrUnmarshableResult,
-							}
-							return
-						}
-						actionResults <- &proto.ActionResponse{
-							Token:  c.token,
-							Id:     action.Id,
-							Status: proto.ActionResponse_SUCCESS,
-							Result: resBytes,
-						}
-					}()
+					return
+				}
+				actionResults <- &proto.ActionResponse{
+					Token:  c.token,
+					Id:     action.Id,
+					Status: proto.ActionResponse_SUCCESS,
+					Result: resBytes,
 				}
 			}()
+		}
+	}()
 
-			// action responses
-			actionsWG.Add(1)
-			go func() {
-				defer actionsWG.Done()
+	// action responses
+	actionsWG.Add(1)
+	go func() {
+		defer actionsWG.Done()
 
-				// initial connection of stream must send the token so
-				// the Elastic Agent knows this clients token.
-				err := actionsClient.Send(&proto.ActionResponse{
-					Token:  c.token,
-					Id:     ActionResponseInitID,
-					Status: proto.ActionResponse_SUCCESS,
-					Result: []byte("{}"),
-				})
+		// initial connection of stream must send the token so
+		// the Elastic Agent knows this clients token.
+		err := actionsClient.Send(&proto.ActionResponse{
+			Token:  c.token,
+			Id:     ActionResponseInitID,
+			Status: proto.ActionResponse_SUCCESS,
+			Result: []byte("{}"),
+		})
+		if err != nil {
+			c.impl.OnError(err)
+			actionsCancel()
+			return
+		}
+
+		for {
+			select {
+			case <-done:
+				return
+			case res := <-actionResults:
+				err := actionsClient.Send(res)
 				if err != nil {
+					// failed to send, add back to response to try again
+					actionResults <- res
 					c.impl.OnError(err)
 					actionsCancel()
 					return
 				}
-
-				for {
-					select {
-					case <-done:
-						return
-					case res := <-actionResults:
-						err := actionsClient.Send(res)
-						if err != nil {
-							// failed to send, add back to response to try again
-							actionResults <- res
-							c.impl.OnError(err)
-							actionsCancel()
-							return
-						}
-					}
-				}
-			}()
-
-			// wait for both send and recv go routines to stop before
-			// starting a new stream.
-			actionsWG.Wait()
-			actionsClient.CloseSend()
-			actionsCancel()
+			}
 		}
 	}()
+
+	// wait for both send and recv go routines to stop before
+	// starting a new stream.
+	actionsWG.Wait()
+	actionsClient.CloseSend()
 }
