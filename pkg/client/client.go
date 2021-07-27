@@ -120,11 +120,10 @@ type client struct {
 // New creates a client connection to Elastic Agent.
 func New(target string, token string, impl StateInterface, actions []Action, opts ...grpc.DialOption) Client {
 	actionMap := map[string]Action{}
-	if actions != nil {
-		for _, act := range actions {
-			actionMap[act.Name()] = act
-		}
+	for _, act := range actions {
+		actionMap[act.Name()] = act
 	}
+
 	return &client{
 		target:          target,
 		opts:            opts,
@@ -215,6 +214,7 @@ func (c *client) startCheckin() {
 			checkinCtx, checkinCancel := context.WithCancel(c.ctx)
 			checkinClient, err := c.client.Checkin(checkinCtx)
 			if err != nil {
+				checkinCancel()
 				c.impl.OnError(err)
 				continue
 			}
@@ -269,10 +269,14 @@ func (c *client) startCheckin() {
 				var lastSentMessage string
 				var lastSentPayload string
 				for {
+					t := time.NewTimer(500 * time.Millisecond)
 					select {
 					case <-done:
+						if !t.Stop() {
+							<-t.C
+						}
 						return
-					case <-time.After(500 * time.Millisecond):
+					case <-t.C:
 					}
 
 					c.cfgLock.RLock()
@@ -323,7 +327,7 @@ func (c *client) startCheckin() {
 					}
 
 					// Send when more than 30 seconds has passed without any status change.
-					if time.Now().Sub(lastSent) >= c.minCheckTimeout {
+					if time.Since(lastSent) >= c.minCheckTimeout {
 						if sendMessage() != nil {
 							return
 						}
@@ -335,6 +339,8 @@ func (c *client) startCheckin() {
 			// wait for both send and recv go routines to stop before
 			// starting a new stream.
 			checkinWG.Wait()
+			checkinClient.CloseSend()
+			checkinCancel()
 		}
 	}()
 }
@@ -366,6 +372,7 @@ func (c *client) startActions() {
 			actionsCtx, actionsCancel := context.WithCancel(c.ctx)
 			actionsClient, err := c.client.Actions(actionsCtx)
 			if err != nil {
+				actionsCancel()
 				c.impl.OnError(err)
 				continue
 			}
@@ -487,6 +494,8 @@ func (c *client) startActions() {
 			// wait for both send and recv go routines to stop before
 			// starting a new stream.
 			actionsWG.Wait()
+			actionsClient.CloseSend()
+			actionsCancel()
 		}
 	}()
 }
