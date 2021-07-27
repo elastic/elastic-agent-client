@@ -279,9 +279,7 @@ func (c *client) checkinRoundTrip() {
 			t := time.NewTimer(500 * time.Millisecond)
 			select {
 			case <-done:
-				if !t.Stop() {
-					<-t.C
-				}
+				t.Stop()
 				return
 			case <-t.C:
 			}
@@ -306,7 +304,6 @@ func (c *client) checkinRoundTrip() {
 				})
 				if err != nil {
 					c.impl.OnError(err)
-					checkinCancel()
 					return err
 				}
 				lastSent = time.Now()
@@ -480,7 +477,6 @@ func (c *client) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 		})
 		if err != nil {
 			c.impl.OnError(err)
-			actionsCancel()
 			return
 		}
 
@@ -494,7 +490,6 @@ func (c *client) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 					// failed to send, add back to response to try again
 					actionResults <- res
 					c.impl.OnError(err)
-					actionsCancel()
 					return
 				}
 			}
