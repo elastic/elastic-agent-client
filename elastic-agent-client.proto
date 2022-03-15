@@ -9,6 +9,279 @@ package proto;
 option cc_enable_arenas = true;
 option go_package = "pkg/proto;proto";
 
+// Empty response message.
+message EmptyResponse {}
+
+// State codes for the current state.
+enum State {
+    STARTING = 0;
+    CONFIGURING = 1;
+    HEALTHY = 2;
+    DEGRADED = 3;
+    FAILED = 4;
+    STOPPING = 5;
+}
+
+// Type of unit.
+enum UnitType {
+    INPUT = 0;
+    OUTPUT = 1;
+}
+
+// A unit that is part of a collector/shipper.
+message UnitExpected {
+    // Unique ID of the unit.
+    string id = 1;
+    // Unit type.
+    UnitType type = 2;
+    // Expected state of the unit.
+    State state = 3;
+    // Index of the either current configuration or new configuration provided.
+    uint64 config_state_idx = 4;
+    // Resulting configuration. (If the application already has the current `config_state_idx` this
+    // will be empty.)
+    string config = 5;
+}
+
+// A set of units and there expected states and configuration.
+message CheckinExpected {
+    repeated UnitExpected units = 1;
+}
+
+// Observed status for a unit.
+//
+// Contains the currently applied `config_state_idx` (0 in the case of initial start, 1 is the first
+// applied config index) along with the status of the application. In the case that the sent `config_state_idx`
+// doesn't match the expected `config_state_idx` that Elastic Agent expects, the unit is always marked as
+// `CONFIGURING` and a new `UnitExpected` will be sent to so it can have the latest configuration.
+message UnitObserved {
+    // Unique ID of the unit.
+    string id = 1;
+    // Unit type.
+    UnitType type = 2;
+    // Current index of the applied configuration.
+    uint64 config_state_idx = 2;
+    // State of unit.
+    State status = 3;
+    // Message for the health status.
+    string message = 4;
+    // JSON encoded payload for the status.
+    string payload = 5;
+}
+
+// Observed statuses and configuration for defined units.
+//
+// In the case that a unit is missing from the observation then the Elastic Agent will mark that missing unit
+// as `STARTING` and send a new `UnitExpected` for the missing input.
+message CheckinObserved {
+    // Token that is used to unique identify the connection to the Elastic Agent.
+    string token = 1;
+    // Units observed state.
+    repeated UnitObserved units = 2;
+}
+
+// A action request is streamed from the Elastic Agent to a unit so an action can be performed by that unit.
+message ActionRequest {
+    // Unique ID of the action.
+    string id = 1;
+    // Unique ID of the unit.
+    string unit_id = 2;
+    // Name of the action.
+    string name = 3;
+    // JSON encoded parameters for the action.
+    bytes params = 4;
+}
+
+// An action response is streamed from the application back to the Elastic Agent to provide a result to
+// an action request.
+message ActionResponse {
+    // Status result of the action.
+    enum Status {
+        // Action was successful.
+        SUCCESS = 0;
+        // Action has failed.
+        FAILED = 1;
+    }
+    // Token that is used to unique identify the connection to the Elastic Agent.
+    string token = 1;
+    // Unique ID of the action.
+    string id = 2;
+    // Status of the action.
+    Status status = 3;
+    // JSON encoded result for the action.
+    bytes result = 4;
+}
+
+// Type of transaction to start.
+enum StoreTxnType {
+    READ_ONLY = 0;
+    READ_WRITE = 1;
+}
+
+// Begins a new transaction.
+//
+// A started transaction must either have commit or discard called.
+message StoreBeginTxnRequest {
+    // Token that is used to unique identify the connection to the Elastic Agent.
+    string token = 1;
+    // ID of the unit.
+    string unit_id = 2;
+    // Type of transaction to start.
+    StoreTxnType type = 3;
+}
+
+// Response for a started transaction.
+message StoreBeginTxnResponse {
+    // Transaction ID.
+    string id = 1;
+}
+
+// Gets a key from the store.
+message StoreGetKeyRequest {
+    // Token that is used to unique identify the connection to the Elastic Agent.
+    string token = 1;
+    // Transaction ID.
+    string txn_id = 2;
+    // Name of the key.
+    string name = 3;
+}
+
+// Response of the retrieved key.
+message StoreGetKeyResponse {
+    // Status result of the get.
+    enum Status {
+        // Action was successful.
+        FOUND = 0;
+        // Action has failed.
+        NOT_FOUND = 1;
+    }
+    Status status = 1;
+    // Value when `FOUND`.
+    bytes value = 2;
+    // Metadata when `FOUND`.
+    bytes metadata = 3;
+}
+
+// Sets a key into the store.
+//
+// `txn_id` must be an ID of a transaction that was started with `READ_WRITE`.
+message StoreSetKeyRequest {
+    // Token that is used to unique identify the connection to the Elastic Agent.
+    string token = 1;
+    // Transaction ID.
+    string txn_id = 2;
+    // Name of the key.
+    string name = 3;
+    // Value of the key.
+    bytes value = 4;
+    // Metadata of the key.
+    bytes metadata = 5;
+    // TTL of the key (in milliseconds)
+    uint64 ttl = 6;
+}
+
+// Deletes a key in the store.
+//
+// `txn_id` must be an ID of a transaction that was started with `READ_WRITE`.
+//
+// Does not error in the case that a key does not exist.
+message StoreDeleteKeyRequest {
+    // Token that is used to unique identify the connection to the Elastic Agent.
+    string token = 1;
+    // Transaction ID.
+    string txn_id = 2;
+    // Name of the key.
+    string name = 3;
+}
+
+// Commits the transaction in the store.
+//
+// Upon error the whole transaction is discarded so no need to call discard after error.
+message StoreCommitRequest {
+    // Token that is used to unique identify the connection to the Elastic Agent.
+    string token = 1;
+    // Transaction ID.
+    string txn_id = 2;
+}
+
+// Discards the transaction in the store.
+message StoreDiscardRequest {
+    // Token that is used to unique identify the connection to the Elastic Agent.
+    string token = 1;
+    // Transaction ID.
+    string txn_id = 2;
+}
+
+message ArtifactFetchRequest {
+    // Token that is used to unique identify the collection of inputs to the agent. When started this is provided
+    // in the `ConnInfo`.
+    string token = 1;
+    // ID of the artifact.
+    string id = 2;
+    // SHA256 of the artifact.
+    string sha256 = 3;
+}
+
+message ArtifactFetchResponse {
+    // Artifact content.
+    bytes content = 1;
+}
+
+message UnitMetric {
+    // ID of the unit.
+    string id = 1;
+
+    // TODO: metrics content
+}
+
+message MetricsReportRequest {
+    // Token that is used to unique identify the collection of inputs to the agent. When started this is provided
+    // in the `ConnInfo`.
+    string token = 1;
+
+    // TODO: metrics content
+
+    repeated UnitMetric units = 2;
+}
+
+service ElasticAgent {
+    // Called by the client to provide the Elastic Agent the state of the application.
+    //
+    // A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the
+    // set of units automatically marked as FAILED, and after 60 seconds it will be force killed the entire
+    // process and restart it.
+    rpc Checkin(stream CheckinObserved) returns (stream CheckinExpected);
+
+    // Called by the client on connection to the GRPC allowing the Elastic Agent to stream action
+    // requests to the application and the application stream back responses to those requests.
+    //
+    // Request and response is swapped here because the Elastic Agent sends the requests in a stream
+    // to the connected process. The order of response from the process does not matter, it is acceptable
+    // for the response order to be different then the request order.
+    rpc Actions(stream ActionResponse) returns (stream ActionRequest);
+
+    // Key-Value state storage is provided for each unit.
+    //
+    // Transactional store is provided to allow multiple key operations to occur before a commit to ensure consistent
+    // state when multiple keys make up the state of an units persistent state.
+    rpc StoreBeginTxn(StoreBeginTxnRequest) returns (StoreBeginTxnResponse);
+    rpc StoreGetKey(StoreGetKeyRequest) returns (StoreGetKeyResponse);
+    rpc StoreSetKey(StoreSetKeyRequest) returns (EmptyResponse);
+    rpc StoreDeleteKey(StoreDeleteKeyRequest) returns (EmptyResponse);
+    rpc StoreCommit(StoreCommitRequest) returns (EmptyResponse);
+    rpc StoreDiscard(StoreDiscardRequest) returns (EmptyResponse);
+
+    // Fetches an artifact from the artifact store.
+    //
+    // Response from this call can be chunked over multiple `ArtifactFetchResponse` for very large responses. A minimum
+    // of two responses will always be returned. The last response is always empty to signal that its the end of the
+    // response.
+    rpc ArtifactFetch(ArtifactFetchRequest) returns (stream ArtifactFetchResponse);
+
+    // Report metrics to the Elastic Agent.
+    rpc MetricsReport(MetricsReportRequest) returns (EmptyResponse);
+}
+
 // Connection information sent to the application on startup so it knows how to connected back to the Elastic Agent.
 //
 // This is normally sent through stdin and should never be sent across a network un-encrypted.
@@ -25,102 +298,4 @@ message ConnInfo {
     bytes peer_cert = 5;
     // Peer private key.
     bytes peer_key = 6;
-}
-
-// A status observed message is streamed from the application to Elastic Agent.
-//
-// This message contains the currently applied `config_state_idx` (0 in the case of initial start, 1 is the first
-// applied config index) along with the status of the application. In the case that the sent `config_state_idx`
-// doesn't match the expected `config_state_idx` that Elastic Agent expects, the application is always marked as
-// `CONFIGURING`.
-message StateObserved {
-    // Status codes for the current state.
-    enum Status {
-        // Application is starting.
-        STARTING = 0;
-        // Application is currently configuring.
-        CONFIGURING = 1;
-        // Application is in healthy state.
-        HEALTHY = 2;
-        // Application is working but in a degraded state.
-        DEGRADED = 3;
-        // Application is failing completely.
-        FAILED = 4;
-        // Application is stopping.
-        STOPPING = 5;
-    }
-    // Token that is used to unique identify the application to agent. When agent started this
-    // application it would have provided it this token.
-    string token = 1;
-    // Current index of the applied configuration.
-    uint64 config_state_idx = 2;
-    // Status code.
-    Status status = 3;
-    // Message for the health status.
-    string message = 4;
-    // JSON encoded payload for the status.
-    string payload = 5;
-}
-
-// A state expected message is streamed from the Elastic Agent to the application informing the application
-// what Elastic Agent expects the applications state to be.
-message StateExpected {
-    enum State {
-        // Expects that the application is running.
-        RUNNING = 0;
-        // Expects that the application is stopping.
-        STOPPING = 1;
-    }
-    // Expected state of the application.
-    State state = 1;
-    // Index of the either current configuration or new configuration provided.
-    uint64 config_state_idx = 2;
-    // Resulting configuration. (If the application already has the current `config_state_idx` this
-    // will be empty.)
-    string config = 3;
-}
-
-// A action request is streamed from the Elastic Agent to the application so an action can be performed
-// by the connected application.
-message ActionRequest {
-    // Unique ID of the action.
-    string id = 1;
-    // Name of the action.
-    string name = 2;
-    // JSON encoded parameters for the action.
-    bytes params = 3;
-}
-
-// An action response is streamed from the application back to the Elastic Agent to provide a result to
-// an action request.
-message ActionResponse {
-    // Status result of the action.
-    enum Status {
-        // Action was successful.
-        SUCCESS = 0;
-        // Action has failed.
-        FAILED = 1;
-    }
-    // Token that is used to unique identify the application to agent. When agent started this
-    // application it would have provided it this token.
-    string token = 1;
-    // Unique ID of the action.
-    string id = 2;
-    // Status of the action.
-    Status status = 3;
-    // JSON encoded result for the action.
-    bytes result = 4;
-}
-
-service ElasticAgent {
-    // Called by the client to provide the Elastic Agent the state of the application.
-    //
-    // A `StateObserved` must be streamed at least every 30 seconds or it will result in the
-    // application be automatically marked as FAILED, and after 60 seconds it will be force killed and
-    // restarted.
-    rpc Checkin(stream StateObserved) returns (stream StateExpected);
-
-    // Called by the client on connection to the GRPC allowing the Elastic Agent to stream action
-    // requests to the application and the application stream back responses to those requests.
-    rpc Actions(stream ActionResponse) returns (stream ActionRequest);
 }
