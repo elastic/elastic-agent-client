@@ -248,7 +248,7 @@ service ElasticAgent {
     // Called by the client to provide the Elastic Agent the state of the application.
     //
     // A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the
-    // set of units automatically marked as FAILED, and after 60 seconds it will be force killed the entire
+    // set of units automatically marked as FAILED, and after 60 seconds it will force kill the entire
     // process and restart it.
     rpc Checkin(stream CheckinObserved) returns (stream CheckinExpected);
 
