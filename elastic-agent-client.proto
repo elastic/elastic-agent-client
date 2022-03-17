@@ -72,7 +72,7 @@ message UnitObserved {
 // Observed statuses and configuration for defined units.
 //
 // In the case that a unit is missing from the observation then the Elastic Agent will mark that missing unit
-// as `STARTING` and send a new `UnitExpected` for the missing input.
+// as `STARTING` and send a new `UnitExpected` for the missing unit.
 message CheckinObserved {
     // Token that is used to unique identify the connection to the Elastic Agent.
     string token = 1;
