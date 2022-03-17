@@ -102,7 +102,7 @@ message ActionResponse {
         // Action has failed.
         FAILED = 1;
     }
-    // Token that is used to unique identify the connection to the Elastic Agent.
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Unique ID of the action.
     string id = 2;
