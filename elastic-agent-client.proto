@@ -49,7 +49,7 @@ message StateObserved {
         // Application is stopping.
         STOPPING = 5;
     }
-    // Token that is used to unique identify the application to agent. When agent started this
+    // Token that is used to uniquely identify the application to agent. When agent started this
     // application it would have provided it this token.
     string token = 1;
     // Current index of the applied configuration.
@@ -103,7 +103,7 @@ message ActionResponse {
         // Action has failed.
         FAILED = 1;
     }
-    // Token that is used to unique identify the application to agent. When agent started this
+    // Token that is used to uniquely identify the application to agent. When agent started this
     // application it would have provided it this token.
     string token = 1;
     // Unique ID of the action.
@@ -174,9 +174,9 @@ message UnitObserved {
 // Observed statuses and configuration for defined units.
 //
 // In the case that a unit is missing from the observation then the Elastic Agent will mark that missing unit
-// as `STARTING` and send a new `UnitExpected` for the missing input.
+// as `STARTING` and send a new `UnitExpected` for the missing unit.
 message CheckinObserved {
-    // Token that is used to unique identify the connection to the Elastic Agent.
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Units observed state.
     repeated UnitObserved units = 2;
@@ -186,14 +186,14 @@ service ElasticAgent {
     // Called by the client to provide the Elastic Agent the state of the application.
     //
     // A `StateObserved` must be streamed at least every 30 seconds or it will result in the
-    // application be automatically marked as FAILED, and after 60 seconds it will be force killed and
-    // restarted.
+    // application be automatically marked as FAILED, and after 60 seconds it will force kill the entire
+    // process and restart it.
     rpc Checkin(stream StateObserved) returns (stream StateExpected);
 
     // Called by the client to provide the Elastic Agent the state of the application over the V2 protocol.
     //
     // A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the
-    // set of units automatically marked as FAILED, and after 60 seconds it will be force killed the entire
+    // set of units automatically marked as FAILED, and after 60 seconds it will force kill the entire
     // process and restart it.
     rpc CheckinV2(stream CheckinObserved) returns (stream CheckinExpected);
 
@@ -216,7 +216,7 @@ enum StoreTxnType {
 //
 // A started transaction must either have commit or discard called.
 message StoreBeginTxnRequest {
-    // Token that is used to unique identify the connection to the Elastic Agent.
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // ID of the unit.
     string unit_id = 2;
@@ -232,7 +232,7 @@ message StoreBeginTxnResponse {
 
 // Gets a key from the store.
 message StoreGetKeyRequest {
-    // Token that is used to unique identify the connection to the Elastic Agent.
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
     string txn_id = 2;
@@ -260,7 +260,7 @@ message StoreGetKeyResponse {
 //
 // `txn_id` must be an ID of a transaction that was started with `READ_WRITE`.
 message StoreSetKeyRequest {
-    // Token that is used to unique identify the connection to the Elastic Agent.
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
     string txn_id = 2;
@@ -285,7 +285,7 @@ message StoreSetKeyResponse {
 //
 // Does not error in the case that a key does not exist.
 message StoreDeleteKeyRequest {
-    // Token that is used to unique identify the connection to the Elastic Agent.
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
     string txn_id = 2;
@@ -302,7 +302,7 @@ message StoreDeleteKeyResponse {
 //
 // Upon error the whole transaction is discarded so no need to call discard after error.
 message StoreCommitRequest {
-    // Token that is used to unique identify the connection to the Elastic Agent.
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
     string txn_id = 2;
@@ -315,7 +315,7 @@ message StoreCommitTxnResponse {
 
 // Discards the transaction in the store.
 message StoreDiscardRequest {
-    // Token that is used to unique identify the connection to the Elastic Agent.
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
     string txn_id = 2;
@@ -341,7 +341,7 @@ service ElasticAgentStore {
 
 // Requests an artifact from the Elastic Agent.
 message ArtifactFetchRequest {
-    // Token that is used to unique identify the collection of inputs to the agent. When started this is provided
+    // Token that is used to uniquely identify the collection of inputs to the agent. When started this is provided
     // in the `ConnInfo`.
     string token = 1;
     // ID of the artifact.
@@ -392,7 +392,7 @@ message UnitMetrics {
 }
 
 message MetricsReportRequest {
-    // Token that is used to unique identify the collection of inputs to the agent. When started this is provided
+    // Token that is used to uniquely identify the collection of inputs to the agent. When started this is provided
     // in the `ConnInfo`.
     string token = 1;
 
