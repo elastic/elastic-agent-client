@@ -8,6 +8,7 @@ package proto;
 
 option cc_enable_arenas = true;
 option go_package = "pkg/proto;proto";
+import "google/protobuf/empty.proto";
 
 // Connection information sent to the application on startup so it knows how to connected back to the Elastic Agent.
 //
@@ -145,7 +146,7 @@ message UnitExpected {
     string config = 5;
 }
 
-// A set of units and there expected states and configuration.
+// A set of units and their expected states and configuration.
 message CheckinExpected {
     repeated UnitExpected units = 1;
 }
@@ -165,10 +166,21 @@ message UnitObserved {
     uint64 config_state_idx = 3;
     // State of unit.
     State status = 4;
-    // Message for the health status.
+    // Nice message for the health status of the unit.
+    // Exposed to users to provide more detail about the status for this single unit.
     string message = 5;
     // JSON encoded payload for the status.
     string payload = 6;
+}
+
+// Observed version information for the running program.
+message CheckinObservedVersionInfo {
+    // Name of the binary.
+    string name = 1;
+    // Version of the binary.
+    string version = 2;
+    // Additional metadata about the binary.
+    map<string, string> meta = 3;
 }
 
 // Observed statuses and configuration for defined units.
@@ -180,6 +192,9 @@ message CheckinObserved {
     string token = 1;
     // Units observed state.
     repeated UnitObserved units = 2;
+    // Version information about the running program. Should always be included on first checkin, and not again unless
+    // one of the values have changed.
+    optional CheckinObservedVersionInfo version_info = 3;
 }
 
 service ElasticAgent {
@@ -352,19 +367,21 @@ message ArtifactFetchRequest {
 
 // Content of the artifact.
 message ArtifactFetchResponse {
-    // Artifact content.
-    bytes content = 1;
+    oneof content_eof {
+        // Artifact content.
+        bytes content = 1;
+        // End-of-file.
+        google.protobuf.Empty eof = 2;
+    }
 }
 
 service ElasticAgentArtifact {
     // Fetches an artifact from the artifact store.
     //
     // Response from this call can be chunked over multiple `ArtifactFetchResponse` for very large responses. A minimum
-    // of two responses will always be returned. The last response is always empty to signal that its the end of the
-    // response.
+    // of two responses will always be returned. The last response has eof set.
     rpc Fetch(ArtifactFetchRequest) returns (stream ArtifactFetchResponse);
 }
-
 
 // A single metric that is reported by a unit. A unit can report multiple metrics in the same period.
 message UnitMetric {
@@ -411,4 +428,48 @@ message MetricsReportResponse {
 service ElasticAgentMetrics {
     // Report metrics to the Elastic Agent.
     rpc Report(MetricsReportRequest) returns (MetricsReportResponse);
+}
+
+message LogMessageRequest {
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
+    string token = 1;
+    // ID of the unit.
+    string unit_id = 2;
+    // ECS log message body JSON encoded.
+    bytes message = 3;
+}
+
+message LogMessageResponse {
+    // Empty at the moment, defined for possibility of adding future return values.
+}
+
+message LogBulkMessage {
+    // ID of the unit.
+    string unit_id = 1;
+    // ECS log message body JSON encoded.
+    bytes message = 2;
+}
+
+message LogBulkMessageRequest {
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
+    string token = 1;
+    // Multiple message to report at the same time.
+    repeated LogBulkMessage messages = 2;
+}
+
+message LogBulkMessageResponse {
+    // Empty at the moment, defined for possibility of adding future return values.
+}
+
+// Log service is only exposed to programs that are not started as sub-processes by Elastic Agent.
+//
+// This allows services that are not started as sub-processes to write to the same stdout that programs that do get
+// started as subprocess to write to. A program that is as a sub-process with stdout connected does not have the
+// ability to use this service.
+service ElasticAgentLog {
+    // Log a message to the Elastic Agent.
+    rpc Log(LogMessageRequest) returns (LogMessageResponse);
+
+    // Bulk log messages to the Elastic Agent.
+    rpc LogBulk(LogBulkMessageRequest) returns (LogBulkMessageResponse);
 }
