@@ -166,7 +166,7 @@ message UnitObserved {
     uint64 config_state_idx = 3;
     // State of unit.
     State status = 4;
-    // Nice message for the health status of the unit.
+    // Human readable message for the health status of the unit.
     // Exposed to users to provide more detail about the status for this single unit.
     string message = 5;
     // JSON encoded payload for the status.
