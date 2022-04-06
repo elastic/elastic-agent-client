@@ -430,34 +430,21 @@ service ElasticAgentMetrics {
     rpc Report(MetricsReportRequest) returns (MetricsReportResponse);
 }
 
-message LogMessageRequest {
-    // Token that is used to uniquely identify the connection to the Elastic Agent.
-    string token = 1;
-    // ID of the unit.
-    string unit_id = 2;
-    // ECS log message body JSON encoded.
-    bytes message = 3;
-}
-
-message LogMessageResponse {
-    // Empty at the moment, defined for possibility of adding future return values.
-}
-
-message LogBulkMessage {
+message LogMessage {
     // ID of the unit.
     string unit_id = 1;
     // ECS log message body JSON encoded.
     bytes message = 2;
 }
 
-message LogBulkMessageRequest {
+message LogMessageRequest {
     // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Multiple message to report at the same time.
-    repeated LogBulkMessage messages = 2;
+    repeated LogMessage messages = 2;
 }
 
-message LogBulkMessageResponse {
+message LogMessageResponse {
     // Empty at the moment, defined for possibility of adding future return values.
 }
 
@@ -467,9 +454,6 @@ message LogBulkMessageResponse {
 // started as subprocess to write to. A program that is as a sub-process with stdout connected does not have the
 // ability to use this service.
 service ElasticAgentLog {
-    // Log a message to the Elastic Agent.
+    // Log messages to the Elastic Agent.
     rpc Log(LogMessageRequest) returns (LogMessageResponse);
-
-    // Bulk log messages to the Elastic Agent.
-    rpc LogBulk(LogBulkMessageRequest) returns (LogBulkMessageResponse);
 }
