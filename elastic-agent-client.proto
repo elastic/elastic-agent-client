@@ -9,6 +9,7 @@ package proto;
 option cc_enable_arenas = true;
 option go_package = "pkg/proto;proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 // Connection information sent to the application on startup so it knows how to connected back to the Elastic Agent.
 //
@@ -84,14 +85,38 @@ message StateExpected {
 // A action request is streamed from the Elastic Agent to the application so an action can be performed
 // by the connected application.
 message ActionRequest {
+    // Type of action being performed.
+    enum Type {
+        // Custom action (registered by the unit)
+        CUSTOM = 0;
+        // Defined diagnostics action.
+        DIAGNOSTICS = 1;
+    }
     // Unique ID of the action.
     string id = 1;
-    // Name of the action.
+    // Name of the action (name is ignored for DIAGNOSTICS).
     string name = 2;
     // JSON encoded parameters for the action.
     bytes params = 3;
     // Unique ID of the unit (only used with V2).
     string unit_id = 4;
+    // Type of action to be performed (only used with V2).
+    Type type = 5;
+}
+
+message ActionDiagnosticUnitResult {
+    // Human readable name of the diagnostic result content.
+    string name = 1;
+    // Filename to use to store the diagnostic to the disk.
+    string filename = 2;
+    // Human readable description of the information this diagnostic provides.
+    string description = 3;
+    // Content-Type of the resulting content.
+    string content_type = 4;
+    // Actual file content.
+    bytes content = 5;
+    // Timestamp the content was generated at.
+    google.protobuf.Timestamp generated = 6;
 }
 
 // An action response is streamed from the application back to the Elastic Agent to provide a result to
@@ -111,8 +136,10 @@ message ActionResponse {
     string id = 2;
     // Status of the action.
     Status status = 3;
-    // JSON encoded result for the action.
+    // JSON encoded result for the action (empty when diagnostic action response).
     bytes result = 4;
+    // Specific result for diagnostics action. (only used in V2)
+    repeated ActionDiagnosticUnitResult diagnostic = 5;
 }
 
 // State codes for the current state.
