@@ -410,53 +410,6 @@ service ElasticAgentArtifact {
     rpc Fetch(ArtifactFetchRequest) returns (stream ArtifactFetchResponse);
 }
 
-// A single metric that is reported by a unit. A unit can report multiple metrics in the same period.
-message UnitMetric {
-    enum MetricType {
-        KEYWORD = 0;
-        LONG = 1;
-    }
-
-    // Label for the metric.
-    string label = 1;
-
-    // Type for the metric.
-    MetricType type = 2;
-
-    // Value for the metric.
-    bytes value = 3;
-}
-
-message UnitMetrics {
-    // ID of the unit.
-    string id = 1;
-
-    // Metrics for this unit in this period.
-    repeated UnitMetric metrics = 2;
-}
-
-message MetricsReportRequest {
-    // Token that is used to uniquely identify the collection of inputs to the agent. When started this is provided
-    // in the `ConnInfo`.
-    string token = 1;
-
-    // Period of time for the metrics that are collected.
-    uint64 period = 2;
-
-    // Reported units for this period.
-    repeated UnitMetrics units = 3;
-}
-
-// Response from `MetricsReport`.
-message MetricsReportResponse {
-    // Empty at the moment, defined for possibility of adding future return values.
-}
-
-service ElasticAgentMetrics {
-    // Report metrics to the Elastic Agent.
-    rpc Report(MetricsReportRequest) returns (MetricsReportResponse);
-}
-
 message LogMessage {
     // ID of the unit.
     string unit_id = 1;
