@@ -442,6 +442,8 @@ type actionResultChan struct {
 }
 
 type StubServer struct {
+	proto.UnimplementedElasticAgentServer
+
 	Port        int
 	CheckinImpl StubServerCheckin
 	ActionImpl  StubServerAction

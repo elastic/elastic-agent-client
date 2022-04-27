@@ -189,6 +189,7 @@ func (c *CertificateAuthority) GeneratePair() (*Pair, error) {
 			Organization: []string{"elastic-fleet"},
 			CommonName:   "localhost",
 		},
+		DNSNames:    []string{"localhost"},
 		NotBefore:   time.Now(),
 		NotAfter:    time.Now().AddDate(10, 0, 0),
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
