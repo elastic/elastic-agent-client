@@ -32,32 +32,24 @@ pipeline {
         stash allowEmpty: true, name: 'source', useDefaultExcludes: false
       }
     }
+    stage('Update') {
+      options { skipDefaultCheckout() }
+      steps {
+        cleanup()
+        withMageEnv(){
+          dir("${BASE_DIR}"){
+            sh(label: 'Generate GRPC code',script: 'mage -debug update')
+          }
+        }
+      }
+    }
     stage('Lint') {
       options { skipDefaultCheckout() }
       steps {
         cleanup()
         withMageEnv(){
           dir("${BASE_DIR}"){
-            sh(label: 'Checks formatting / linting',script: 'mage -debug check:all')
-          }
-        }
-      }
-    }
-    stage('Update') {
-      options { skipDefaultCheckout() }
-      steps {
-        cleanup()
-        withMageEnv(pkgs: [
-          "golang.org/x/lint/golint",
-          "github.com/golang/protobuf/proto",
-          "github.com/golang/protobuf/protoc-gen-go",
-          ]){
-          sh '''
-          curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.12.3/protoc-3.12.3-linux-x86_64.zip
-          unzip protoc.zip
-          '''
-          dir("${BASE_DIR}"){
-            sh(label: 'Checks formatting / linting',script: 'mage -debug update')
+            sh(label: 'Checks formatting / linting',script: 'mage -debug check')
           }
         }
       }
