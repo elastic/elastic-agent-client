@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build mage
 // +build mage
 
 package main
@@ -48,7 +49,11 @@ func (Prepare) InstallGoLint() error {
 // Update generates client/server code based on proto definition.
 func Update() error {
 	defer mg.SerialDeps(Format.All)
-	return sh.RunV("protoc", "--go_out=plugins=grpc:.", "elastic-agent-client.proto")
+	return sh.RunV(
+		"protoc",
+		"--go_out=pkg/proto", "--go_opt=paths=source_relative",
+		"--go-grpc_out=pkg/proto", "--go-grpc_opt=paths=source_relative",
+		"elastic-agent-client.proto")
 }
 
 // All format automatically all the codes.
