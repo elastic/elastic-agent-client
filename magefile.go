@@ -2,6 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
+//go:build mage
 // +build mage
 
 package main
@@ -16,18 +17,26 @@ import (
 )
 
 const (
-	goLintRepo     = "golang.org/x/lint/golint"
-	goLicenserRepo = "github.com/elastic/go-licenser"
+	goLintRepo        = "golang.org/x/lint/golint"
+	goLicenserRepo    = "github.com/elastic/go-licenser"
+	goProtocGenGo     = "google.golang.org/protobuf/cmd/protoc-gen-go@v1.28"
+	goProtocGenGoGRPC = "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2"
 )
 
 // Aliases for commands required by master makefile
 var Aliases = map[string]interface{}{
-	"fmt":   Format.All,
-	"check": Check.All,
+	"prepare": Prepare.All,
+	"update":  Update.All,
+	"fmt":     Format.All,
+	"format":  Format.All,
+	"check":   Check.All,
 }
 
 // Prepare tasks related to bootstrap the environment or get information about the environment.
 type Prepare mg.Namespace
+
+// Update updates the generated GRPC code.
+type Update mg.Namespace
 
 // Format automatically format the code.
 type Format mg.Namespace
@@ -45,10 +54,32 @@ func (Prepare) InstallGoLint() error {
 	return GoGet(goLintRepo)
 }
 
-// Update generates client/server code based on proto definition.
-func Update() error {
+// All runs prepare:installGoLicenser and prepare:installGoLint.
+func (Prepare) All() {
+	mg.SerialDeps(Prepare.InstallGoLicenser, Prepare.InstallGoLint)
+}
+
+// Prepare installs the required GRPC tools for generation to occur.
+func (Update) Prepare() error {
+	if err := GoInstall(goProtocGenGo); err != nil {
+		return err
+	}
+	return GoInstall(goProtocGenGoGRPC)
+}
+
+// Generate generates the GRPC code.
+func (Update) Generate() error {
 	defer mg.SerialDeps(Format.All)
-	return sh.RunV("protoc", "--go_out=plugins=grpc:.", "elastic-agent-client.proto")
+	return sh.RunV(
+		"protoc",
+		"--go_out=pkg/proto", "--go_opt=paths=source_relative",
+		"--go-grpc_out=pkg/proto", "--go-grpc_opt=paths=source_relative",
+		"elastic-agent-client.proto")
+}
+
+// All runs update:prepare then update:generate.
+func (Update) All() {
+	mg.SerialDeps(Update.Prepare, Update.Generate)
 }
 
 // All format automatically all the codes.
@@ -104,6 +135,12 @@ func (Check) License() error {
 // GoGet fetch a remote dependencies.
 func GoGet(link string) error {
 	_, err := sh.Exec(map[string]string{"GO111MODULE": "off"}, os.Stdout, os.Stderr, "go", "get", link)
+	return err
+}
+
+// GoInstall installs a remote dependencies.
+func GoInstall(link string) error {
+	_, err := sh.Exec(map[string]string{}, os.Stdout, os.Stderr, "go", "install", link)
 	return err
 }
 
