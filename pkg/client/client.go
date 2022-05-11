@@ -17,40 +17,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 )
 
-// CheckinMinimumTimeout is the amount of time the client must send a new checkin even if the status has not changed.
-const CheckinMinimumTimeout = time.Second * 30
-
-// InitialConfigIdx is the initial configuration index the client starts with. 0 represents no config state.
-const InitialConfigIdx = 0
-
-// ActionResponseInitID is the initial ID sent to Agent on first connect.
-const ActionResponseInitID = "init"
-
-// ActionErrUndefined is returned to Elastic Agent as result to an action request
-// when the request action is not registered in the client.
-var ActionErrUndefined = utils.JSONMustMarshal(map[string]string{
-	"error": "action undefined",
-})
-
-// ActionErrUnmarshableParams is returned to Elastic Agent as result to an action request
-// when the request params could not be un-marshaled to send to the action.
-var ActionErrUnmarshableParams = utils.JSONMustMarshal(map[string]string{
-	"error": "action params failed to be un-marshaled",
-})
-
-// ActionErrInvalidParams is returned to Elastic Agent as result to an action request
-// when the request params are invalid for the action.
-var ActionErrInvalidParams = utils.JSONMustMarshal(map[string]string{
-	"error": "action params invalid",
-})
-
-// ActionErrUnmarshableResult is returned to Elastic Agent as result to an action request
-// when the action was performed but the response could not be marshalled to send back to
-// the agent.
-var ActionErrUnmarshableResult = utils.JSONMustMarshal(map[string]string{
-	"error": "action result failed to be marshaled",
-})
-
 // Action is an action the client exposed to the Elastic Agent.
 type Action interface {
 	// Name of the action.

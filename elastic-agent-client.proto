@@ -11,6 +11,20 @@ option go_package = "pkg/proto;proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
+// Services that the client is allowed to use over the connection.
+enum ConnInfoServices {
+    // V1 checkin service.
+    Checkin = 0;
+    // V2 checkin service.
+    CheckinV2 = 1;
+    // Key-value store service.
+    Store = 2;
+    // Artifact store service.
+    Artifact = 3;
+    // Log service.
+    Log = 4;
+}
+
 // Connection information sent to the application on startup so it knows how to connected back to the Elastic Agent.
 //
 // This is normally sent through stdin and should never be sent across a network un-encrypted.
@@ -27,6 +41,8 @@ message ConnInfo {
     bytes peer_cert = 5;
     // Peer private key.
     bytes peer_key = 6;
+    // Allowed services that spawned process can use. (only used in V2)
+    repeated ConnInfoServices services = 7;
 }
 
 // A status observed message is streamed from the application to Elastic Agent.
@@ -100,8 +116,10 @@ message ActionRequest {
     bytes params = 3;
     // Unique ID of the unit (only used with V2).
     string unit_id = 4;
+    // Type of the unit (only used with V2).
+    UnitType unit_type = 5;
     // Type of action to be performed (only used with V2).
-    Type type = 5;
+    Type type = 6;
 }
 
 message ActionDiagnosticUnitResult {
@@ -192,11 +210,11 @@ message UnitObserved {
     // Current index of the applied configuration.
     uint64 config_state_idx = 3;
     // State of unit.
-    State status = 4;
-    // Human readable message for the health status of the unit.
-    // Exposed to users to provide more detail about the status for this single unit.
+    State state = 4;
+    // Human readable message for the state of the unit.
+    // Exposed to users to provide more detail about the state for this single unit.
     string message = 5;
-    // JSON encoded payload for the status.
+    // JSON encoded payload for the state.
     bytes payload = 6;
 }
 
@@ -228,15 +246,15 @@ service ElasticAgent {
     // Called by the client to provide the Elastic Agent the state of the application.
     //
     // A `StateObserved` must be streamed at least every 30 seconds or it will result in the
-    // application be automatically marked as FAILED, and after 60 seconds it will force kill the entire
-    // process and restart it.
+    // application be automatically marked as FAILED, and after 60 seconds the Elastic Agent will
+    // force kill the entire process and restart it.
     rpc Checkin(stream StateObserved) returns (stream StateExpected);
 
     // Called by the client to provide the Elastic Agent the state of the application over the V2 protocol.
     //
     // A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the
-    // set of units automatically marked as FAILED, and after 60 seconds it will force kill the entire
-    // process and restart it.
+    // set of units automatically marked as FAILED, and after 60 seconds the Elastic Agent will
+    // force kill the entire process and restart it.
     rpc CheckinV2(stream CheckinObserved) returns (stream CheckinExpected);
 
     // Called by the client on connection to the GRPC allowing the Elastic Agent to stream action
@@ -262,8 +280,10 @@ message StoreBeginTxnRequest {
     string token = 1;
     // ID of the unit.
     string unit_id = 2;
+    // Type of the unit.
+    UnitType unit_type = 3;
     // Type of transaction to start.
-    StoreTxnType type = 3;
+    StoreTxnType type = 4;
 }
 
 // Response for a started transaction.
@@ -294,8 +314,6 @@ message StoreGetKeyResponse {
     Status status = 1;
     // Value when `FOUND`.
     bytes value = 2;
-    // Metadata when `FOUND`.
-    bytes metadata = 3;
 }
 
 // Sets a key into the store.
@@ -310,10 +328,8 @@ message StoreSetKeyRequest {
     string name = 3;
     // Value of the key.
     bytes value = 4;
-    // Metadata of the key.
-    bytes metadata = 5;
     // TTL of the key (in milliseconds)
-    uint64 ttl = 6;
+    uint64 ttl = 5;
 }
 
 // Response from `SetKey`.
@@ -343,7 +359,7 @@ message StoreDeleteKeyResponse {
 // Commits the transaction in the store.
 //
 // Upon error the whole transaction is discarded so no need to call discard after error.
-message StoreCommitRequest {
+message StoreCommitTxnRequest {
     // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
@@ -356,7 +372,7 @@ message StoreCommitTxnResponse {
 }
 
 // Discards the transaction in the store.
-message StoreDiscardRequest {
+message StoreDiscardTxnRequest {
     // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
@@ -377,8 +393,8 @@ service ElasticAgentStore {
     rpc GetKey(StoreGetKeyRequest) returns (StoreGetKeyResponse);
     rpc SetKey(StoreSetKeyRequest) returns (StoreSetKeyResponse);
     rpc DeleteKey(StoreDeleteKeyRequest) returns (StoreDeleteKeyResponse);
-    rpc CommitTxn(StoreCommitRequest) returns (StoreCommitTxnResponse);
-    rpc DiscardTxn(StoreDiscardRequest) returns (StoreDiscardTxnResponse);
+    rpc CommitTxn(StoreCommitTxnRequest) returns (StoreCommitTxnResponse);
+    rpc DiscardTxn(StoreDiscardTxnRequest) returns (StoreDiscardTxnResponse);
 }
 
 // Requests an artifact from the Elastic Agent.
@@ -413,8 +429,10 @@ service ElasticAgentArtifact {
 message LogMessage {
     // ID of the unit.
     string unit_id = 1;
+    // Type of the unit.
+    UnitType unit_type = 2;
     // ECS log message body JSON encoded.
-    bytes message = 2;
+    bytes message = 3;
 }
 
 message LogMessageRequest {
@@ -430,9 +448,9 @@ message LogMessageResponse {
 
 // Log service is only exposed to programs that are not started as sub-processes by Elastic Agent.
 //
-// This allows services that are not started as sub-processes to write to the same stdout that programs that do get
-// started as subprocess to write to. A program that is as a sub-process with stdout connected does not have the
-// ability to use this service.
+// This allows services that are not started as sub-processes to write to the same stdout that programs that are
+// started as subprocess. A program that is as a sub-process with stdout connected does not have the ability to use
+// this service.
 service ElasticAgentLog {
     // Log messages to the Elastic Agent.
     rpc Log(LogMessageRequest) returns (LogMessageResponse);
