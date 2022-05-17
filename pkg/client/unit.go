@@ -16,7 +16,7 @@ type UnitType proto.UnitType
 
 const (
 	// UnitTypeInput is an input unit.
-	UnitTypeInput  = UnitType(proto.UnitType_INPUT)
+	UnitTypeInput = UnitType(proto.UnitType_INPUT)
 	// UnitTypeOutput is an output unit.
 	UnitTypeOutput = UnitType(proto.UnitType_OUTPUT)
 )
@@ -26,39 +26,41 @@ type UnitState proto.State
 
 const (
 	// UnitStateStarting is when a unit is starting.
-	UnitStateStarting    = UnitState(proto.State_STARTING)
+	UnitStateStarting = UnitState(proto.State_STARTING)
 	// UnitStateConfiguring is when a unit is currently configuring.
 	UnitStateConfiguring = UnitState(proto.State_CONFIGURING)
 	// UnitStateHealthy is when the unit is working exactly as it should.
-	UnitStateHealthy     = UnitState(proto.State_HEALTHY)
+	UnitStateHealthy = UnitState(proto.State_HEALTHY)
 	// UnitStateDegraded is when the unit is working but not exactly as its expected.
-	UnitStateDegraded    = UnitState(proto.State_DEGRADED)
+	UnitStateDegraded = UnitState(proto.State_DEGRADED)
 	// UnitStateFailed is when the unit is completely broken and failing to work.
-	UnitStateFailed      = UnitState(proto.State_FAILED)
+	UnitStateFailed = UnitState(proto.State_FAILED)
 	// UnitStateStopping is when the unit is stopping.
-	UnitStateStopping    = UnitState(proto.State_STOPPING)
+	UnitStateStopping = UnitState(proto.State_STOPPING)
+	// UnitStateStopped is when the unit is stopped.
+	UnitStateStopped = UnitState(proto.State_STOPPED)
 )
 
 // Unit represents a distinct item that needs to be operating with-in this process.
 //
 // This is normally N number of inputs and 1 output (possible for multiple in the future).
 type Unit struct {
-	id string
+	id       string
 	unitType UnitType
 
-	expLock sync.RWMutex
-	exp UnitState
-	config string
+	expLock   sync.RWMutex
+	exp       UnitState
+	config    string
 	configIdx uint64
 
-	stateLock sync.RWMutex
-	state UnitState
-	stateMsg string
-	statePayload map[string]interface{}
+	stateLock           sync.RWMutex
+	state               UnitState
+	stateMsg            string
+	statePayload        map[string]interface{}
 	statePayloadEncoded json.RawMessage
 
-	amx             sync.RWMutex
-	actions         map[string]Action
+	amx     sync.RWMutex
+	actions map[string]Action
 
 	client *clientV2
 }
@@ -194,22 +196,23 @@ func (u *Unit) toObserved() *proto.UnitObserved {
 		Id:             u.id,
 		Type:           proto.UnitType(u.unitType),
 		ConfigStateIdx: cfgIdx,
-		State:         proto.State(u.state),
-		Message: u.stateMsg,
-		Payload: u.statePayloadEncoded,
+		State:          proto.State(u.state),
+		Message:        u.stateMsg,
+		Payload:        u.statePayloadEncoded,
 	}
 }
 
 // newUnit creates a new unit that needs to be created in this process.
 func newUnit(id string, unitType UnitType, exp UnitState, cfg string, cfgIdx uint64, client *clientV2) *Unit {
 	return &Unit{
-		id:                  id,
-		unitType:            unitType,
-		config:              cfg,
-		configIdx:           cfgIdx,
-		exp:                 exp,
-		state:               UnitStateStarting,
-		stateMsg:            "Starting",
-		client:              client,
+		id:        id,
+		unitType:  unitType,
+		config:    cfg,
+		configIdx: cfgIdx,
+		exp:       exp,
+		state:     UnitStateStarting,
+		stateMsg:  "Starting",
+		client:    client,
+		actions:   make(map[string]Action),
 	}
 }

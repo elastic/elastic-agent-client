@@ -25,7 +25,7 @@ type artifactsClient struct {
 func (c *artifactsClient) Fetch(ctx context.Context, id string, sha256 string) ([]byte, error) {
 	var data bytes.Buffer
 	client, err := c.client.artifactClient.Fetch(ctx, &proto.ArtifactFetchRequest{
-		Token: 	c.client.token,
+		Token:  c.client.token,
 		Id:     id,
 		Sha256: sha256,
 	})

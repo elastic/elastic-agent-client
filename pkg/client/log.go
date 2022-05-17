@@ -16,19 +16,20 @@ type LogClient interface {
 }
 
 type logClient struct {
-	client *clientV2
-	unitId string
+	client   *clientV2
+	unitId   string
 	unitType UnitType
 }
 
 // Log logs a message for the unit.
 func (c *logClient) Log(ctx context.Context, message []byte) error {
 	_, err := c.client.logClient.Log(ctx, &proto.LogMessageRequest{
-		Token: 	c.client.token,
+		Token: c.client.token,
 		Messages: []*proto.LogMessage{
 			{
-				UnitId: c.unitId,
+				UnitId:   c.unitId,
 				UnitType: proto.UnitType(c.unitType),
+				Message:  message,
 			},
 		},
 	})

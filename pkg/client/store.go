@@ -47,8 +47,8 @@ type StoreClient interface {
 
 type storeClientTxn struct {
 	client *storeClient
-	txnId string
-	write bool
+	txnId  string
+	write  bool
 
 	brokenErr error
 	discarded bool
@@ -56,8 +56,8 @@ type storeClientTxn struct {
 }
 
 type storeClient struct {
-	client *clientV2
-	unitId string
+	client   *clientV2
+	unitId   string
 	unitType UnitType
 }
 
@@ -78,8 +78,8 @@ func (c *storeClient) BeginTxn(ctx context.Context, write bool) (StoreTxnClient,
 	}
 	return &storeClientTxn{
 		client: c,
-		txnId: res.Id,
-		write: write,
+		txnId:  res.Id,
+		write:  write,
 	}, nil
 }
 
@@ -95,9 +95,9 @@ func (c *storeClientTxn) GetKey(ctx context.Context, name string) ([]byte, bool,
 		return nil, false, ErrStoreTxnCommitted
 	}
 	res, err := c.client.client.storeClient.GetKey(ctx, &proto.StoreGetKeyRequest{
-		Token:    c.client.client.token,
-		TxnId:    c.txnId,
-		Name:     name,
+		Token: c.client.client.token,
+		TxnId: c.txnId,
+		Name:  name,
 	})
 	if err != nil {
 		c.brokenErr = err
@@ -129,11 +129,11 @@ func (c *storeClientTxn) SetKey(ctx context.Context, name string, value []byte, 
 		return ErrStoreTxnReadOnly
 	}
 	_, err := c.client.client.storeClient.SetKey(ctx, &proto.StoreSetKeyRequest{
-		Token:    c.client.client.token,
-		TxnId:    c.txnId,
-		Name:     name,
-		Value:    value,
-		Ttl:      ttl,
+		Token: c.client.client.token,
+		TxnId: c.txnId,
+		Name:  name,
+		Value: value,
+		Ttl:   ttl,
 	})
 	if err != nil {
 		c.brokenErr = err
@@ -157,9 +157,9 @@ func (c *storeClientTxn) DeleteKey(ctx context.Context, name string) error {
 		return ErrStoreTxnReadOnly
 	}
 	_, err := c.client.client.storeClient.DeleteKey(ctx, &proto.StoreDeleteKeyRequest{
-		Token:    c.client.client.token,
-		TxnId:    c.txnId,
-		Name:     name,
+		Token: c.client.client.token,
+		TxnId: c.txnId,
+		Name:  name,
 	})
 	if err != nil {
 		c.brokenErr = err
@@ -180,8 +180,8 @@ func (c *storeClientTxn) Commit(ctx context.Context) error {
 		return nil
 	}
 	_, err := c.client.client.storeClient.CommitTxn(ctx, &proto.StoreCommitTxnRequest{
-		Token:    c.client.client.token,
-		TxnId:    c.txnId,
+		Token: c.client.client.token,
+		TxnId: c.txnId,
 	})
 	if err != nil {
 		c.brokenErr = err
@@ -202,8 +202,8 @@ func (c *storeClientTxn) Discard(ctx context.Context) error {
 		return nil
 	}
 	_, err := c.client.client.storeClient.DiscardTxn(ctx, &proto.StoreDiscardTxnRequest{
-		Token:    c.client.client.token,
-		TxnId:    c.txnId,
+		Token: c.client.client.token,
+		TxnId: c.txnId,
 	})
 	if err != nil {
 		c.brokenErr = err

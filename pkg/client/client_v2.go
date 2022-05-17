@@ -52,8 +52,12 @@ type ClientV2 interface {
 	// Stop stops the connection to Elastic Agent.
 	Stop()
 	// UnitChanges returns channel client send unit change notifications to.
+	//
+	// User of this client must read from this channel, or it will block the client.
 	UnitChanges() <-chan UnitChanged
 	// Errors returns channel of errors that occurred during communication.
+	//
+	// User of this client must read from this channel, or it will block the client.
 	Errors() <-chan error
 	// Artifacts returns the artifacts client.
 	Artifacts() ArtifactsClient
@@ -61,11 +65,11 @@ type ClientV2 interface {
 
 // clientV2 manages the state and communication to the Elastic Agent over the V2 control protocol.
 type clientV2 struct {
-	target          string
-	opts            []grpc.DialOption
-	token           string
+	target string
+	opts   []grpc.DialOption
+	token  string
 
-	versionInfo		VersionInfo
+	versionInfo     VersionInfo
 	versionInfoSent bool
 
 	ctx     context.Context
@@ -75,15 +79,15 @@ type clientV2 struct {
 	cfgLock sync.RWMutex
 	obsLock sync.RWMutex
 
-	kickChan chan struct{}
-	errChan chan error
+	kickChan  chan struct{}
+	errChan   chan error
 	unitsChan chan UnitChanged
 	unitsLock sync.RWMutex
-	units []*Unit
+	units     []*Unit
 
-	storeClient proto.ElasticAgentStoreClient
+	storeClient    proto.ElasticAgentStoreClient
 	artifactClient proto.ElasticAgentArtifactClient
-	logClient proto.ElasticAgentLogClient
+	logClient      proto.ElasticAgentLogClient
 
 	// overridden in tests to make fast
 	minCheckTimeout time.Duration
@@ -95,7 +99,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.Di
 		target:          target,
 		opts:            opts,
 		token:           token,
-		versionInfo: 	 versionInfo,
+		versionInfo:     versionInfo,
 		kickChan:        make(chan struct{}, 1),
 		errChan:         make(chan error),
 		unitsChan:       make(chan UnitChanged),
@@ -252,12 +256,11 @@ func (c *clientV2) checkinRoundTrip() {
 // sendObserved sends the observed state of all the units.
 func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error {
 	c.unitsLock.RLock()
-	units := c.units
-	c.unitsLock.RUnlock()
-	observed := make([]*proto.UnitObserved, 0, len(units))
-	for _, unit := range units {
+	observed := make([]*proto.UnitObserved, 0, len(c.units))
+	for _, unit := range c.units {
 		observed = append(observed, unit.toObserved())
 	}
+	c.unitsLock.RUnlock()
 	msg := &proto.CheckinObserved{
 		Token:       c.token,
 		Units:       observed,
@@ -273,7 +276,6 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 	}
 	return client.Send(msg)
 }
-
 
 // syncUnits syncs the expected units with the current state.
 func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
@@ -390,16 +392,21 @@ func (c *clientV2) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 			switch action.Type {
 			case proto.ActionRequest_CUSTOM:
 				c.tryPerformAction(actionResults, action)
-				continue
 			case proto.ActionRequest_DIAGNOSTICS:
-				// TODO: Diagnostic
-				continue
+				// TODO: Implement the diagnostics action.
+				// At the moment it just returns action type unknown until implemented.
+				actionResults <- &proto.ActionResponse{
+					Token:  c.token,
+					Id:     action.Id,
+					Status: proto.ActionResponse_FAILED,
+					Result: ActionTypeUnknown,
+				}
 			default:
 				actionResults <- &proto.ActionResponse{
 					Token:  c.token,
 					Id:     action.Id,
 					Status: proto.ActionResponse_FAILED,
-					Result: ActionErrUnitNotFound,
+					Result: ActionTypeUnknown,
 				}
 			}
 		}

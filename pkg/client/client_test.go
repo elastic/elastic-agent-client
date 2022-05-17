@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"google.golang.org/grpc/credentials/insecure"
 	"net"
 	"sync"
 	"testing"
@@ -91,7 +92,7 @@ func TestClient_Checkin_With_Token(t *testing.T) {
 
 	// connect with an invalid token
 	impl := &StubClientImpl{}
-	invalidClient := New(fmt.Sprintf(":%d", srv.Port), "invalid_token", impl, nil, grpc.WithInsecure())
+	invalidClient := New(fmt.Sprintf(":%d", srv.Port), "invalid_token", impl, nil, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, invalidClient.Start(context.Background()))
 	defer invalidClient.Stop()
 	require.NoError(t, waitFor(func() error {
@@ -107,7 +108,7 @@ func TestClient_Checkin_With_Token(t *testing.T) {
 
 	// connect with an valid token
 	impl = &StubClientImpl{}
-	validClient := New(fmt.Sprintf(":%d", srv.Port), token, impl, nil, grpc.WithInsecure()).(*client)
+	validClient := New(fmt.Sprintf(":%d", srv.Port), token, impl, nil, grpc.WithTransportCredentials(insecure.NewCredentials())).(*client)
 	require.NoError(t, validClient.Start(context.Background()))
 	defer validClient.Stop()
 	require.NoError(t, waitFor(func() error {
@@ -176,7 +177,7 @@ func TestClient_Checkin_Status(t *testing.T) {
 	defer srv.Stop()
 
 	impl := &StubClientImpl{}
-	client := New(fmt.Sprintf(":%d", srv.Port), token, impl, nil, grpc.WithInsecure()).(*client)
+	client := New(fmt.Sprintf(":%d", srv.Port), token, impl, nil, grpc.WithTransportCredentials(insecure.NewCredentials())).(*client)
 	client.minCheckTimeout = 100 * time.Millisecond
 	require.NoError(t, client.Start(context.Background()))
 	defer client.Stop()
@@ -263,7 +264,7 @@ func TestClient_Checkin_Stop(t *testing.T) {
 	defer srv.Stop()
 
 	impl := &StubClientImpl{}
-	client := New(fmt.Sprintf(":%d", srv.Port), token, impl, nil, grpc.WithInsecure()).(*client)
+	client := New(fmt.Sprintf(":%d", srv.Port), token, impl, nil, grpc.WithTransportCredentials(insecure.NewCredentials())).(*client)
 	client.minCheckTimeout = 100 * time.Millisecond
 	require.NoError(t, client.Start(context.Background()))
 	defer client.Stop()
@@ -342,7 +343,7 @@ func TestClient_Actions(t *testing.T) {
 	defer srv.Stop()
 
 	impl := &StubClientImpl{}
-	client := New(fmt.Sprintf(":%d", srv.Port), token, impl, []Action{&AddAction{}}, grpc.WithInsecure())
+	client := New(fmt.Sprintf(":%d", srv.Port), token, impl, []Action{&AddAction{}}, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	require.NoError(t, client.Start(context.Background()))
 	defer client.Stop()
 	require.NoError(t, waitFor(func() error {
@@ -434,6 +435,8 @@ type performAction struct {
 	Name     string
 	Params   []byte
 	Callback func(map[string]interface{}, error)
+	UnitID   string
+	UnitType proto.UnitType
 }
 
 type actionResultChan struct {

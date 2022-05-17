@@ -168,6 +168,7 @@ enum State {
     DEGRADED = 3;
     FAILED = 4;
     STOPPING = 5;
+    STOPPED = 6;
 }
 
 // Type of unit.

@@ -49,3 +49,9 @@ var ActionErrUnmarshableResult = utils.JSONMustMarshal(map[string]string{
 var ActionErrUnitNotFound = utils.JSONMustMarshal(map[string]string{
 	"error": "action unit not found",
 })
+
+// ActionTypeUnknown is returned to Elastic Agent as result to an action request
+// where the action type is unknown.
+var ActionTypeUnknown = utils.JSONMustMarshal(map[string]string{
+	"error": "action type unknown",
+})
