@@ -10,6 +10,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
+// LogClient provides Log that allows a message to be logged by Elastic Agent.
 type LogClient interface {
 	// Log logs a message for the unit.
 	Log(ctx context.Context, message []byte) error
