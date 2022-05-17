@@ -37,8 +37,8 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	token := newID()
 	gotInvalid := false
 	gotValid := false
-	unitOneId := newID()
-	unitTwoId := newID()
+	unitOneID := newID()
+	unitTwoID := newID()
 	reportedVersion := VersionInfo{}
 	srv := StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
@@ -53,14 +53,14 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 				return &proto.CheckinExpected{
 					Units: []*proto.UnitExpected{
 						{
-							Id:             unitOneId,
+							Id:             unitOneID,
 							Type:           proto.UnitType_OUTPUT,
 							ConfigStateIdx: 1,
 							Config:         "config",
 							State:          proto.State_HEALTHY,
 						},
 						{
-							Id:             unitTwoId,
+							Id:             unitTwoID,
 							Type:           proto.UnitType_INPUT,
 							ConfigStateIdx: 1,
 							Config:         "config",
@@ -157,9 +157,9 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	validClient.Stop()
 	cancel()
 
-	assert.Equal(t, units[0].ID(), unitOneId)
+	assert.Equal(t, units[0].ID(), unitOneID)
 	assert.Equal(t, units[0].Type(), UnitTypeOutput)
-	assert.Equal(t, units[1].ID(), unitTwoId)
+	assert.Equal(t, units[1].ID(), unitTwoID)
 	assert.Equal(t, units[1].Type(), UnitTypeInput)
 	assert.Equal(t, reportedVersion.Name, "program")
 	assert.Equal(t, reportedVersion.Version, "v1.0.0")
@@ -602,7 +602,7 @@ func (s *StubServerV2) Actions(server proto.ElasticAgent_ActionsServer) error {
 	}
 }
 
-func (s *StubServerV2) PerformAction(unitId string, unitType proto.UnitType, name string, params map[string]interface{}) (map[string]interface{}, error) {
+func (s *StubServerV2) PerformAction(unitID string, unitType proto.UnitType, name string, params map[string]interface{}) (map[string]interface{}, error) {
 	paramBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -610,7 +610,7 @@ func (s *StubServerV2) PerformAction(unitId string, unitType proto.UnitType, nam
 
 	resChan := make(chan actionResultChan)
 	s.actions <- &performAction{
-		UnitID:   unitId,
+		UnitID:   unitID,
 		UnitType: unitType,
 		Name:     name,
 		Params:   paramBytes,
@@ -661,7 +661,7 @@ func newID() string {
 	return uuid.Must(uuid.NewV4()).String()
 }
 
-func storeErrors(ctx context.Context, client ClientV2, errs *[]error, lock *sync.Mutex) {
+func storeErrors(ctx context.Context, client V2, errs *[]error, lock *sync.Mutex) {
 	go func() {
 		for {
 			select {

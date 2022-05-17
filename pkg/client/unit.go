@@ -147,7 +147,7 @@ func (u *Unit) GetAction(name string) (Action, bool) {
 func (u *Unit) Store() StoreClient {
 	return &storeClient{
 		client:   u.client,
-		unitId:   u.id,
+		unitID:   u.id,
 		unitType: u.unitType,
 	}
 }
@@ -161,7 +161,7 @@ func (u *Unit) Artifacts() ArtifactsClient {
 func (u *Unit) Logger() LogClient {
 	return &logClient{
 		client:   u.client,
-		unitId:   u.id,
+		unitID:   u.id,
 		unitType: u.unitType,
 	}
 }

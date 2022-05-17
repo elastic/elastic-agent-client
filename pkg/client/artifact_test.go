@@ -92,14 +92,14 @@ func TestArtifact(t *testing.T) {
 
 	t.Run("ErrorOnFetch", func(t *testing.T) {
 		id := newID()
-		badId := newID()
+		badID := newID()
 		srv.ArtifactFetchImpl = func(request *proto.ArtifactFetchRequest, server proto.ElasticAgentArtifact_FetchServer) error {
 			if request.Id != id || request.Sha256 != id {
 				return errors.New("missing artifact")
 			}
 			panic("should not get this far")
 		}
-		_, err := artifactClient.Fetch(ctx, badId, badId)
+		_, err := artifactClient.Fetch(ctx, badID, badID)
 		require.Error(t, err)
 	})
 

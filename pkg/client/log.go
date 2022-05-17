@@ -17,7 +17,7 @@ type LogClient interface {
 
 type logClient struct {
 	client   *clientV2
-	unitId   string
+	unitID   string
 	unitType UnitType
 }
 
@@ -27,7 +27,7 @@ func (c *logClient) Log(ctx context.Context, message []byte) error {
 		Token: c.client.token,
 		Messages: []*proto.LogMessage{
 			{
-				UnitId:   c.unitId,
+				UnitId:   c.unitID,
 				UnitType: proto.UnitType(c.unitType),
 				Message:  message,
 			},

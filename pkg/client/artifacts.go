@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
+// ArtifactsClient provides Fetch that allows artifacts to be fetched from the artifact store.
 type ArtifactsClient interface {
 	// Fetch fetches the artifact from the artifact store.
 	Fetch(ctx context.Context, id string, sha256 string) ([]byte, error)

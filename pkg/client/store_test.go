@@ -243,7 +243,7 @@ type unitMemoryStoreTxn struct {
 }
 
 type unitMemoryStore struct {
-	unitId   string
+	unitID   string
 	unitType proto.UnitType
 
 	mux  sync.RWMutex
@@ -308,10 +308,10 @@ func (s *MemoryStore) Clear() {
 	s.txns = make(map[string]*unitMemoryStore)
 }
 
-func (s *MemoryStore) Clean(unitId string, unitType proto.UnitType) bool {
+func (s *MemoryStore) Clean(unitID string, unitType proto.UnitType) bool {
 	s.storeLock.RLock()
 	defer s.storeLock.RUnlock()
-	unitStore := s.findUnitStore(unitId, unitType)
+	unitStore := s.findUnitStore(unitID, unitType)
 	if unitStore == nil {
 		return true
 	}
@@ -320,10 +320,10 @@ func (s *MemoryStore) Clean(unitId string, unitType proto.UnitType) bool {
 	return len(unitStore.txns) == 0
 }
 
-func (s *MemoryStore) Dirty(unitId string, unitType proto.UnitType) bool {
+func (s *MemoryStore) Dirty(unitID string, unitType proto.UnitType) bool {
 	s.storeLock.RLock()
 	defer s.storeLock.RUnlock()
-	unitStore := s.findUnitStore(unitId, unitType)
+	unitStore := s.findUnitStore(unitID, unitType)
 	if unitStore == nil {
 		return true
 	}
@@ -332,10 +332,10 @@ func (s *MemoryStore) Dirty(unitId string, unitType proto.UnitType) bool {
 	return len(unitStore.txns) > 0
 }
 
-func (s *MemoryStore) Current(unitId string, unitType proto.UnitType) map[string][]byte {
+func (s *MemoryStore) Current(unitID string, unitType proto.UnitType) map[string][]byte {
 	s.storeLock.RLock()
 	defer s.storeLock.RUnlock()
-	unitStore := s.findUnitStore(unitId, unitType)
+	unitStore := s.findUnitStore(unitID, unitType)
 	if unitStore == nil {
 		return nil
 	}
@@ -470,22 +470,22 @@ func (s *MemoryStore) DiscardTxn(request *proto.StoreDiscardTxnRequest) (*proto.
 	return &proto.StoreDiscardTxnResponse{}, nil
 }
 
-func (s *MemoryStore) findUnitStore(unitId string, unitType proto.UnitType) *unitMemoryStore {
+func (s *MemoryStore) findUnitStore(unitID string, unitType proto.UnitType) *unitMemoryStore {
 	for _, unit := range s.store {
-		if unit.unitId == unitId && unit.unitType == unitType {
+		if unit.unitID == unitID && unit.unitType == unitType {
 			return unit
 		}
 	}
 	return nil
 }
 
-func (s *MemoryStore) findOrCreateUnitStore(unitId string, unitType proto.UnitType) *unitMemoryStore {
+func (s *MemoryStore) findOrCreateUnitStore(unitID string, unitType proto.UnitType) *unitMemoryStore {
 	s.storeLock.Lock()
 	defer s.storeLock.Unlock()
-	unitStore := s.findUnitStore(unitId, unitType)
+	unitStore := s.findUnitStore(unitID, unitType)
 	if unitStore == nil {
 		unitStore = &unitMemoryStore{
-			unitId:   unitId,
+			unitID:   unitID,
 			unitType: unitType,
 			data:     make(map[string]unitMemoryValue),
 			txns:     make(map[string]*unitMemoryStoreTxn),

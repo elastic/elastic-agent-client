@@ -45,8 +45,8 @@ type VersionInfo struct {
 	Meta map[string]string
 }
 
-// ClientV2 manages the state and communication to the Elastic Agent over the V2 control protocol.
-type ClientV2 interface {
+// V2 manages the state and communication to the Elastic Agent over the V2 control protocol.
+type V2 interface {
 	// Start starts the connection to Elastic Agent.
 	Start(ctx context.Context) error
 	// Stop stops the connection to Elastic Agent.
@@ -94,7 +94,7 @@ type clientV2 struct {
 }
 
 // NewV2 creates a client connection to Elastic Agent over the V2 control protocol.
-func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.DialOption) ClientV2 {
+func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.DialOption) V2 {
 	return &clientV2{
 		target:          target,
 		opts:            opts,

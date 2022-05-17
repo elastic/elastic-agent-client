@@ -63,7 +63,7 @@ func NewFromReader(reader io.Reader, impl StateInterface, actions ...Action) (Cl
 }
 
 // NewV2FromReader creates a new V2 client reading the connection information from the io.Reader.
-func NewV2FromReader(reader io.Reader, ver VersionInfo) (ClientV2, []Service, error) {
+func NewV2FromReader(reader io.Reader, ver VersionInfo) (V2, []Service, error) {
 	connInfo := &proto.ConnInfo{}
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
