@@ -100,7 +100,7 @@ func TestClient_Checkin_With_Token(t *testing.T) {
 		defer m.Unlock()
 
 		if !gotInvalid {
-			return fmt.Errorf("server never recieved invalid token")
+			return fmt.Errorf("server never received invalid token")
 		}
 		return nil
 	}))
@@ -116,14 +116,14 @@ func TestClient_Checkin_With_Token(t *testing.T) {
 		defer m.Unlock()
 
 		if !gotValid {
-			return fmt.Errorf("server never recieved valid token")
+			return fmt.Errorf("server never received valid token")
 		}
 		return nil
 	}))
-	impl.Lock.Lock()
-	defer impl.Lock.Unlock()
-	validClient.cfgLock.Lock()
-	defer validClient.cfgLock.Unlock()
+	impl.Mu.Lock()
+	defer impl.Mu.Unlock()
+	validClient.cfgMu.Lock()
+	defer validClient.cfgMu.Unlock()
 	assert.Equal(t, uint64(1), validClient.cfgIdx)
 	assert.Equal(t, "config", validClient.cfg)
 	assert.Equal(t, "config", impl.Config)
@@ -186,7 +186,7 @@ func TestClient_Checkin_Status(t *testing.T) {
 		defer m.Unlock()
 
 		if !connected {
-			return fmt.Errorf("server never recieved valid token")
+			return fmt.Errorf("server never received valid token")
 		}
 		return nil
 	}))
@@ -196,7 +196,7 @@ func TestClient_Checkin_Status(t *testing.T) {
 		defer m.Unlock()
 
 		if status != proto.StateObserved_CONFIGURING {
-			return fmt.Errorf("server never recieved updated status")
+			return fmt.Errorf("server never received updated status")
 		}
 		return nil
 	}))
@@ -212,7 +212,7 @@ func TestClient_Checkin_Status(t *testing.T) {
 		defer m.Unlock()
 
 		if healthyCount < 5 {
-			return fmt.Errorf("server never recieved 5 healthy checkins")
+			return fmt.Errorf("server never received 5 healthy checkins")
 		}
 		return nil
 	}))
@@ -273,17 +273,17 @@ func TestClient_Checkin_Stop(t *testing.T) {
 		defer m.Unlock()
 
 		if !connected {
-			return fmt.Errorf("server never recieved valid token")
+			return fmt.Errorf("server never received valid token")
 		}
 		return nil
 	}))
 	// wait for client to receive stop
 	require.NoError(t, waitFor(func() error {
-		impl.Lock.Lock()
-		defer impl.Lock.Unlock()
+		impl.Mu.Lock()
+		defer impl.Mu.Unlock()
 
 		if !impl.Stop {
-			return fmt.Errorf("client never recieved stop")
+			return fmt.Errorf("client never received stop")
 		}
 		return nil
 	}))
@@ -294,7 +294,7 @@ func TestClient_Checkin_Stop(t *testing.T) {
 		defer m.Unlock()
 
 		if !shuttingDown {
-			return fmt.Errorf("server never recieved stopping status from client")
+			return fmt.Errorf("server never received stopping status from client")
 		}
 		return nil
 	}))
@@ -351,7 +351,7 @@ func TestClient_Actions(t *testing.T) {
 		defer m.Unlock()
 
 		if !gotInit {
-			return fmt.Errorf("server never recieved valid token")
+			return fmt.Errorf("server never received valid token")
 		}
 		return nil
 	}))
@@ -404,27 +404,27 @@ func (a *AddAction) Execute(ctx context.Context, params map[string]interface{}) 
 }
 
 type StubClientImpl struct {
-	Lock   sync.Mutex
+	Mu     sync.Mutex
 	Config string
 	Stop   bool
 	Error  error
 }
 
 func (c *StubClientImpl) OnConfig(config string) {
-	c.Lock.Lock()
-	defer c.Lock.Unlock()
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
 	c.Config = config
 }
 
 func (c *StubClientImpl) OnStop() {
-	c.Lock.Lock()
-	defer c.Lock.Unlock()
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
 	c.Stop = true
 }
 
 func (c *StubClientImpl) OnError(err error) {
-	c.Lock.Lock()
-	defer c.Lock.Unlock()
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
 	c.Error = err
 }
 
@@ -439,7 +439,7 @@ type performAction struct {
 	UnitType proto.UnitType
 }
 
-type actionResultChan struct {
+type actionResultCh struct {
 	Result map[string]interface{}
 	Err    error
 }
@@ -566,18 +566,18 @@ func (s *StubServer) PerformAction(name string, params map[string]interface{}) (
 		return nil, err
 	}
 
-	resChan := make(chan actionResultChan)
+	resCh := make(chan actionResultCh)
 	s.actions <- &performAction{
 		Name:   name,
 		Params: paramBytes,
 		Callback: func(m map[string]interface{}, err error) {
-			resChan <- actionResultChan{
+			resCh <- actionResultCh{
 				Result: m,
 				Err:    err,
 			}
 		},
 	}
-	res := <-resChan
+	res := <-resCh
 	return res.Result, res.Err
 }
 

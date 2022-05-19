@@ -49,14 +49,14 @@ func TestStore(t *testing.T) {
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
 
-	var errsLock sync.Mutex
+	var errsMu sync.Mutex
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	storeErrors(ctx, client, &errs, &errsLock)
+	storeErrors(ctx, client, &errs, &errsMu)
 
-	var unitsLock sync.Mutex
+	var unitsMu sync.Mutex
 	var units []*Unit
 	go func() {
 		for {
@@ -66,9 +66,9 @@ func TestStore(t *testing.T) {
 			case change := <-client.UnitChanges():
 				switch change.Type {
 				case UnitChangedAdded:
-					unitsLock.Lock()
+					unitsMu.Lock()
 					units = append(units, change.Unit)
-					unitsLock.Unlock()
+					unitsMu.Unlock()
 				default:
 					panic("not implemented")
 				}
@@ -79,8 +79,8 @@ func TestStore(t *testing.T) {
 	require.NoError(t, client.Start(ctx))
 	defer client.Stop()
 	require.NoError(t, waitFor(func() error {
-		unitsLock.Lock()
-		defer unitsLock.Unlock()
+		unitsMu.Lock()
+		defer unitsMu.Unlock()
 
 		if len(units) != 1 {
 			return fmt.Errorf("client never got unit")
@@ -93,63 +93,63 @@ func TestStore(t *testing.T) {
 
 	t.Run("SetGet", func(t *testing.T) {
 		store.Clear()
-		txn, err := storeClient.BeginTxn(ctx, true)
+		tx, err := storeClient.BeginTx(ctx, true)
 		require.NoError(t, err)
-		defer txn.Discard(ctx)
-		err = txn.SetKey(ctx, "test", []byte("value"), 0)
+		defer tx.Discard(ctx)
+		err = tx.SetKey(ctx, "test", []byte("value"), 0)
 		require.NoError(t, err)
-		res, ok, err := txn.GetKey(ctx, "test")
+		res, ok, err := tx.GetKey(ctx, "test")
 		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, []byte("value"), res)
-		err = txn.Commit(ctx)
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		// get value in separate transaction
-		txn, err = storeClient.BeginTxn(ctx, false)
+		tx, err = storeClient.BeginTx(ctx, false)
 		require.NoError(t, err)
-		defer txn.Discard(ctx)
-		res, ok, err = txn.GetKey(ctx, "test")
+		defer tx.Discard(ctx)
+		res, ok, err = tx.GetKey(ctx, "test")
 		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, []byte("value"), res)
 	})
 
-	t.Run("SetGetSeperateTxn", func(t *testing.T) {
+	t.Run("SetGetSeperateTx", func(t *testing.T) {
 		store.Clear()
-		txn, err := storeClient.BeginTxn(ctx, true)
+		tx, err := storeClient.BeginTx(ctx, true)
 		require.NoError(t, err)
-		defer txn.Discard(ctx)
-		err = txn.SetKey(ctx, "test", []byte("value"), 0)
+		defer tx.Discard(ctx)
+		err = tx.SetKey(ctx, "test", []byte("value"), 0)
 		require.NoError(t, err)
-		res, ok, err := txn.GetKey(ctx, "test")
+		res, ok, err := tx.GetKey(ctx, "test")
 		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, []byte("value"), res)
 
 		// get value in separate transaction (before commit)
-		newTxn, err := storeClient.BeginTxn(ctx, false)
+		newTx, err := storeClient.BeginTx(ctx, false)
 		require.NoError(t, err)
-		defer newTxn.Discard(ctx)
-		res, ok, err = newTxn.GetKey(ctx, "test")
+		defer newTx.Discard(ctx)
+		res, ok, err = newTx.GetKey(ctx, "test")
 		require.NoError(t, err)
 		require.False(t, ok)
 
 		// commit original
-		err = txn.Commit(ctx)
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		// get value in one opened before commit (should still fail)
-		res, ok, err = newTxn.GetKey(ctx, "test")
+		res, ok, err = newTx.GetKey(ctx, "test")
 		require.NoError(t, err)
 		require.False(t, ok)
-		newTxn.Commit(ctx)
+		newTx.Commit(ctx)
 
-		// create another txn (should be able to get)
-		newTxn, err = storeClient.BeginTxn(ctx, false)
+		// create another transaction (should be able to get)
+		newTx, err = storeClient.BeginTx(ctx, false)
 		require.NoError(t, err)
-		defer newTxn.Discard(ctx)
-		res, ok, err = newTxn.GetKey(ctx, "test")
+		defer newTx.Discard(ctx)
+		res, ok, err = newTx.GetKey(ctx, "test")
 		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, []byte("value"), res)
@@ -157,76 +157,76 @@ func TestStore(t *testing.T) {
 
 	t.Run("WriteReadOnly", func(t *testing.T) {
 		store.Clear()
-		txn, err := storeClient.BeginTxn(ctx, false)
+		tx, err := storeClient.BeginTx(ctx, false)
 		require.NoError(t, err)
-		defer txn.Discard(ctx)
-		err = txn.SetKey(ctx, "test", []byte("value"), 0)
-		require.Equal(t, ErrStoreTxnReadOnly, err)
+		defer tx.Discard(ctx)
+		err = tx.SetKey(ctx, "test", []byte("value"), 0)
+		require.Equal(t, ErrStoreTxReadOnly, err)
 	})
 
 	t.Run("Discarded", func(t *testing.T) {
 		store.Clear()
-		txn, err := storeClient.BeginTxn(ctx, true)
+		tx, err := storeClient.BeginTx(ctx, true)
 		require.NoError(t, err)
-		err = txn.Discard(ctx)
+		err = tx.Discard(ctx)
 		require.NoError(t, err)
-		err = txn.SetKey(ctx, "test", []byte("value"), 0)
-		require.Equal(t, ErrStoreTxnDiscarded, err)
-		_, _, err = txn.GetKey(ctx, "test")
-		require.Equal(t, ErrStoreTxnDiscarded, err)
-		err = txn.DeleteKey(ctx, "test")
-		require.Equal(t, ErrStoreTxnDiscarded, err)
-		err = txn.Commit(ctx)
-		require.Equal(t, ErrStoreTxnDiscarded, err)
+		err = tx.SetKey(ctx, "test", []byte("value"), 0)
+		require.Equal(t, ErrStoreTxDiscarded, err)
+		_, _, err = tx.GetKey(ctx, "test")
+		require.Equal(t, ErrStoreTxDiscarded, err)
+		err = tx.DeleteKey(ctx, "test")
+		require.Equal(t, ErrStoreTxDiscarded, err)
+		err = tx.Commit(ctx)
+		require.Equal(t, ErrStoreTxDiscarded, err)
 	})
 
 	t.Run("Committed", func(t *testing.T) {
 		store.Clear()
-		txn, err := storeClient.BeginTxn(ctx, true)
+		tx, err := storeClient.BeginTx(ctx, true)
 		require.NoError(t, err)
-		err = txn.Commit(ctx)
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
-		err = txn.SetKey(ctx, "test", []byte("value"), 0)
-		require.Equal(t, ErrStoreTxnCommitted, err)
-		_, _, err = txn.GetKey(ctx, "test")
-		require.Equal(t, ErrStoreTxnCommitted, err)
-		err = txn.DeleteKey(ctx, "test")
-		require.Equal(t, ErrStoreTxnCommitted, err)
-		err = txn.Commit(ctx)
+		err = tx.SetKey(ctx, "test", []byte("value"), 0)
+		require.Equal(t, ErrStoreTxCommitted, err)
+		_, _, err = tx.GetKey(ctx, "test")
+		require.Equal(t, ErrStoreTxCommitted, err)
+		err = tx.DeleteKey(ctx, "test")
+		require.Equal(t, ErrStoreTxCommitted, err)
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 	})
 
 	t.Run("DiscardAfterCommitted", func(t *testing.T) {
 		store.Clear()
-		txn, err := storeClient.BeginTxn(ctx, true)
+		tx, err := storeClient.BeginTx(ctx, true)
 		require.NoError(t, err)
-		err = txn.Commit(ctx)
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
-		err = txn.Discard(ctx)
+		err = tx.Discard(ctx)
 		require.NoError(t, err)
 	})
 
-	t.Run("BrokenTxn", func(t *testing.T) {
+	t.Run("BrokenTx", func(t *testing.T) {
 		store.Clear()
-		txn, err := storeClient.BeginTxn(ctx, false)
+		tx, err := storeClient.BeginTx(ctx, false)
 		require.NoError(t, err)
-		// mark the txn as writeable, when server-side it's not
+		// mark the tx as writeable, when server-side it's not
 		// it will then get into the broken state.
-		sTxn := txn.(*storeClientTxn)
-		sTxn.write = true
-		err = txn.SetKey(ctx, "test", []byte("value"), 0)
+		sTx := tx.(*storeClientTx)
+		sTx.write = true
+		err = tx.SetKey(ctx, "test", []byte("value"), 0)
 		require.Error(t, err)
 
-		err = txn.SetKey(ctx, "test", []byte("value"), 0)
-		require.Equal(t, ErrStoreTxnBroken, err)
-		_, _, err = txn.GetKey(ctx, "test")
-		require.Equal(t, ErrStoreTxnBroken, err)
-		err = txn.DeleteKey(ctx, "test")
-		require.Equal(t, ErrStoreTxnBroken, err)
-		err = txn.Commit(ctx)
-		require.Equal(t, ErrStoreTxnBroken, err)
-		err = txn.Discard(ctx)
-		require.Equal(t, ErrStoreTxnBroken, err)
+		err = tx.SetKey(ctx, "test", []byte("value"), 0)
+		require.Equal(t, ErrStoreTxBroken, err)
+		_, _, err = tx.GetKey(ctx, "test")
+		require.Equal(t, ErrStoreTxBroken, err)
+		err = tx.DeleteKey(ctx, "test")
+		require.Equal(t, ErrStoreTxBroken, err)
+		err = tx.Commit(ctx)
+		require.Equal(t, ErrStoreTxBroken, err)
+		err = tx.Discard(ctx)
+		require.Equal(t, ErrStoreTxBroken, err)
 	})
 }
 
@@ -237,7 +237,7 @@ type unitMemoryValue struct {
 	touched bool
 }
 
-type unitMemoryStoreTxn struct {
+type unitMemoryStoreTx struct {
 	writeable bool
 	data      map[string]unitMemoryValue
 }
@@ -248,25 +248,25 @@ type unitMemoryStore struct {
 
 	mux  sync.RWMutex
 	data map[string]unitMemoryValue
-	txns map[string]*unitMemoryStoreTxn
+	txs  map[string]*unitMemoryStoreTx
 }
 
-func (s *unitMemoryStore) startTxn(writeable bool) string {
-	txnID := newID()
+func (s *unitMemoryStore) startTx(writeable bool) string {
+	txID := newID()
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	data := s.copyData()
-	s.txns[txnID] = &unitMemoryStoreTxn{
+	s.txs[txID] = &unitMemoryStoreTx{
 		writeable: writeable,
 		data:      data,
 	}
-	return txnID
+	return txID
 }
 
-func (s *unitMemoryStore) commitTxn(txn *unitMemoryStoreTxn) {
+func (s *unitMemoryStore) commitTx(tx *unitMemoryStoreTx) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	for key, value := range txn.data {
+	for key, value := range tx.data {
 		if !value.touched {
 			continue
 		}
@@ -287,54 +287,54 @@ func (s *unitMemoryStore) copyData() map[string]unitMemoryValue {
 }
 
 type MemoryStore struct {
-	storeLock sync.RWMutex
-	store     []*unitMemoryStore
-	txnLock   sync.RWMutex
-	txns      map[string]*unitMemoryStore
+	storeMu sync.RWMutex
+	store   []*unitMemoryStore
+	txMu    sync.RWMutex
+	txs     map[string]*unitMemoryStore
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		txns: make(map[string]*unitMemoryStore),
+		txs: make(map[string]*unitMemoryStore),
 	}
 }
 
 func (s *MemoryStore) Clear() {
-	s.storeLock.Lock()
-	defer s.storeLock.Unlock()
-	s.txnLock.Lock()
-	defer s.txnLock.Unlock()
+	s.storeMu.Lock()
+	defer s.storeMu.Unlock()
+	s.txMu.Lock()
+	defer s.txMu.Unlock()
 	s.store = nil
-	s.txns = make(map[string]*unitMemoryStore)
+	s.txs = make(map[string]*unitMemoryStore)
 }
 
 func (s *MemoryStore) Clean(unitID string, unitType proto.UnitType) bool {
-	s.storeLock.RLock()
-	defer s.storeLock.RUnlock()
+	s.storeMu.RLock()
+	defer s.storeMu.RUnlock()
 	unitStore := s.findUnitStore(unitID, unitType)
 	if unitStore == nil {
 		return true
 	}
 	unitStore.mux.RLock()
 	defer unitStore.mux.RUnlock()
-	return len(unitStore.txns) == 0
+	return len(unitStore.txs) == 0
 }
 
 func (s *MemoryStore) Dirty(unitID string, unitType proto.UnitType) bool {
-	s.storeLock.RLock()
-	defer s.storeLock.RUnlock()
+	s.storeMu.RLock()
+	defer s.storeMu.RUnlock()
 	unitStore := s.findUnitStore(unitID, unitType)
 	if unitStore == nil {
 		return true
 	}
 	unitStore.mux.RLock()
 	defer unitStore.mux.RUnlock()
-	return len(unitStore.txns) > 0
+	return len(unitStore.txs) > 0
 }
 
 func (s *MemoryStore) Current(unitID string, unitType proto.UnitType) map[string][]byte {
-	s.storeLock.RLock()
-	defer s.storeLock.RUnlock()
+	s.storeMu.RLock()
+	defer s.storeMu.RUnlock()
 	unitStore := s.findUnitStore(unitID, unitType)
 	if unitStore == nil {
 		return nil
@@ -352,27 +352,27 @@ func (s *MemoryStore) Current(unitID string, unitType proto.UnitType) map[string
 	return res
 }
 
-func (s *MemoryStore) BeginTxn(request *proto.StoreBeginTxnRequest) (*proto.StoreBeginTxnResponse, error) {
+func (s *MemoryStore) BeginTx(request *proto.StoreBeginTxRequest) (*proto.StoreBeginTxResponse, error) {
 	unitStore := s.findOrCreateUnitStore(request.UnitId, request.UnitType)
-	txnID := unitStore.startTxn(request.Type == proto.StoreTxnType_READ_WRITE)
-	s.txnLock.Lock()
-	defer s.txnLock.Unlock()
-	s.txns[txnID] = unitStore
-	return &proto.StoreBeginTxnResponse{Id: txnID}, nil
+	txID := unitStore.startTx(request.Type == proto.StoreTxType_READ_WRITE)
+	s.txMu.Lock()
+	defer s.txMu.Unlock()
+	s.txs[txID] = unitStore
+	return &proto.StoreBeginTxResponse{Id: txID}, nil
 }
 
 func (s *MemoryStore) GetKey(request *proto.StoreGetKeyRequest) (*proto.StoreGetKeyResponse, error) {
-	s.txnLock.RLock()
-	unitStore, ok := s.txns[request.TxnId]
-	s.txnLock.RUnlock()
+	s.txMu.RLock()
+	unitStore, ok := s.txs[request.TxId]
+	s.txMu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("invalid transaction id: %s", request.TxnId)
+		return nil, fmt.Errorf("invalid transaction id: %s", request.TxId)
 	}
-	txn, ok := unitStore.txns[request.TxnId]
+	tx, ok := unitStore.txs[request.TxId]
 	if !ok {
-		return nil, fmt.Errorf("error with transaction id: %s", request.TxnId)
+		return nil, fmt.Errorf("error with transaction id: %s", request.TxId)
 	}
-	val, ok := txn.data[request.Name]
+	val, ok := tx.data[request.Name]
 	if !ok || val.deleted {
 		// not found or deleted
 		return &proto.StoreGetKeyResponse{
@@ -392,18 +392,18 @@ func (s *MemoryStore) GetKey(request *proto.StoreGetKeyRequest) (*proto.StoreGet
 }
 
 func (s *MemoryStore) SetKey(request *proto.StoreSetKeyRequest) (*proto.StoreSetKeyResponse, error) {
-	s.txnLock.RLock()
-	unitStore, ok := s.txns[request.TxnId]
-	s.txnLock.RUnlock()
+	s.txMu.RLock()
+	unitStore, ok := s.txs[request.TxId]
+	s.txMu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("invalid transaction id: %s", request.TxnId)
+		return nil, fmt.Errorf("invalid transaction id: %s", request.TxId)
 	}
-	txn, ok := unitStore.txns[request.TxnId]
+	tx, ok := unitStore.txs[request.TxId]
 	if !ok {
-		return nil, fmt.Errorf("error with transaction id: %s", request.TxnId)
+		return nil, fmt.Errorf("error with transaction id: %s", request.TxId)
 	}
-	if !txn.writeable {
-		return nil, fmt.Errorf("not writeable transaction id: %s", request.TxnId)
+	if !tx.writeable {
+		return nil, fmt.Errorf("not writeable transaction id: %s", request.TxId)
 	}
 	var val unitMemoryValue
 	val.value = request.Value
@@ -413,61 +413,61 @@ func (s *MemoryStore) SetKey(request *proto.StoreSetKeyRequest) (*proto.StoreSet
 	if request.Ttl > 0 {
 		val.exp = time.Now().UTC().Add(time.Duration(request.Ttl) * time.Millisecond)
 	}
-	txn.data[request.Name] = val
+	tx.data[request.Name] = val
 	return &proto.StoreSetKeyResponse{}, nil
 }
 
 func (s *MemoryStore) DeleteKey(request *proto.StoreDeleteKeyRequest) (*proto.StoreDeleteKeyResponse, error) {
-	s.txnLock.RLock()
-	unitStore, ok := s.txns[request.TxnId]
-	s.txnLock.RUnlock()
+	s.txMu.RLock()
+	unitStore, ok := s.txs[request.TxId]
+	s.txMu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("invalid transaction id: %s", request.TxnId)
+		return nil, fmt.Errorf("invalid transaction id: %s", request.TxId)
 	}
-	txn, ok := unitStore.txns[request.TxnId]
+	tx, ok := unitStore.txs[request.TxId]
 	if !ok {
-		return nil, fmt.Errorf("error with transaction id: %s", request.TxnId)
+		return nil, fmt.Errorf("error with transaction id: %s", request.TxId)
 	}
-	if !txn.writeable {
-		return nil, fmt.Errorf("not writeable transaction id: %s", request.TxnId)
+	if !tx.writeable {
+		return nil, fmt.Errorf("not writeable transaction id: %s", request.TxId)
 	}
-	val, ok := txn.data[request.Name]
+	val, ok := tx.data[request.Name]
 	if !ok {
 		// doesn't exist at all
 		return &proto.StoreDeleteKeyResponse{}, nil
 	}
 	val.deleted = true
 	val.touched = true
-	txn.data[request.Name] = val
+	tx.data[request.Name] = val
 	return &proto.StoreDeleteKeyResponse{}, nil
 }
 
-func (s *MemoryStore) CommitTxn(request *proto.StoreCommitTxnRequest) (*proto.StoreCommitTxnResponse, error) {
-	s.txnLock.RLock()
-	unitStore, ok := s.txns[request.TxnId]
-	s.txnLock.RUnlock()
+func (s *MemoryStore) CommitTx(request *proto.StoreCommitTxRequest) (*proto.StoreCommitTxResponse, error) {
+	s.txMu.RLock()
+	unitStore, ok := s.txs[request.TxId]
+	s.txMu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("invalid transaction id: %s", request.TxnId)
+		return nil, fmt.Errorf("invalid transaction id: %s", request.TxId)
 	}
-	txn, ok := unitStore.txns[request.TxnId]
+	tx, ok := unitStore.txs[request.TxId]
 	if !ok {
-		return nil, fmt.Errorf("error with transaction id: %s", request.TxnId)
+		return nil, fmt.Errorf("error with transaction id: %s", request.TxId)
 	}
-	unitStore.commitTxn(txn)
-	delete(unitStore.txns, request.TxnId)
-	delete(s.txns, request.TxnId)
-	return &proto.StoreCommitTxnResponse{}, nil
+	unitStore.commitTx(tx)
+	delete(unitStore.txs, request.TxId)
+	delete(s.txs, request.TxId)
+	return &proto.StoreCommitTxResponse{}, nil
 }
 
-func (s *MemoryStore) DiscardTxn(request *proto.StoreDiscardTxnRequest) (*proto.StoreDiscardTxnResponse, error) {
-	s.txnLock.RLock()
-	unitStore, ok := s.txns[request.TxnId]
-	s.txnLock.RUnlock()
+func (s *MemoryStore) DiscardTx(request *proto.StoreDiscardTxRequest) (*proto.StoreDiscardTxResponse, error) {
+	s.txMu.RLock()
+	unitStore, ok := s.txs[request.TxId]
+	s.txMu.RUnlock()
 	if ok {
-		delete(unitStore.txns, request.TxnId)
-		delete(s.txns, request.TxnId)
+		delete(unitStore.txs, request.TxId)
+		delete(s.txs, request.TxId)
 	}
-	return &proto.StoreDiscardTxnResponse{}, nil
+	return &proto.StoreDiscardTxResponse{}, nil
 }
 
 func (s *MemoryStore) findUnitStore(unitID string, unitType proto.UnitType) *unitMemoryStore {
@@ -480,15 +480,15 @@ func (s *MemoryStore) findUnitStore(unitID string, unitType proto.UnitType) *uni
 }
 
 func (s *MemoryStore) findOrCreateUnitStore(unitID string, unitType proto.UnitType) *unitMemoryStore {
-	s.storeLock.Lock()
-	defer s.storeLock.Unlock()
+	s.storeMu.Lock()
+	defer s.storeMu.Unlock()
 	unitStore := s.findUnitStore(unitID, unitType)
 	if unitStore == nil {
 		unitStore = &unitMemoryStore{
 			unitID:   unitID,
 			unitType: unitType,
 			data:     make(map[string]unitMemoryValue),
-			txns:     make(map[string]*unitMemoryStoreTxn),
+			txs:      make(map[string]*unitMemoryStoreTx),
 		}
 		s.store = append(s.store, unitStore)
 	}

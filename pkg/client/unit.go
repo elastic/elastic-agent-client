@@ -48,12 +48,12 @@ type Unit struct {
 	id       string
 	unitType UnitType
 
-	expLock   sync.RWMutex
+	expMu     sync.RWMutex
 	exp       UnitState
 	config    string
 	configIdx uint64
 
-	stateLock           sync.RWMutex
+	stateMu             sync.RWMutex
 	state               UnitState
 	stateMsg            string
 	statePayload        map[string]interface{}
@@ -77,15 +77,15 @@ func (u *Unit) Type() UnitType {
 
 // Expected returns the expected state and config for the unit.
 func (u *Unit) Expected() (UnitState, string) {
-	u.expLock.RLock()
-	defer u.expLock.RUnlock()
+	u.expMu.RLock()
+	defer u.expMu.RUnlock()
 	return u.exp, u.config
 }
 
 // State returns the currently reported state for the unit.
 func (u *Unit) State() (UnitState, string, map[string]interface{}) {
-	u.stateLock.RLock()
-	defer u.stateLock.RUnlock()
+	u.stateMu.RLock()
+	defer u.stateMu.RUnlock()
 	return u.state, u.stateMsg, u.statePayload
 }
 
@@ -99,8 +99,8 @@ func (u *Unit) UpdateState(state UnitState, message string, payload map[string]i
 			return err
 		}
 	}
-	u.stateLock.Lock()
-	defer u.stateLock.Unlock()
+	u.stateMu.Lock()
+	defer u.stateMu.Unlock()
 	changed := false
 	if u.state != state {
 		u.state = state
@@ -168,8 +168,8 @@ func (u *Unit) Logger() LogClient {
 
 // updateConfig updates the configuration for this unit, triggering the delegate function if set.
 func (u *Unit) updateState(exp UnitState, cfg string, cfgIdx uint64) bool {
-	u.expLock.Lock()
-	defer u.expLock.Unlock()
+	u.expMu.Lock()
+	defer u.expMu.Unlock()
 	changed := false
 	if u.exp != exp {
 		u.exp = exp
@@ -187,11 +187,11 @@ func (u *Unit) updateState(exp UnitState, cfg string, cfgIdx uint64) bool {
 
 // toObserved returns the observed unit protocol to send over the stream.
 func (u *Unit) toObserved() *proto.UnitObserved {
-	u.expLock.RLock()
+	u.expMu.RLock()
 	cfgIdx := u.configIdx
-	u.expLock.RUnlock()
-	u.stateLock.RLock()
-	defer u.stateLock.RUnlock()
+	u.expMu.RUnlock()
+	u.stateMu.RLock()
+	defer u.stateMu.RUnlock()
 	return &proto.UnitObserved{
 		Id:             u.id,
 		Type:           proto.UnitType(u.unitType),

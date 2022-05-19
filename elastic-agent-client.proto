@@ -268,7 +268,7 @@ service ElasticAgent {
 }
 
 // Type of transaction to start.
-enum StoreTxnType {
+enum StoreTxType {
     READ_ONLY = 0;
     READ_WRITE = 1;
 }
@@ -276,7 +276,7 @@ enum StoreTxnType {
 // Begins a new transaction.
 //
 // A started transaction must either have commit or discard called.
-message StoreBeginTxnRequest {
+message StoreBeginTxRequest {
     // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // ID of the unit.
@@ -284,11 +284,11 @@ message StoreBeginTxnRequest {
     // Type of the unit.
     UnitType unit_type = 3;
     // Type of transaction to start.
-    StoreTxnType type = 4;
+    StoreTxType type = 4;
 }
 
 // Response for a started transaction.
-message StoreBeginTxnResponse {
+message StoreBeginTxResponse {
     // Transaction ID.
     string id = 1;
 }
@@ -298,7 +298,7 @@ message StoreGetKeyRequest {
     // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
-    string txn_id = 2;
+    string tx_id = 2;
     // Name of the key.
     string name = 3;
 }
@@ -319,12 +319,12 @@ message StoreGetKeyResponse {
 
 // Sets a key into the store.
 //
-// `txn_id` must be an ID of a transaction that was started with `READ_WRITE`.
+// `tx_id` must be an ID of a transaction that was started with `READ_WRITE`.
 message StoreSetKeyRequest {
     // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
-    string txn_id = 2;
+    string tx_id = 2;
     // Name of the key.
     string name = 3;
     // Value of the key.
@@ -340,14 +340,14 @@ message StoreSetKeyResponse {
 
 // Deletes a key in the store.
 //
-// `txn_id` must be an ID of a transaction that was started with `READ_WRITE`.
+// `tx_id` must be an ID of a transaction that was started with `READ_WRITE`.
 //
 // Does not error in the case that a key does not exist.
 message StoreDeleteKeyRequest {
     // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
-    string txn_id = 2;
+    string tx_id = 2;
     // Name of the key.
     string name = 3;
 }
@@ -360,28 +360,28 @@ message StoreDeleteKeyResponse {
 // Commits the transaction in the store.
 //
 // Upon error the whole transaction is discarded so no need to call discard after error.
-message StoreCommitTxnRequest {
+message StoreCommitTxRequest {
     // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
-    string txn_id = 2;
+    string tx_id = 2;
 }
 
-// Response from `CommitTxn`.
-message StoreCommitTxnResponse {
+// Response from `CommitTx`.
+message StoreCommitTxResponse {
     // Empty at the moment, defined for possibility of adding future return values.
 }
 
 // Discards the transaction in the store.
-message StoreDiscardTxnRequest {
+message StoreDiscardTxRequest {
     // Token that is used to uniquely identify the connection to the Elastic Agent.
     string token = 1;
     // Transaction ID.
-    string txn_id = 2;
+    string tx_id = 2;
 }
 
-// Response from `DiscardTxn`.
-message StoreDiscardTxnResponse {
+// Response from `DiscardTx`.
+message StoreDiscardTxResponse {
     // Empty at the moment, defined for possibility of adding future return values.
 }
 
@@ -390,12 +390,12 @@ service ElasticAgentStore {
     //
     // Transactional store is provided to allow multiple key operations to occur before a commit to ensure consistent
     // state when multiple keys make up the state of an units persistent state.
-    rpc BeginTxn(StoreBeginTxnRequest) returns (StoreBeginTxnResponse);
+    rpc BeginTx(StoreBeginTxRequest) returns (StoreBeginTxResponse);
     rpc GetKey(StoreGetKeyRequest) returns (StoreGetKeyResponse);
     rpc SetKey(StoreSetKeyRequest) returns (StoreSetKeyResponse);
     rpc DeleteKey(StoreDeleteKeyRequest) returns (StoreDeleteKeyResponse);
-    rpc CommitTxn(StoreCommitTxnRequest) returns (StoreCommitTxnResponse);
-    rpc DiscardTxn(StoreDiscardTxnRequest) returns (StoreDiscardTxnResponse);
+    rpc CommitTx(StoreCommitTxRequest) returns (StoreCommitTxResponse);
+    rpc DiscardTx(StoreDiscardTxRequest) returns (StoreDiscardTxResponse);
 }
 
 // Requests an artifact from the Elastic Agent.

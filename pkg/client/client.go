@@ -7,6 +7,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"sync"
 	"time"
@@ -72,12 +73,12 @@ type client struct {
 	observedMessage string
 	observedPayload string
 
-	ctx     context.Context
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
-	client  proto.ElasticAgentClient
-	cfgLock sync.RWMutex
-	obsLock sync.RWMutex
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+	client proto.ElasticAgentClient
+	cfgMu  sync.RWMutex
+	obsMu  sync.RWMutex
 
 	// overridden in tests to make fast
 	minCheckTimeout time.Duration
@@ -149,11 +150,11 @@ func (c *client) Status(status proto.StateObserved_Status, message string, paylo
 		}
 		payloadStr = string(payloadBytes)
 	}
-	c.obsLock.Lock()
+	c.obsMu.Lock()
 	c.observed = status
 	c.observedMessage = message
 	c.observedPayload = payloadStr
-	c.obsLock.Unlock()
+	c.obsMu.Unlock()
 	return nil
 }
 
@@ -202,7 +203,7 @@ func (c *client) checkinRoundTrip() {
 		for {
 			expected, err := checkinClient.Recv()
 			if err != nil {
-				if err != io.EOF {
+				if !errors.Is(err, io.EOF) {
 					c.impl.OnError(err)
 				}
 				close(done)
@@ -221,10 +222,10 @@ func (c *client) checkinRoundTrip() {
 			}
 			if expected.ConfigStateIdx != c.cfgIdx {
 				// Elastic Agent is requesting us to update config.
-				c.cfgLock.Lock()
+				c.cfgMu.Lock()
 				c.cfgIdx = expected.ConfigStateIdx
 				c.cfg = expected.Config
-				c.cfgLock.Unlock()
+				c.cfgMu.Unlock()
 				c.impl.OnConfig(expected.Config)
 				continue
 			}
@@ -250,15 +251,15 @@ func (c *client) checkinRoundTrip() {
 			case <-t.C:
 			}
 
-			c.cfgLock.RLock()
+			c.cfgMu.RLock()
 			cfgIdx := c.cfgIdx
-			c.cfgLock.RUnlock()
+			c.cfgMu.RUnlock()
 
-			c.obsLock.RLock()
+			c.obsMu.RLock()
 			observed := c.observed
 			observedMsg := c.observedMessage
 			observedPayload := c.observedPayload
-			c.obsLock.RUnlock()
+			c.obsMu.RUnlock()
 
 			sendMessage := func() error {
 				err := checkinClient.Send(&proto.StateObserved{
@@ -360,7 +361,7 @@ func (c *client) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 		for {
 			action, err := actionsClient.Recv()
 			if err != nil {
-				if err != io.EOF {
+				if !errors.Is(err, io.EOF) {
 					c.impl.OnError(err)
 				}
 				close(done)

@@ -7,6 +7,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"sync"
 	"time"
@@ -72,18 +73,18 @@ type clientV2 struct {
 	versionInfo     VersionInfo
 	versionInfoSent bool
 
-	ctx     context.Context
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
-	client  proto.ElasticAgentClient
-	cfgLock sync.RWMutex
-	obsLock sync.RWMutex
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+	client proto.ElasticAgentClient
+	cfgMu  sync.RWMutex
+	obsMu  sync.RWMutex
 
-	kickChan  chan struct{}
-	errChan   chan error
-	unitsChan chan UnitChanged
-	unitsLock sync.RWMutex
-	units     []*Unit
+	kickCh  chan struct{}
+	errCh   chan error
+	unitsCh chan UnitChanged
+	unitsMu sync.RWMutex
+	units   []*Unit
 
 	storeClient    proto.ElasticAgentStoreClient
 	artifactClient proto.ElasticAgentArtifactClient
@@ -100,9 +101,9 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.Di
 		opts:            opts,
 		token:           token,
 		versionInfo:     versionInfo,
-		kickChan:        make(chan struct{}, 1),
-		errChan:         make(chan error),
-		unitsChan:       make(chan UnitChanged),
+		kickCh:          make(chan struct{}, 1),
+		errCh:           make(chan error),
+		unitsCh:         make(chan UnitChanged),
 		minCheckTimeout: CheckinMinimumTimeout,
 	}
 }
@@ -135,12 +136,12 @@ func (c *clientV2) Stop() {
 
 // UnitChanges returns channel client send unit change notifications to.
 func (c *clientV2) UnitChanges() <-chan UnitChanged {
-	return c.unitsChan
+	return c.unitsCh
 }
 
 // Errors returns channel of errors that occurred during communication.
 func (c *clientV2) Errors() <-chan error {
-	return c.errChan
+	return c.errCh
 }
 
 // Artifacts returns the artifacts client.
@@ -179,7 +180,7 @@ func (c *clientV2) checkinRoundTrip() {
 
 	checkinClient, err := c.client.CheckinV2(checkinCtx)
 	if err != nil {
-		c.errChan <- err
+		c.errCh <- err
 		return
 	}
 
@@ -197,8 +198,8 @@ func (c *clientV2) checkinRoundTrip() {
 		for {
 			expected, err := checkinClient.Recv()
 			if err != nil {
-				if err != io.EOF {
-					c.errChan <- err
+				if !errors.Is(err, io.EOF) {
+					c.errCh <- err
 				}
 				close(done)
 				return
@@ -213,8 +214,8 @@ func (c *clientV2) checkinRoundTrip() {
 		defer checkinWrite.Done()
 
 		if err := c.sendObserved(checkinClient); err != nil {
-			if err != io.EOF {
-				c.errChan <- err
+			if !errors.Is(err, io.EOF) {
+				c.errCh <- err
 			}
 			return
 		}
@@ -226,18 +227,18 @@ func (c *clientV2) checkinRoundTrip() {
 			select {
 			case <-done:
 				return
-			case <-c.kickChan:
+			case <-c.kickCh:
 				if err := c.sendObserved(checkinClient); err != nil {
-					if err != io.EOF {
-						c.errChan <- err
+					if !errors.Is(err, io.EOF) {
+						c.errCh <- err
 					}
 					return
 				}
 				t.Reset(c.minCheckTimeout)
 			case <-t.C:
 				if err := c.sendObserved(checkinClient); err != nil {
-					if err != io.EOF {
-						c.errChan <- err
+					if !errors.Is(err, io.EOF) {
+						c.errCh <- err
 					}
 					return
 				}
@@ -255,12 +256,12 @@ func (c *clientV2) checkinRoundTrip() {
 
 // sendObserved sends the observed state of all the units.
 func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error {
-	c.unitsLock.RLock()
+	c.unitsMu.RLock()
 	observed := make([]*proto.UnitObserved, 0, len(c.units))
 	for _, unit := range c.units {
 		observed = append(observed, unit.toObserved())
 	}
-	c.unitsLock.RUnlock()
+	c.unitsMu.RUnlock()
 	msg := &proto.CheckinObserved{
 		Token:       c.token,
 		Units:       observed,
@@ -279,20 +280,21 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 
 // syncUnits syncs the expected units with the current state.
 func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
-	c.unitsLock.Lock()
-	defer c.unitsLock.Unlock()
+	c.unitsMu.Lock()
+	defer c.unitsMu.Unlock()
 	i := 0
 	for _, unit := range c.units {
 		if inExpected(unit, expected.Units) {
 			c.units[i] = unit
 			i++
 		} else {
-			c.unitsChan <- UnitChanged{
+			c.unitsCh <- UnitChanged{
 				Type: UnitChangedRemoved,
 				Unit: unit,
 			}
 		}
 	}
+	// resize so units that no longer exist are removed from the slice
 	c.units = c.units[:i]
 	for _, agentUnit := range expected.Units {
 		unit := c.findUnit(agentUnit.Id, UnitType(agentUnit.Type))
@@ -300,14 +302,14 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			// new unit
 			unit = newUnit(agentUnit.Id, UnitType(agentUnit.Type), UnitState(agentUnit.State), agentUnit.Config, agentUnit.ConfigStateIdx, c)
 			c.units = append(c.units, unit)
-			c.unitsChan <- UnitChanged{
+			c.unitsCh <- UnitChanged{
 				Type: UnitChangedAdded,
 				Unit: unit,
 			}
 		} else {
 			// existing unit
 			if unit.updateState(UnitState(agentUnit.State), agentUnit.Config, agentUnit.ConfigStateIdx) {
-				c.unitsChan <- UnitChanged{
+				c.unitsCh <- UnitChanged{
 					Type: UnitChangedModified,
 					Unit: unit,
 				}
@@ -328,8 +330,8 @@ func (c *clientV2) findUnit(id string, unitType UnitType) *Unit {
 
 // unitChanged triggers the send goroutine to send a new observed state
 func (c *clientV2) unitChanged() {
-	if len(c.kickChan) <= 0 {
-		c.kickChan <- struct{}{}
+	if len(c.kickCh) <= 0 {
+		c.kickCh <- struct{}{}
 	}
 }
 
@@ -367,7 +369,7 @@ func (c *clientV2) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 	defer actionsCancel()
 	actionsClient, err := c.client.Actions(actionsCtx)
 	if err != nil {
-		c.errChan <- err
+		c.errCh <- err
 		return
 	}
 
@@ -382,8 +384,8 @@ func (c *clientV2) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 		for {
 			action, err := actionsClient.Recv()
 			if err != nil {
-				if err != io.EOF {
-					c.errChan <- err
+				if !errors.Is(err, io.EOF) {
+					c.errCh <- err
 				}
 				close(done)
 				return
@@ -426,7 +428,7 @@ func (c *clientV2) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 			Result: []byte("{}"),
 		})
 		if err != nil {
-			c.errChan <- err
+			c.errCh <- err
 			return
 		}
 
@@ -439,7 +441,7 @@ func (c *clientV2) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 				if err != nil {
 					// failed to send, add back to response to try again
 					actionResults <- res
-					c.errChan <- err
+					c.errCh <- err
 					return
 				}
 			}
@@ -456,9 +458,9 @@ func (c *clientV2) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 
 func (c *clientV2) tryPerformAction(actionResults chan *proto.ActionResponse, action *proto.ActionRequest) {
 	// find the unit
-	c.unitsLock.RLock()
+	c.unitsMu.RLock()
 	unit := c.findUnit(action.UnitId, UnitType(action.UnitType))
-	c.unitsLock.RUnlock()
+	c.unitsMu.RUnlock()
 	if unit == nil {
 		actionResults <- &proto.ActionResponse{
 			Token:  c.token,
@@ -513,7 +515,7 @@ func (c *clientV2) tryPerformAction(actionResults chan *proto.ActionResponse, ac
 		resBytes, err := json.Marshal(res)
 		if err != nil {
 			// client-side error, should have been marshal-able
-			c.errChan <- err
+			c.errCh <- err
 			actionResults <- &proto.ActionResponse{
 				Token:  c.token,
 				Id:     action.Id,

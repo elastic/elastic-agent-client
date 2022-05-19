@@ -11,20 +11,20 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
-// ErrStoreTxnReadOnly is an error when write actions are performed on a read-only transaction.
-var ErrStoreTxnReadOnly = errors.New("txn is read-only")
+// ErrStoreTxReadOnly is an error when write actions are performed on a read-only transaction.
+var ErrStoreTxReadOnly = errors.New("transaction is read-only")
 
-// ErrStoreTxnBroken is an error when an action on a transaction has failed causing the whole transaction to be broken.
-var ErrStoreTxnBroken = errors.New("txn is broken")
+// ErrStoreTxBroken is an error when an action on a transaction has failed causing the whole transaction to be broken.
+var ErrStoreTxBroken = errors.New("transaction is broken")
 
-// ErrStoreTxnDiscarded is an error when Commit is called on an already discarded transaction.
-var ErrStoreTxnDiscarded = errors.New("txn was already discarded")
+// ErrStoreTxDiscarded is an error when Commit is called on an already discarded transaction.
+var ErrStoreTxDiscarded = errors.New("transaction was already discarded")
 
-// ErrStoreTxnCommitted is an error action is performed on an already committed transaction.
-var ErrStoreTxnCommitted = errors.New("txn was already committed")
+// ErrStoreTxCommitted is an error action is performed on an already committed transaction.
+var ErrStoreTxCommitted = errors.New("transaction was already committed")
 
-// StoreTxnClient provides actions allowed for a started transaction.
-type StoreTxnClient interface {
+// StoreTxClient provides actions allowed for a started transaction.
+type StoreTxClient interface {
 	// GetKey fetches a value from its key in the store.
 	GetKey(ctx context.Context, name string) ([]byte, bool, error)
 	// SetKey sets a value for a key in the store.
@@ -41,13 +41,13 @@ type StoreTxnClient interface {
 
 // StoreClient provides access to the key-value store from Elastic Agent for this unit.
 type StoreClient interface {
-	// BeginTxn starts a transaction for the key-value store.
-	BeginTxn(ctx context.Context, write bool) (StoreTxnClient, error)
+	// BeginTx starts a transaction for the key-value store.
+	BeginTx(ctx context.Context, write bool) (StoreTxClient, error)
 }
 
-type storeClientTxn struct {
+type storeClientTx struct {
 	client *storeClient
-	txnID  string
+	txID   string
 	write  bool
 
 	brokenErr error
@@ -61,42 +61,42 @@ type storeClient struct {
 	unitType UnitType
 }
 
-// BeginTxn starts a transaction for the key-value store.
-func (c *storeClient) BeginTxn(ctx context.Context, write bool) (StoreTxnClient, error) {
-	txnType := proto.StoreTxnType_READ_ONLY
+// BeginTx starts a transaction for the key-value store.
+func (c *storeClient) BeginTx(ctx context.Context, write bool) (StoreTxClient, error) {
+	txType := proto.StoreTxType_READ_ONLY
 	if write {
-		txnType = proto.StoreTxnType_READ_WRITE
+		txType = proto.StoreTxType_READ_WRITE
 	}
-	res, err := c.client.storeClient.BeginTxn(ctx, &proto.StoreBeginTxnRequest{
+	res, err := c.client.storeClient.BeginTx(ctx, &proto.StoreBeginTxRequest{
 		Token:    c.client.token,
 		UnitId:   c.unitID,
 		UnitType: proto.UnitType(c.unitType),
-		Type:     txnType,
+		Type:     txType,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &storeClientTxn{
+	return &storeClientTx{
 		client: c,
-		txnID:  res.Id,
+		txID:   res.Id,
 		write:  write,
 	}, nil
 }
 
 // GetKey fetches a value from its key in the store.
-func (c *storeClientTxn) GetKey(ctx context.Context, name string) ([]byte, bool, error) {
+func (c *storeClientTx) GetKey(ctx context.Context, name string) ([]byte, bool, error) {
 	if c.brokenErr != nil {
-		return nil, false, ErrStoreTxnBroken
+		return nil, false, ErrStoreTxBroken
 	}
 	if c.discarded {
-		return nil, false, ErrStoreTxnDiscarded
+		return nil, false, ErrStoreTxDiscarded
 	}
 	if c.committed {
-		return nil, false, ErrStoreTxnCommitted
+		return nil, false, ErrStoreTxCommitted
 	}
 	res, err := c.client.client.storeClient.GetKey(ctx, &proto.StoreGetKeyRequest{
 		Token: c.client.client.token,
-		TxnId: c.txnID,
+		TxId:  c.txID,
 		Name:  name,
 	})
 	if err != nil {
@@ -115,22 +115,22 @@ func (c *storeClientTxn) GetKey(ctx context.Context, name string) ([]byte, bool,
 }
 
 // SetKey sets a value for a key in the store.
-func (c *storeClientTxn) SetKey(ctx context.Context, name string, value []byte, ttl uint64) error {
+func (c *storeClientTx) SetKey(ctx context.Context, name string, value []byte, ttl uint64) error {
 	if c.brokenErr != nil {
-		return ErrStoreTxnBroken
+		return ErrStoreTxBroken
 	}
 	if c.discarded {
-		return ErrStoreTxnDiscarded
+		return ErrStoreTxDiscarded
 	}
 	if c.committed {
-		return ErrStoreTxnCommitted
+		return ErrStoreTxCommitted
 	}
 	if !c.write {
-		return ErrStoreTxnReadOnly
+		return ErrStoreTxReadOnly
 	}
 	_, err := c.client.client.storeClient.SetKey(ctx, &proto.StoreSetKeyRequest{
 		Token: c.client.client.token,
-		TxnId: c.txnID,
+		TxId:  c.txID,
 		Name:  name,
 		Value: value,
 		Ttl:   ttl,
@@ -143,22 +143,22 @@ func (c *storeClientTxn) SetKey(ctx context.Context, name string, value []byte, 
 }
 
 // DeleteKey deletes a key from the store.
-func (c *storeClientTxn) DeleteKey(ctx context.Context, name string) error {
+func (c *storeClientTx) DeleteKey(ctx context.Context, name string) error {
 	if c.brokenErr != nil {
-		return ErrStoreTxnBroken
+		return ErrStoreTxBroken
 	}
 	if c.discarded {
-		return ErrStoreTxnDiscarded
+		return ErrStoreTxDiscarded
 	}
 	if c.committed {
-		return ErrStoreTxnCommitted
+		return ErrStoreTxCommitted
 	}
 	if !c.write {
-		return ErrStoreTxnReadOnly
+		return ErrStoreTxReadOnly
 	}
 	_, err := c.client.client.storeClient.DeleteKey(ctx, &proto.StoreDeleteKeyRequest{
 		Token: c.client.client.token,
-		TxnId: c.txnID,
+		TxId:  c.txID,
 		Name:  name,
 	})
 	if err != nil {
@@ -169,19 +169,19 @@ func (c *storeClientTxn) DeleteKey(ctx context.Context, name string) error {
 }
 
 // Commit commits the transaction.
-func (c *storeClientTxn) Commit(ctx context.Context) error {
+func (c *storeClientTx) Commit(ctx context.Context) error {
 	if c.brokenErr != nil {
-		return ErrStoreTxnBroken
+		return ErrStoreTxBroken
 	}
 	if c.discarded {
-		return ErrStoreTxnDiscarded
+		return ErrStoreTxDiscarded
 	}
 	if c.committed {
 		return nil
 	}
-	_, err := c.client.client.storeClient.CommitTxn(ctx, &proto.StoreCommitTxnRequest{
+	_, err := c.client.client.storeClient.CommitTx(ctx, &proto.StoreCommitTxRequest{
 		Token: c.client.client.token,
-		TxnId: c.txnID,
+		TxId:  c.txID,
 	})
 	if err != nil {
 		c.brokenErr = err
@@ -194,16 +194,16 @@ func (c *storeClientTxn) Commit(ctx context.Context) error {
 // Discard discards the transaction.
 //
 // Can be called even if already committed, in that case it does nothing.
-func (c *storeClientTxn) Discard(ctx context.Context) error {
+func (c *storeClientTx) Discard(ctx context.Context) error {
 	if c.brokenErr != nil {
-		return ErrStoreTxnBroken
+		return ErrStoreTxBroken
 	}
 	if c.discarded || c.committed {
 		return nil
 	}
-	_, err := c.client.client.storeClient.DiscardTxn(ctx, &proto.StoreDiscardTxnRequest{
+	_, err := c.client.client.storeClient.DiscardTx(ctx, &proto.StoreDiscardTxRequest{
 		Token: c.client.client.token,
-		TxnId: c.txnID,
+		TxId:  c.txID,
 	})
 	if err != nil {
 		c.brokenErr = err

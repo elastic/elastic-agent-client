@@ -316,12 +316,12 @@ type ElasticAgentStoreClient interface {
 	//
 	// Transactional store is provided to allow multiple key operations to occur before a commit to ensure consistent
 	// state when multiple keys make up the state of an units persistent state.
-	BeginTxn(ctx context.Context, in *StoreBeginTxnRequest, opts ...grpc.CallOption) (*StoreBeginTxnResponse, error)
+	BeginTx(ctx context.Context, in *StoreBeginTxRequest, opts ...grpc.CallOption) (*StoreBeginTxResponse, error)
 	GetKey(ctx context.Context, in *StoreGetKeyRequest, opts ...grpc.CallOption) (*StoreGetKeyResponse, error)
 	SetKey(ctx context.Context, in *StoreSetKeyRequest, opts ...grpc.CallOption) (*StoreSetKeyResponse, error)
 	DeleteKey(ctx context.Context, in *StoreDeleteKeyRequest, opts ...grpc.CallOption) (*StoreDeleteKeyResponse, error)
-	CommitTxn(ctx context.Context, in *StoreCommitTxnRequest, opts ...grpc.CallOption) (*StoreCommitTxnResponse, error)
-	DiscardTxn(ctx context.Context, in *StoreDiscardTxnRequest, opts ...grpc.CallOption) (*StoreDiscardTxnResponse, error)
+	CommitTx(ctx context.Context, in *StoreCommitTxRequest, opts ...grpc.CallOption) (*StoreCommitTxResponse, error)
+	DiscardTx(ctx context.Context, in *StoreDiscardTxRequest, opts ...grpc.CallOption) (*StoreDiscardTxResponse, error)
 }
 
 type elasticAgentStoreClient struct {
@@ -332,9 +332,9 @@ func NewElasticAgentStoreClient(cc grpc.ClientConnInterface) ElasticAgentStoreCl
 	return &elasticAgentStoreClient{cc}
 }
 
-func (c *elasticAgentStoreClient) BeginTxn(ctx context.Context, in *StoreBeginTxnRequest, opts ...grpc.CallOption) (*StoreBeginTxnResponse, error) {
-	out := new(StoreBeginTxnResponse)
-	err := c.cc.Invoke(ctx, "/proto.ElasticAgentStore/BeginTxn", in, out, opts...)
+func (c *elasticAgentStoreClient) BeginTx(ctx context.Context, in *StoreBeginTxRequest, opts ...grpc.CallOption) (*StoreBeginTxResponse, error) {
+	out := new(StoreBeginTxResponse)
+	err := c.cc.Invoke(ctx, "/proto.ElasticAgentStore/BeginTx", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -368,18 +368,18 @@ func (c *elasticAgentStoreClient) DeleteKey(ctx context.Context, in *StoreDelete
 	return out, nil
 }
 
-func (c *elasticAgentStoreClient) CommitTxn(ctx context.Context, in *StoreCommitTxnRequest, opts ...grpc.CallOption) (*StoreCommitTxnResponse, error) {
-	out := new(StoreCommitTxnResponse)
-	err := c.cc.Invoke(ctx, "/proto.ElasticAgentStore/CommitTxn", in, out, opts...)
+func (c *elasticAgentStoreClient) CommitTx(ctx context.Context, in *StoreCommitTxRequest, opts ...grpc.CallOption) (*StoreCommitTxResponse, error) {
+	out := new(StoreCommitTxResponse)
+	err := c.cc.Invoke(ctx, "/proto.ElasticAgentStore/CommitTx", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *elasticAgentStoreClient) DiscardTxn(ctx context.Context, in *StoreDiscardTxnRequest, opts ...grpc.CallOption) (*StoreDiscardTxnResponse, error) {
-	out := new(StoreDiscardTxnResponse)
-	err := c.cc.Invoke(ctx, "/proto.ElasticAgentStore/DiscardTxn", in, out, opts...)
+func (c *elasticAgentStoreClient) DiscardTx(ctx context.Context, in *StoreDiscardTxRequest, opts ...grpc.CallOption) (*StoreDiscardTxResponse, error) {
+	out := new(StoreDiscardTxResponse)
+	err := c.cc.Invoke(ctx, "/proto.ElasticAgentStore/DiscardTx", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -394,12 +394,12 @@ type ElasticAgentStoreServer interface {
 	//
 	// Transactional store is provided to allow multiple key operations to occur before a commit to ensure consistent
 	// state when multiple keys make up the state of an units persistent state.
-	BeginTxn(context.Context, *StoreBeginTxnRequest) (*StoreBeginTxnResponse, error)
+	BeginTx(context.Context, *StoreBeginTxRequest) (*StoreBeginTxResponse, error)
 	GetKey(context.Context, *StoreGetKeyRequest) (*StoreGetKeyResponse, error)
 	SetKey(context.Context, *StoreSetKeyRequest) (*StoreSetKeyResponse, error)
 	DeleteKey(context.Context, *StoreDeleteKeyRequest) (*StoreDeleteKeyResponse, error)
-	CommitTxn(context.Context, *StoreCommitTxnRequest) (*StoreCommitTxnResponse, error)
-	DiscardTxn(context.Context, *StoreDiscardTxnRequest) (*StoreDiscardTxnResponse, error)
+	CommitTx(context.Context, *StoreCommitTxRequest) (*StoreCommitTxResponse, error)
+	DiscardTx(context.Context, *StoreDiscardTxRequest) (*StoreDiscardTxResponse, error)
 	mustEmbedUnimplementedElasticAgentStoreServer()
 }
 
@@ -407,8 +407,8 @@ type ElasticAgentStoreServer interface {
 type UnimplementedElasticAgentStoreServer struct {
 }
 
-func (UnimplementedElasticAgentStoreServer) BeginTxn(context.Context, *StoreBeginTxnRequest) (*StoreBeginTxnResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method BeginTxn not implemented")
+func (UnimplementedElasticAgentStoreServer) BeginTx(context.Context, *StoreBeginTxRequest) (*StoreBeginTxResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BeginTx not implemented")
 }
 func (UnimplementedElasticAgentStoreServer) GetKey(context.Context, *StoreGetKeyRequest) (*StoreGetKeyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetKey not implemented")
@@ -419,11 +419,11 @@ func (UnimplementedElasticAgentStoreServer) SetKey(context.Context, *StoreSetKey
 func (UnimplementedElasticAgentStoreServer) DeleteKey(context.Context, *StoreDeleteKeyRequest) (*StoreDeleteKeyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteKey not implemented")
 }
-func (UnimplementedElasticAgentStoreServer) CommitTxn(context.Context, *StoreCommitTxnRequest) (*StoreCommitTxnResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CommitTxn not implemented")
+func (UnimplementedElasticAgentStoreServer) CommitTx(context.Context, *StoreCommitTxRequest) (*StoreCommitTxResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CommitTx not implemented")
 }
-func (UnimplementedElasticAgentStoreServer) DiscardTxn(context.Context, *StoreDiscardTxnRequest) (*StoreDiscardTxnResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DiscardTxn not implemented")
+func (UnimplementedElasticAgentStoreServer) DiscardTx(context.Context, *StoreDiscardTxRequest) (*StoreDiscardTxResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DiscardTx not implemented")
 }
 func (UnimplementedElasticAgentStoreServer) mustEmbedUnimplementedElasticAgentStoreServer() {}
 
@@ -438,20 +438,20 @@ func RegisterElasticAgentStoreServer(s grpc.ServiceRegistrar, srv ElasticAgentSt
 	s.RegisterService(&ElasticAgentStore_ServiceDesc, srv)
 }
 
-func _ElasticAgentStore_BeginTxn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StoreBeginTxnRequest)
+func _ElasticAgentStore_BeginTx_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreBeginTxRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ElasticAgentStoreServer).BeginTxn(ctx, in)
+		return srv.(ElasticAgentStoreServer).BeginTx(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.ElasticAgentStore/BeginTxn",
+		FullMethod: "/proto.ElasticAgentStore/BeginTx",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ElasticAgentStoreServer).BeginTxn(ctx, req.(*StoreBeginTxnRequest))
+		return srv.(ElasticAgentStoreServer).BeginTx(ctx, req.(*StoreBeginTxRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -510,38 +510,38 @@ func _ElasticAgentStore_DeleteKey_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ElasticAgentStore_CommitTxn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StoreCommitTxnRequest)
+func _ElasticAgentStore_CommitTx_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreCommitTxRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ElasticAgentStoreServer).CommitTxn(ctx, in)
+		return srv.(ElasticAgentStoreServer).CommitTx(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.ElasticAgentStore/CommitTxn",
+		FullMethod: "/proto.ElasticAgentStore/CommitTx",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ElasticAgentStoreServer).CommitTxn(ctx, req.(*StoreCommitTxnRequest))
+		return srv.(ElasticAgentStoreServer).CommitTx(ctx, req.(*StoreCommitTxRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ElasticAgentStore_DiscardTxn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StoreDiscardTxnRequest)
+func _ElasticAgentStore_DiscardTx_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreDiscardTxRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ElasticAgentStoreServer).DiscardTxn(ctx, in)
+		return srv.(ElasticAgentStoreServer).DiscardTx(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.ElasticAgentStore/DiscardTxn",
+		FullMethod: "/proto.ElasticAgentStore/DiscardTx",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ElasticAgentStoreServer).DiscardTxn(ctx, req.(*StoreDiscardTxnRequest))
+		return srv.(ElasticAgentStoreServer).DiscardTx(ctx, req.(*StoreDiscardTxRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -554,8 +554,8 @@ var ElasticAgentStore_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ElasticAgentStoreServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "BeginTxn",
-			Handler:    _ElasticAgentStore_BeginTxn_Handler,
+			MethodName: "BeginTx",
+			Handler:    _ElasticAgentStore_BeginTx_Handler,
 		},
 		{
 			MethodName: "GetKey",
@@ -570,12 +570,12 @@ var ElasticAgentStore_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ElasticAgentStore_DeleteKey_Handler,
 		},
 		{
-			MethodName: "CommitTxn",
-			Handler:    _ElasticAgentStore_CommitTxn_Handler,
+			MethodName: "CommitTx",
+			Handler:    _ElasticAgentStore_CommitTx_Handler,
 		},
 		{
-			MethodName: "DiscardTxn",
-			Handler:    _ElasticAgentStore_DiscardTxn_Handler,
+			MethodName: "DiscardTx",
+			Handler:    _ElasticAgentStore_DiscardTx_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

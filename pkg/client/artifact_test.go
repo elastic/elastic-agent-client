@@ -48,14 +48,14 @@ func TestArtifact(t *testing.T) {
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
 
-	var errsLock sync.Mutex
+	var errsMu sync.Mutex
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	storeErrors(ctx, client, &errs, &errsLock)
+	storeErrors(ctx, client, &errs, &errsMu)
 
-	var unitsLock sync.Mutex
+	var unitsMu sync.Mutex
 	var units []*Unit
 	go func() {
 		for {
@@ -65,9 +65,9 @@ func TestArtifact(t *testing.T) {
 			case change := <-client.UnitChanges():
 				switch change.Type {
 				case UnitChangedAdded:
-					unitsLock.Lock()
+					unitsMu.Lock()
 					units = append(units, change.Unit)
-					unitsLock.Unlock()
+					unitsMu.Unlock()
 				default:
 					panic("not implemented")
 				}
@@ -78,8 +78,8 @@ func TestArtifact(t *testing.T) {
 	require.NoError(t, client.Start(ctx))
 	defer client.Stop()
 	require.NoError(t, waitFor(func() error {
-		unitsLock.Lock()
-		defer unitsLock.Unlock()
+		unitsMu.Lock()
+		defer unitsMu.Unlock()
 
 		if len(units) != 1 {
 			return fmt.Errorf("client never got unit")
@@ -97,7 +97,8 @@ func TestArtifact(t *testing.T) {
 			if request.Id != id || request.Sha256 != id {
 				return errors.New("missing artifact")
 			}
-			panic("should not get this far")
+			t.Fatal("should not get this far")
+			return nil
 		}
 		_, err := artifactClient.Fetch(ctx, badID, badID)
 		require.Error(t, err)

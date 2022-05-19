@@ -83,12 +83,12 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	defer srv.Stop()
 
 	// connect with an invalid token
-	var errsLock sync.Mutex
+	var errsMu sync.Mutex
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	invalidClient := NewV2(fmt.Sprintf(":%d", srv.Port), newID(), VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	storeErrors(ctx, invalidClient, &errs, &errsLock)
+	storeErrors(ctx, invalidClient, &errs, &errsMu)
 	require.NoError(t, invalidClient.Start(ctx))
 	defer invalidClient.Stop()
 	require.NoError(t, waitFor(func() error {
@@ -96,7 +96,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 		defer m.Unlock()
 
 		if !gotInvalid {
-			return fmt.Errorf("server never recieved invalid token")
+			return fmt.Errorf("server never received invalid token")
 		}
 		return nil
 	}))
@@ -104,7 +104,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	cancel()
 
 	// connect with an valid token
-	var errs2Lock sync.Mutex
+	var errs2Mu sync.Mutex
 	var errs2 []error
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
@@ -115,10 +115,10 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 			"key": "value",
 		},
 	}, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	storeErrors(ctx, validClient, &errs2, &errs2Lock)
+	storeErrors(ctx, validClient, &errs2, &errs2Mu)
 
 	// receive the units
-	var unitsLock sync.Mutex
+	var unitsMu sync.Mutex
 	var units []*Unit
 	go func() {
 		for {
@@ -128,9 +128,9 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 			case change := <-validClient.UnitChanges():
 				switch change.Type {
 				case UnitChangedAdded:
-					unitsLock.Lock()
+					unitsMu.Lock()
 					units = append(units, change.Unit)
-					unitsLock.Unlock()
+					unitsMu.Unlock()
 				default:
 					panic("not implemented")
 				}
@@ -143,14 +143,14 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	require.NoError(t, waitFor(func() error {
 		m.Lock()
 		defer m.Unlock()
-		unitsLock.Lock()
-		defer unitsLock.Unlock()
+		unitsMu.Lock()
+		defer unitsMu.Unlock()
 
 		if !gotValid {
-			return fmt.Errorf("server never recieved valid token")
+			return fmt.Errorf("server never received valid token")
 		}
 		if len(units) < 2 {
-			return fmt.Errorf("never recieved 2 units")
+			return fmt.Errorf("never received 2 units")
 		}
 		return nil
 	}))
@@ -181,7 +181,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 
 			if observed.Token == token {
 				connected = true
-				updateUnits(observed, unitOne, unitTwo)
+				updateUnits(t, observed, unitOne, unitTwo)
 				if unitOne.state == UnitStateStarting && unitTwo.state == UnitStateStarting {
 					// first checkin; create units
 					return &proto.CheckinExpected{
@@ -237,7 +237,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 					}
 				} else {
 					// outside of the state diagram we are testing
-					panic(fmt.Errorf("invalid state; unitOne(%v) - unitTwo(%v)", unitOne.state, unitTwo.state))
+					t.Fatal(fmt.Errorf("invalid state; unitOne(%v) - unitTwo(%v)", unitOne.state, unitTwo.state))
 				}
 			}
 			// disconnect
@@ -252,15 +252,15 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
 
-	var errsLock sync.Mutex
+	var errsMu sync.Mutex
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials())).(*clientV2)
-	storeErrors(ctx, client, &errs, &errsLock)
+	storeErrors(ctx, client, &errs, &errsMu)
 
 	// receive the units
-	var unitsLock sync.Mutex
+	var unitsMu sync.Mutex
 	units := make(map[string]*Unit)
 	go func() {
 		for {
@@ -270,9 +270,9 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 			case change := <-client.UnitChanges():
 				switch change.Type {
 				case UnitChangedAdded:
-					unitsLock.Lock()
+					unitsMu.Lock()
 					units[change.Unit.ID()] = change.Unit
-					unitsLock.Unlock()
+					unitsMu.Unlock()
 					change.Unit.UpdateState(UnitStateHealthy, "Healthy", map[string]interface{}{
 						"custom": "payload",
 					})
@@ -286,9 +286,9 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 						}()
 					}
 				case UnitChangedRemoved:
-					unitsLock.Lock()
+					unitsMu.Lock()
 					delete(units, change.Unit.ID())
-					unitsLock.Unlock()
+					unitsMu.Unlock()
 				}
 
 			}
@@ -302,7 +302,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 		defer m.Unlock()
 
 		if !connected {
-			return fmt.Errorf("server never recieved valid token")
+			return fmt.Errorf("server never received valid token")
 		}
 		return nil
 	}))
@@ -315,10 +315,16 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 		}
 		return nil
 	}))
+	require.NoError(t, waitFor(func() error {
+		unitsMu.Lock()
+		defer unitsMu.Unlock()
 
-	unitsLock.Lock()
-	defer unitsLock.Unlock()
-	assert.Len(t, units, 1)
+		if len(units) != 1 {
+			return fmt.Errorf("never got the removal of unitTwo")
+		}
+		return nil
+	}))
+
 	assert.Equal(t, UnitStateHealthy, unitOne.state)
 	assert.Equal(t, "Healthy", unitOne.stateMsg)
 	assert.Equal(t, UnitStateStopped, unitTwo.state)
@@ -365,14 +371,14 @@ func TestClientV2_Actions(t *testing.T) {
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
 
-	var errsLock sync.Mutex
+	var errsMu sync.Mutex
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	storeErrors(ctx, client, &errs, &errsLock)
+	storeErrors(ctx, client, &errs, &errsMu)
 
-	var unitsLock sync.Mutex
+	var unitsMu sync.Mutex
 	var units []*Unit
 	go func() {
 		for {
@@ -382,9 +388,9 @@ func TestClientV2_Actions(t *testing.T) {
 			case change := <-client.UnitChanges():
 				switch change.Type {
 				case UnitChangedAdded:
-					unitsLock.Lock()
+					unitsMu.Lock()
 					units = append(units, change.Unit)
-					unitsLock.Unlock()
+					unitsMu.Unlock()
 				default:
 					panic("not implemented")
 				}
@@ -399,13 +405,13 @@ func TestClientV2_Actions(t *testing.T) {
 		defer m.Unlock()
 
 		if !gotInit {
-			return fmt.Errorf("server never recieved valid token")
+			return fmt.Errorf("server never received valid token")
 		}
 		return nil
 	}))
 	require.NoError(t, waitFor(func() error {
-		unitsLock.Lock()
-		defer unitsLock.Unlock()
+		unitsMu.Lock()
+		defer unitsMu.Unlock()
 
 		if len(units) != 1 {
 			return fmt.Errorf("client never got unit")
@@ -413,9 +419,9 @@ func TestClientV2_Actions(t *testing.T) {
 		return nil
 	}))
 
-	unitsLock.Lock()
+	unitsMu.Lock()
 	unit := units[0]
-	unitsLock.Unlock()
+	unitsMu.Unlock()
 	unit.RegisterAction(&AddAction{})
 
 	// send an none registered action
@@ -448,12 +454,12 @@ type StubServerArtifactFetch func(request *proto.ArtifactFetchRequest, server pr
 type StubServerLog func(fetch *proto.LogMessageRequest) (*proto.LogMessageResponse, error)
 
 type StubServerStore interface {
-	BeginTxn(request *proto.StoreBeginTxnRequest) (*proto.StoreBeginTxnResponse, error)
+	BeginTx(request *proto.StoreBeginTxRequest) (*proto.StoreBeginTxResponse, error)
 	GetKey(request *proto.StoreGetKeyRequest) (*proto.StoreGetKeyResponse, error)
 	SetKey(request *proto.StoreSetKeyRequest) (*proto.StoreSetKeyResponse, error)
 	DeleteKey(request *proto.StoreDeleteKeyRequest) (*proto.StoreDeleteKeyResponse, error)
-	CommitTxn(request *proto.StoreCommitTxnRequest) (*proto.StoreCommitTxnResponse, error)
-	DiscardTxn(request *proto.StoreDiscardTxnRequest) (*proto.StoreDiscardTxnResponse, error)
+	CommitTx(request *proto.StoreCommitTxRequest) (*proto.StoreCommitTxResponse, error)
+	DiscardTx(request *proto.StoreDiscardTxRequest) (*proto.StoreDiscardTxResponse, error)
 }
 
 type StubServerV2 struct {
@@ -608,25 +614,25 @@ func (s *StubServerV2) PerformAction(unitID string, unitType proto.UnitType, nam
 		return nil, err
 	}
 
-	resChan := make(chan actionResultChan)
+	resCh := make(chan actionResultCh)
 	s.actions <- &performAction{
 		UnitID:   unitID,
 		UnitType: unitType,
 		Name:     name,
 		Params:   paramBytes,
 		Callback: func(m map[string]interface{}, err error) {
-			resChan <- actionResultChan{
+			resCh <- actionResultCh{
 				Result: m,
 				Err:    err,
 			}
 		},
 	}
-	res := <-resChan
+	res := <-resCh
 	return res.Result, res.Err
 }
 
-func (s *StubServerV2) BeginTxn(_ context.Context, request *proto.StoreBeginTxnRequest) (*proto.StoreBeginTxnResponse, error) {
-	return s.StoreImpl.BeginTxn(request)
+func (s *StubServerV2) BeginTx(_ context.Context, request *proto.StoreBeginTxRequest) (*proto.StoreBeginTxResponse, error) {
+	return s.StoreImpl.BeginTx(request)
 }
 
 func (s *StubServerV2) GetKey(_ context.Context, request *proto.StoreGetKeyRequest) (*proto.StoreGetKeyResponse, error) {
@@ -641,12 +647,12 @@ func (s *StubServerV2) DeleteKey(_ context.Context, request *proto.StoreDeleteKe
 	return s.StoreImpl.DeleteKey(request)
 }
 
-func (s *StubServerV2) CommitTxn(_ context.Context, request *proto.StoreCommitTxnRequest) (*proto.StoreCommitTxnResponse, error) {
-	return s.StoreImpl.CommitTxn(request)
+func (s *StubServerV2) CommitTx(_ context.Context, request *proto.StoreCommitTxRequest) (*proto.StoreCommitTxResponse, error) {
+	return s.StoreImpl.CommitTx(request)
 }
 
-func (s *StubServerV2) DiscardTxn(_ context.Context, request *proto.StoreDiscardTxnRequest) (*proto.StoreDiscardTxnResponse, error) {
-	return s.StoreImpl.DiscardTxn(request)
+func (s *StubServerV2) DiscardTx(_ context.Context, request *proto.StoreDiscardTxRequest) (*proto.StoreDiscardTxResponse, error) {
+	return s.StoreImpl.DiscardTx(request)
 }
 
 func (s *StubServerV2) Fetch(request *proto.ArtifactFetchRequest, server proto.ElasticAgentArtifact_FetchServer) error {
@@ -676,7 +682,8 @@ func storeErrors(ctx context.Context, client V2, errs *[]error, lock *sync.Mutex
 	}()
 }
 
-func updateUnits(observed *proto.CheckinObserved, units ...*Unit) {
+func updateUnits(t *testing.T, observed *proto.CheckinObserved, units ...*Unit) {
+	t.Helper()
 	for _, unit := range units {
 		for _, observedUnit := range observed.Units {
 			if unit.id == observedUnit.Id && unit.unitType == UnitType(observedUnit.Type) {
@@ -687,7 +694,7 @@ func updateUnits(observed *proto.CheckinObserved, units ...*Unit) {
 					unit.statePayload = nil
 				} else {
 					if err := json.Unmarshal(unit.statePayloadEncoded, &unit.statePayload); err != nil {
-						panic(err)
+						t.Fatal(err)
 					}
 				}
 			}
