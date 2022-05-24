@@ -7,6 +7,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"sync"
 	"time"
@@ -16,40 +17,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 )
-
-// CheckinMinimumTimeout is the amount of time the client must send a new checkin even if the status has not changed.
-const CheckinMinimumTimeout = time.Second * 30
-
-// InitialConfigIdx is the initial configuration index the client starts with. 0 represents no config state.
-const InitialConfigIdx = 0
-
-// ActionResponseInitID is the initial ID sent to Agent on first connect.
-const ActionResponseInitID = "init"
-
-// ActionErrUndefined is returned to Elastic Agent as result to an action request
-// when the request action is not registered in the client.
-var ActionErrUndefined = utils.JSONMustMarshal(map[string]string{
-	"error": "action undefined",
-})
-
-// ActionErrUnmarshableParams is returned to Elastic Agent as result to an action request
-// when the request params could not be un-marshaled to send to the action.
-var ActionErrUnmarshableParams = utils.JSONMustMarshal(map[string]string{
-	"error": "action params failed to be un-marshaled",
-})
-
-// ActionErrInvalidParams is returned to Elastic Agent as result to an action request
-// when the request params are invalid for the action.
-var ActionErrInvalidParams = utils.JSONMustMarshal(map[string]string{
-	"error": "action params invalid",
-})
-
-// ActionErrUnmarshableResult is returned to Elastic Agent as result to an action request
-// when the action was performed but the response could not be marshalled to send back to
-// the agent.
-var ActionErrUnmarshableResult = utils.JSONMustMarshal(map[string]string{
-	"error": "action result failed to be marshaled",
-})
 
 // Action is an action the client exposed to the Elastic Agent.
 type Action interface {
@@ -106,12 +73,12 @@ type client struct {
 	observedMessage string
 	observedPayload string
 
-	ctx     context.Context
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
-	client  proto.ElasticAgentClient
-	cfgLock sync.RWMutex
-	obsLock sync.RWMutex
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+	client proto.ElasticAgentClient
+	cfgMu  sync.RWMutex
+	obsMu  sync.RWMutex
 
 	// overridden in tests to make fast
 	minCheckTimeout time.Duration
@@ -183,11 +150,11 @@ func (c *client) Status(status proto.StateObserved_Status, message string, paylo
 		}
 		payloadStr = string(payloadBytes)
 	}
-	c.obsLock.Lock()
+	c.obsMu.Lock()
 	c.observed = status
 	c.observedMessage = message
 	c.observedPayload = payloadStr
-	c.obsLock.Unlock()
+	c.obsMu.Unlock()
 	return nil
 }
 
@@ -236,7 +203,7 @@ func (c *client) checkinRoundTrip() {
 		for {
 			expected, err := checkinClient.Recv()
 			if err != nil {
-				if err != io.EOF {
+				if !errors.Is(err, io.EOF) {
 					c.impl.OnError(err)
 				}
 				close(done)
@@ -255,10 +222,10 @@ func (c *client) checkinRoundTrip() {
 			}
 			if expected.ConfigStateIdx != c.cfgIdx {
 				// Elastic Agent is requesting us to update config.
-				c.cfgLock.Lock()
+				c.cfgMu.Lock()
 				c.cfgIdx = expected.ConfigStateIdx
 				c.cfg = expected.Config
-				c.cfgLock.Unlock()
+				c.cfgMu.Unlock()
 				c.impl.OnConfig(expected.Config)
 				continue
 			}
@@ -284,15 +251,15 @@ func (c *client) checkinRoundTrip() {
 			case <-t.C:
 			}
 
-			c.cfgLock.RLock()
+			c.cfgMu.RLock()
 			cfgIdx := c.cfgIdx
-			c.cfgLock.RUnlock()
+			c.cfgMu.RUnlock()
 
-			c.obsLock.RLock()
+			c.obsMu.RLock()
 			observed := c.observed
 			observedMsg := c.observedMessage
 			observedPayload := c.observedPayload
-			c.obsLock.RUnlock()
+			c.obsMu.RUnlock()
 
 			sendMessage := func() error {
 				err := checkinClient.Send(&proto.StateObserved{
@@ -394,7 +361,7 @@ func (c *client) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 		for {
 			action, err := actionsClient.Recv()
 			if err != nil {
-				if err != io.EOF {
+				if !errors.Is(err, io.EOF) {
 					c.impl.OnError(err)
 				}
 				close(done)

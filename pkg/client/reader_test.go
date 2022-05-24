@@ -111,6 +111,43 @@ func TestNewFromReader_Connects(t *testing.T) {
 	}))
 }
 
+func TestNewV2FromReader_Empty(t *testing.T) {
+	_, _, err := NewV2FromReader(bytes.NewBuffer([]byte("")), VersionInfo{})
+	assert.Error(t, err)
+}
+
+func TestNewV2FromReader_BadProto(t *testing.T) {
+	_, _, err := NewV2FromReader(bytes.NewBuffer([]byte("bad proto")), VersionInfo{})
+	assert.Error(t, err)
+}
+
+func TestNewV2FromReader_Services(t *testing.T) {
+	ca, err := NewCA()
+	require.NoError(t, err)
+	peer, err := ca.GeneratePair()
+	require.NoError(t, err)
+	token := "expected_token"
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(ca.caPEM)
+
+	connInfo := &proto.ConnInfo{
+		Addr:       ":7777",
+		ServerName: "localhost",
+		Token:      token,
+		CaCert:     ca.caPEM,
+		PeerCert:   peer.Crt,
+		PeerKey:    peer.Key,
+		Services:   []proto.ConnInfoServices{proto.ConnInfoServices_CheckinV2, proto.ConnInfoServices_Store, proto.ConnInfoServices_Artifact},
+	}
+	connInfoBytes, err := protobuf.Marshal(connInfo)
+	require.NoError(t, err)
+	connInfoReader := bytes.NewReader(connInfoBytes)
+
+	_, srvs, err := NewV2FromReader(connInfoReader, VersionInfo{})
+	require.NoError(t, err)
+	require.Equal(t, []Service{ServiceCheckinV2, ServiceStore, ServiceArtifact}, srvs)
+}
+
 type CertificateAuthority struct {
 	caCert     *x509.Certificate
 	privateKey crypto.PrivateKey
