@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
@@ -58,7 +59,7 @@ func TestNewFromReader_Connects(t *testing.T) {
 	var m sync.Mutex
 	token := "expected_token"
 	gotValid := false
-	srv := StubServer{
+	srv := mock.StubServer{
 		CheckinImpl: func(observed *proto.StateObserved) *proto.StateExpected {
 			m.Lock()
 			defer m.Unlock()
@@ -78,7 +79,7 @@ func TestNewFromReader_Connects(t *testing.T) {
 			// actions not tested here
 			return nil
 		},
-		actions: make(chan *performAction, 100),
+		ActionsChan: make(chan *mock.PerformAction, 100),
 	}
 	require.NoError(t, srv.Start(grpc.Creds(creds)))
 	defer srv.Stop()

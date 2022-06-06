@@ -16,19 +16,20 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestStore(t *testing.T) {
-	token := newID()
+	token := mock.NewID()
 	store := NewMemoryStore()
-	srv := StubServerV2{
+	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			if observed.Token == token {
 				return &proto.CheckinExpected{
 					Units: []*proto.UnitExpected{
 						{
-							Id:             newID(),
+							Id:             mock.NewID(),
 							Type:           proto.UnitType_OUTPUT,
 							State:          proto.State_HEALTHY,
 							ConfigStateIdx: 1,
@@ -252,7 +253,7 @@ type unitMemoryStore struct {
 }
 
 func (s *unitMemoryStore) startTx(writeable bool) string {
-	txID := newID()
+	txID := mock.NewID()
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	data := s.copyData()
