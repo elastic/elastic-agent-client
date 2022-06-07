@@ -8,22 +8,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestClientV2_DialError(t *testing.T) {
-	srv := StubServerV2{}
+	srv := mock.StubServerV2{}
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
 
@@ -34,13 +33,13 @@ func TestClientV2_DialError(t *testing.T) {
 
 func TestClientV2_Checkin_Initial(t *testing.T) {
 	var m sync.Mutex
-	token := newID()
+	token := mock.NewID()
 	gotInvalid := false
 	gotValid := false
-	unitOneID := newID()
-	unitTwoID := newID()
+	unitOneID := mock.NewID()
+	unitTwoID := mock.NewID()
 	reportedVersion := VersionInfo{}
-	srv := StubServerV2{
+	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			m.Lock()
 			defer m.Unlock()
@@ -77,7 +76,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 			// actions not tested here
 			return nil
 		},
-		actions: make(chan *performAction, 100),
+		ActionsChan: make(chan *mock.PerformAction, 100),
 	}
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
@@ -87,7 +86,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	invalidClient := NewV2(fmt.Sprintf(":%d", srv.Port), newID(), VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	invalidClient := NewV2(fmt.Sprintf(":%d", srv.Port), mock.NewID(), VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	storeErrors(ctx, invalidClient, &errs, &errsMu)
 	require.NoError(t, invalidClient.Start(ctx))
 	defer invalidClient.Stop()
@@ -170,11 +169,11 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 
 func TestClientV2_Checkin_UnitState(t *testing.T) {
 	var m sync.Mutex
-	token := newID()
+	token := mock.NewID()
 	connected := false
-	unitOne := newUnit(newID(), UnitTypeOutput, UnitStateStarting, "", 0, nil)
-	unitTwo := newUnit(newID(), UnitTypeInput, UnitStateStarting, "", 0, nil)
-	srv := StubServerV2{
+	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, "", 0, nil)
+	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, "", 0, nil)
+	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			m.Lock()
 			defer m.Unlock()
@@ -247,7 +246,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 			// actions not tested here
 			return nil
 		},
-		actions: make(chan *performAction, 100),
+		ActionsChan: make(chan *mock.PerformAction, 100),
 	}
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
@@ -333,15 +332,15 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 
 func TestClientV2_Actions(t *testing.T) {
 	var m sync.Mutex
-	token := newID()
+	token := mock.NewID()
 	gotInit := false
-	srv := StubServerV2{
+	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			if observed.Token == token {
 				return &proto.CheckinExpected{
 					Units: []*proto.UnitExpected{
 						{
-							Id:             newID(),
+							Id:             mock.NewID(),
 							Type:           proto.UnitType_OUTPUT,
 							State:          proto.State_HEALTHY,
 							ConfigStateIdx: 1,
@@ -365,8 +364,8 @@ func TestClientV2_Actions(t *testing.T) {
 			}
 			return nil
 		},
-		actions:     make(chan *performAction, 100),
-		sentActions: make(map[string]*performAction),
+		ActionsChan: make(chan *mock.PerformAction, 100),
+		SentActions: make(map[string]*mock.PerformAction),
 	}
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
@@ -447,224 +446,6 @@ func TestClientV2_Actions(t *testing.T) {
 		"numbers": []interface{}{"bad", 20, 30},
 	})
 	assert.Error(t, err)
-}
-
-type StubServerCheckinV2 func(observed *proto.CheckinObserved) *proto.CheckinExpected
-type StubServerArtifactFetch func(request *proto.ArtifactFetchRequest, server proto.ElasticAgentArtifact_FetchServer) error
-type StubServerLog func(fetch *proto.LogMessageRequest) (*proto.LogMessageResponse, error)
-
-type StubServerStore interface {
-	BeginTx(request *proto.StoreBeginTxRequest) (*proto.StoreBeginTxResponse, error)
-	GetKey(request *proto.StoreGetKeyRequest) (*proto.StoreGetKeyResponse, error)
-	SetKey(request *proto.StoreSetKeyRequest) (*proto.StoreSetKeyResponse, error)
-	DeleteKey(request *proto.StoreDeleteKeyRequest) (*proto.StoreDeleteKeyResponse, error)
-	CommitTx(request *proto.StoreCommitTxRequest) (*proto.StoreCommitTxResponse, error)
-	DiscardTx(request *proto.StoreDiscardTxRequest) (*proto.StoreDiscardTxResponse, error)
-}
-
-type StubServerV2 struct {
-	proto.UnimplementedElasticAgentServer
-	proto.UnimplementedElasticAgentStoreServer
-	proto.UnimplementedElasticAgentArtifactServer
-	proto.UnimplementedElasticAgentLogServer
-
-	Port              int
-	CheckinImpl       StubServerCheckin
-	ActionImpl        StubServerAction
-	CheckinV2Impl     StubServerCheckinV2
-	StoreImpl         StubServerStore
-	ArtifactFetchImpl StubServerArtifactFetch
-	LogImpl           StubServerLog
-
-	server      *grpc.Server
-	actions     chan *performAction
-	sentActions map[string]*performAction
-}
-
-func (s *StubServerV2) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return err
-	}
-	s.Port = lis.Addr().(*net.TCPAddr).Port
-	srv := grpc.NewServer(opt...)
-	s.server = srv
-	proto.RegisterElasticAgentServer(s.server, s)
-	proto.RegisterElasticAgentStoreServer(s.server, s)
-	proto.RegisterElasticAgentArtifactServer(s.server, s)
-	proto.RegisterElasticAgentLogServer(s.server, s)
-	go func() {
-		srv.Serve(lis)
-	}()
-	return nil
-}
-
-func (s *StubServerV2) Stop() {
-	if s.server != nil {
-		s.server.Stop()
-		s.server = nil
-	}
-}
-
-func (s *StubServerV2) Checkin(server proto.ElasticAgent_CheckinServer) error {
-	for {
-		checkin, err := server.Recv()
-		if err != nil {
-			return err
-		}
-		resp := s.CheckinImpl(checkin)
-		if resp == nil {
-			// close connection to client
-			return nil
-		}
-		err = server.Send(resp)
-		if err != nil {
-			return err
-		}
-	}
-}
-
-func (s *StubServerV2) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
-	for {
-		checkin, err := server.Recv()
-		if err != nil {
-			return err
-		}
-		resp := s.CheckinV2Impl(checkin)
-		if resp == nil {
-			// close connection to client
-			return nil
-		}
-		err = server.Send(resp)
-		if err != nil {
-			return err
-		}
-	}
-}
-
-func (s *StubServerV2) Actions(server proto.ElasticAgent_ActionsServer) error {
-	var m sync.Mutex
-	done := make(chan bool)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case act := <-s.actions:
-				id := uuid.Must(uuid.NewV4())
-				m.Lock()
-				s.sentActions[id.String()] = act
-				m.Unlock()
-				err := server.Send(&proto.ActionRequest{
-					Id:       id.String(),
-					Name:     act.Name,
-					Params:   act.Params,
-					UnitId:   act.UnitID,
-					UnitType: act.UnitType,
-				})
-				if err != nil {
-					panic(err)
-				}
-			}
-		}
-	}()
-	defer close(done)
-
-	for {
-		response, err := server.Recv()
-		if err != nil {
-			return err
-		}
-		err = s.ActionImpl(response)
-		if err != nil {
-			// close connection to client
-			return nil
-		}
-		m.Lock()
-		action, ok := s.sentActions[response.Id]
-		if !ok {
-			// nothing to do, unknown action
-			m.Unlock()
-			continue
-		}
-		delete(s.sentActions, response.Id)
-		m.Unlock()
-		var result map[string]interface{}
-		err = json.Unmarshal(response.Result, &result)
-		if err != nil {
-			return err
-		}
-		if response.Status == proto.ActionResponse_FAILED {
-			error, ok := result["error"]
-			if ok {
-				err = fmt.Errorf("%s", error)
-			} else {
-				err = fmt.Errorf("unknown error")
-			}
-			action.Callback(nil, err)
-		} else {
-			action.Callback(result, nil)
-		}
-	}
-}
-
-func (s *StubServerV2) PerformAction(unitID string, unitType proto.UnitType, name string, params map[string]interface{}) (map[string]interface{}, error) {
-	paramBytes, err := json.Marshal(params)
-	if err != nil {
-		return nil, err
-	}
-
-	resCh := make(chan actionResultCh)
-	s.actions <- &performAction{
-		UnitID:   unitID,
-		UnitType: unitType,
-		Name:     name,
-		Params:   paramBytes,
-		Callback: func(m map[string]interface{}, err error) {
-			resCh <- actionResultCh{
-				Result: m,
-				Err:    err,
-			}
-		},
-	}
-	res := <-resCh
-	return res.Result, res.Err
-}
-
-func (s *StubServerV2) BeginTx(_ context.Context, request *proto.StoreBeginTxRequest) (*proto.StoreBeginTxResponse, error) {
-	return s.StoreImpl.BeginTx(request)
-}
-
-func (s *StubServerV2) GetKey(_ context.Context, request *proto.StoreGetKeyRequest) (*proto.StoreGetKeyResponse, error) {
-	return s.StoreImpl.GetKey(request)
-}
-
-func (s *StubServerV2) SetKey(_ context.Context, request *proto.StoreSetKeyRequest) (*proto.StoreSetKeyResponse, error) {
-	return s.StoreImpl.SetKey(request)
-}
-
-func (s *StubServerV2) DeleteKey(_ context.Context, request *proto.StoreDeleteKeyRequest) (*proto.StoreDeleteKeyResponse, error) {
-	return s.StoreImpl.DeleteKey(request)
-}
-
-func (s *StubServerV2) CommitTx(_ context.Context, request *proto.StoreCommitTxRequest) (*proto.StoreCommitTxResponse, error) {
-	return s.StoreImpl.CommitTx(request)
-}
-
-func (s *StubServerV2) DiscardTx(_ context.Context, request *proto.StoreDiscardTxRequest) (*proto.StoreDiscardTxResponse, error) {
-	return s.StoreImpl.DiscardTx(request)
-}
-
-func (s *StubServerV2) Fetch(request *proto.ArtifactFetchRequest, server proto.ElasticAgentArtifact_FetchServer) error {
-	return s.ArtifactFetchImpl(request, server)
-}
-
-func (s *StubServerV2) Log(_ context.Context, request *proto.LogMessageRequest) (*proto.LogMessageResponse, error) {
-	return s.LogImpl(request)
-}
-
-func newID() string {
-	return uuid.Must(uuid.NewV4()).String()
 }
 
 func storeErrors(ctx context.Context, client V2, errs *[]error, lock *sync.Mutex) {

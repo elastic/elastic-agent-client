@@ -9,26 +9,28 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestArtifact(t *testing.T) {
-	token := newID()
-	srv := StubServerV2{
+	token := mock.NewID()
+	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			if observed.Token == token {
 				return &proto.CheckinExpected{
 					Units: []*proto.UnitExpected{
 						{
-							Id:             newID(),
+							Id:             mock.NewID(),
 							Type:           proto.UnitType_OUTPUT,
 							State:          proto.State_HEALTHY,
 							ConfigStateIdx: 1,
@@ -91,8 +93,8 @@ func TestArtifact(t *testing.T) {
 	artifactClient := unit.Artifacts()
 
 	t.Run("ErrorOnFetch", func(t *testing.T) {
-		id := newID()
-		badID := newID()
+		id := mock.NewID()
+		badID := mock.NewID()
 		srv.ArtifactFetchImpl = func(request *proto.ArtifactFetchRequest, server proto.ElasticAgentArtifact_FetchServer) error {
 			if request.Id != id || request.Sha256 != id {
 				return errors.New("missing artifact")
@@ -105,7 +107,7 @@ func TestArtifact(t *testing.T) {
 	})
 
 	t.Run("Fetch", func(t *testing.T) {
-		id := newID()
+		id := mock.NewID()
 		content := make([]byte, 256)
 		_, err := rand.Read(content)
 		require.NoError(t, err)

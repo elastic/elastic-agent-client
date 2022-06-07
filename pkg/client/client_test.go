@@ -6,25 +6,23 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"google.golang.org/grpc/credentials/insecure"
-	"net"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/gofrs/uuid"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestClient_DialError(t *testing.T) {
-	srv := StubServer{
+	srv := mock.StubServer{
 		CheckinImpl: func(observed *proto.StateObserved) *proto.StateExpected {
 			return nil
 		},
@@ -32,7 +30,7 @@ func TestClient_DialError(t *testing.T) {
 			// actions not tested here
 			return nil
 		},
-		actions: make(chan *performAction, 100),
+		ActionsChan: make(chan *mock.PerformAction, 100),
 	}
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
@@ -64,7 +62,7 @@ func TestClient_Checkin_With_Token(t *testing.T) {
 	token := "expected_token"
 	gotInvalid := false
 	gotValid := false
-	srv := StubServer{
+	srv := mock.StubServer{
 		CheckinImpl: func(observed *proto.StateObserved) *proto.StateExpected {
 			m.Lock()
 			defer m.Unlock()
@@ -85,7 +83,7 @@ func TestClient_Checkin_With_Token(t *testing.T) {
 			// actions not tested here
 			return nil
 		},
-		actions: make(chan *performAction, 100),
+		ActionsChan: make(chan *mock.PerformAction, 100),
 	}
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
@@ -137,7 +135,7 @@ func TestClient_Checkin_Status(t *testing.T) {
 	message := ""
 	payload := ""
 	healthyCount := 0
-	srv := StubServer{
+	srv := mock.StubServer{
 		CheckinImpl: func(observed *proto.StateObserved) *proto.StateExpected {
 			m.Lock()
 			defer m.Unlock()
@@ -171,7 +169,7 @@ func TestClient_Checkin_Status(t *testing.T) {
 			// actions not tested here
 			return nil
 		},
-		actions: make(chan *performAction, 100),
+		ActionsChan: make(chan *mock.PerformAction, 100),
 	}
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
@@ -227,7 +225,7 @@ func TestClient_Checkin_Stop(t *testing.T) {
 	token := "expected_token"
 	connected := false
 	shuttingDown := false
-	srv := StubServer{
+	srv := mock.StubServer{
 		CheckinImpl: func(observed *proto.StateObserved) *proto.StateExpected {
 			m.Lock()
 			defer m.Unlock()
@@ -258,7 +256,7 @@ func TestClient_Checkin_Stop(t *testing.T) {
 			// actions not tested here
 			return nil
 		},
-		actions: make(chan *performAction, 100),
+		ActionsChan: make(chan *mock.PerformAction, 100),
 	}
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
@@ -304,7 +302,7 @@ func TestClient_Actions(t *testing.T) {
 	var m sync.Mutex
 	token := "expected_token"
 	gotInit := false
-	srv := StubServer{
+	srv := mock.StubServer{
 		CheckinImpl: func(observed *proto.StateObserved) *proto.StateExpected {
 			if observed.Token == token {
 				if observed.ConfigStateIdx == 0 {
@@ -336,8 +334,8 @@ func TestClient_Actions(t *testing.T) {
 			}
 			return nil
 		},
-		actions:     make(chan *performAction, 100),
-		sentActions: make(map[string]*performAction),
+		ActionsChan: make(chan *mock.PerformAction, 100),
+		SentActions: make(map[string]*mock.PerformAction),
 	}
 	require.NoError(t, srv.Start())
 	defer srv.Stop()
@@ -426,159 +424,6 @@ func (c *StubClientImpl) OnError(err error) {
 	c.Mu.Lock()
 	defer c.Mu.Unlock()
 	c.Error = err
-}
-
-type StubServerCheckin func(*proto.StateObserved) *proto.StateExpected
-type StubServerAction func(*proto.ActionResponse) error
-
-type performAction struct {
-	Name     string
-	Params   []byte
-	Callback func(map[string]interface{}, error)
-	UnitID   string
-	UnitType proto.UnitType
-}
-
-type actionResultCh struct {
-	Result map[string]interface{}
-	Err    error
-}
-
-type StubServer struct {
-	proto.UnimplementedElasticAgentServer
-
-	Port        int
-	CheckinImpl StubServerCheckin
-	ActionImpl  StubServerAction
-
-	server      *grpc.Server
-	actions     chan *performAction
-	sentActions map[string]*performAction
-}
-
-func (s *StubServer) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return err
-	}
-	s.Port = lis.Addr().(*net.TCPAddr).Port
-	srv := grpc.NewServer(opt...)
-	s.server = srv
-	proto.RegisterElasticAgentServer(s.server, s)
-	go func() {
-		srv.Serve(lis)
-	}()
-	return nil
-}
-
-func (s *StubServer) Stop() {
-	if s.server != nil {
-		s.server.Stop()
-		s.server = nil
-	}
-}
-
-func (s *StubServer) Checkin(server proto.ElasticAgent_CheckinServer) error {
-	for {
-		checkin, err := server.Recv()
-		if err != nil {
-			return err
-		}
-		resp := s.CheckinImpl(checkin)
-		if resp == nil {
-			// close connection to client
-			return nil
-		}
-		err = server.Send(resp)
-		if err != nil {
-			return err
-		}
-	}
-}
-
-func (s *StubServer) Actions(server proto.ElasticAgent_ActionsServer) error {
-	var m sync.Mutex
-	done := make(chan bool)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case act := <-s.actions:
-				id := uuid.Must(uuid.NewV4())
-				m.Lock()
-				s.sentActions[id.String()] = act
-				m.Unlock()
-				err := server.Send(&proto.ActionRequest{
-					Id:     id.String(),
-					Name:   act.Name,
-					Params: act.Params,
-				})
-				if err != nil {
-					panic(err)
-				}
-			}
-		}
-	}()
-	defer close(done)
-
-	for {
-		response, err := server.Recv()
-		if err != nil {
-			return err
-		}
-		err = s.ActionImpl(response)
-		if err != nil {
-			// close connection to client
-			return nil
-		}
-		m.Lock()
-		action, ok := s.sentActions[response.Id]
-		if !ok {
-			// nothing to do, unknown action
-			m.Unlock()
-			continue
-		}
-		delete(s.sentActions, response.Id)
-		m.Unlock()
-		var result map[string]interface{}
-		err = json.Unmarshal(response.Result, &result)
-		if err != nil {
-			return err
-		}
-		if response.Status == proto.ActionResponse_FAILED {
-			error, ok := result["error"]
-			if ok {
-				err = fmt.Errorf("%s", error)
-			} else {
-				err = fmt.Errorf("unknown error")
-			}
-			action.Callback(nil, err)
-		} else {
-			action.Callback(result, nil)
-		}
-	}
-}
-
-func (s *StubServer) PerformAction(name string, params map[string]interface{}) (map[string]interface{}, error) {
-	paramBytes, err := json.Marshal(params)
-	if err != nil {
-		return nil, err
-	}
-
-	resCh := make(chan actionResultCh)
-	s.actions <- &performAction{
-		Name:   name,
-		Params: paramBytes,
-		Callback: func(m map[string]interface{}, err error) {
-			resCh <- actionResultCh{
-				Result: m,
-				Err:    err,
-			}
-		},
-	}
-	res := <-resCh
-	return res.Result, res.Err
 }
 
 func waitFor(check func() error) error {

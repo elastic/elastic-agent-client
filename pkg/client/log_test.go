@@ -7,26 +7,28 @@ package client
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 func TestLog(t *testing.T) {
-	token := newID()
-	srv := StubServerV2{
+	token := mock.NewID()
+	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			if observed.Token == token {
 				return &proto.CheckinExpected{
 					Units: []*proto.UnitExpected{
 						{
-							Id:             newID(),
+							Id:             mock.NewID(),
 							Type:           proto.UnitType_OUTPUT,
 							State:          proto.State_HEALTHY,
 							ConfigStateIdx: 1,
