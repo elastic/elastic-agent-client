@@ -33,8 +33,9 @@ func TestArtifact(t *testing.T) {
 							Id:             mock.NewID(),
 							Type:           proto.UnitType_OUTPUT,
 							State:          proto.State_HEALTHY,
+							LogLevel:       proto.UnitLogLevel_INFO,
 							ConfigStateIdx: 1,
-							Config:         "config",
+							Config:         &proto.UnitExpectedConfig{},
 						},
 					},
 				}

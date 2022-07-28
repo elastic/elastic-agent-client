@@ -21,6 +21,22 @@ const (
 	UnitTypeOutput = UnitType(proto.UnitType_OUTPUT)
 )
 
+// UnitLogLevel is the log level the unit should run at.
+type UnitLogLevel proto.UnitLogLevel
+
+const (
+	// UnitLogLevelTrace is when the unit should log at trace level.
+	UnitLogLevelTrace = UnitLogLevel(proto.UnitLogLevel_TRACE)
+	// UnitLogLevelDebug is when the unit should log at debug level.
+	UnitLogLevelDebug = UnitLogLevel(proto.UnitLogLevel_DEBUG)
+	// UnitLogLevelInfo is when the unit should log at info level.
+	UnitLogLevelInfo = UnitLogLevel(proto.UnitLogLevel_INFO)
+	// UnitLogLevelWarn is when the unit should log at warn level.
+	UnitLogLevelWarn = UnitLogLevel(proto.UnitLogLevel_WARN)
+	// UnitLogLevelError is when the unit should log at error level.
+	UnitLogLevelError = UnitLogLevel(proto.UnitLogLevel_ERROR)
+)
+
 // UnitState is the state for the unit, used both for expected and observed state.
 type UnitState proto.State
 
@@ -50,7 +66,8 @@ type Unit struct {
 
 	expMu     sync.RWMutex
 	exp       UnitState
-	config    string
+	logLevel  UnitLogLevel
+	config    *proto.UnitExpectedConfig
 	configIdx uint64
 
 	stateMu             sync.RWMutex
@@ -76,10 +93,10 @@ func (u *Unit) Type() UnitType {
 }
 
 // Expected returns the expected state and config for the unit.
-func (u *Unit) Expected() (UnitState, string) {
+func (u *Unit) Expected() (UnitState, UnitLogLevel, *proto.UnitExpectedConfig) {
 	u.expMu.RLock()
 	defer u.expMu.RUnlock()
-	return u.exp, u.config
+	return u.exp, u.logLevel, u.config
 }
 
 // State returns the currently reported state for the unit.
@@ -167,12 +184,16 @@ func (u *Unit) Logger() LogClient {
 }
 
 // updateConfig updates the configuration for this unit, triggering the delegate function if set.
-func (u *Unit) updateState(exp UnitState, cfg string, cfgIdx uint64) bool {
+func (u *Unit) updateState(exp UnitState, logLevel UnitLogLevel, cfg *proto.UnitExpectedConfig, cfgIdx uint64) bool {
 	u.expMu.Lock()
 	defer u.expMu.Unlock()
 	changed := false
 	if u.exp != exp {
 		u.exp = exp
+		changed = true
+	}
+	if u.logLevel != logLevel {
+		u.logLevel = logLevel
 		changed = true
 	}
 	if u.configIdx != cfgIdx {
@@ -203,13 +224,14 @@ func (u *Unit) toObserved() *proto.UnitObserved {
 }
 
 // newUnit creates a new unit that needs to be created in this process.
-func newUnit(id string, unitType UnitType, exp UnitState, cfg string, cfgIdx uint64, client *clientV2) *Unit {
+func newUnit(id string, unitType UnitType, exp UnitState, logLevel UnitLogLevel, cfg *proto.UnitExpectedConfig, cfgIdx uint64, client *clientV2) *Unit {
 	return &Unit{
 		id:        id,
 		unitType:  unitType,
 		config:    cfg,
 		configIdx: cfgIdx,
 		exp:       exp,
+		logLevel:  logLevel,
 		state:     UnitStateStarting,
 		stateMsg:  "Starting",
 		client:    client,

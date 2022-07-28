@@ -9,6 +9,7 @@ package proto;
 option cc_enable_arenas = true;
 option go_package = "pkg/proto;proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 // Services that the client is allowed to use over the connection.
@@ -177,6 +178,78 @@ enum UnitType {
     OUTPUT = 1;
 }
 
+// Log level for the unit.
+enum UnitLogLevel {
+    TRACE = 0;
+    DEBUG = 1;
+    INFO = 2;
+    WARN = 3;
+    ERROR = 4;
+}
+
+// Package metadata provided in the meta field of a unit.
+message Package {
+    // Source is the original source of the message. All values from the message are included here
+    // even if other concrete fields are defined for this message.
+    google.protobuf.Struct source = 1;
+    // Name of the package.
+    string name = 2;
+    // Version of the package.
+    string version = 3;
+}
+
+// Metadata provided in the meta field of a unit.
+message Meta {
+    // Source is the original source of the message. All values from the message are included here
+    // even if other concrete fields are defined for this message.
+    google.protobuf.Struct source = 1;
+    // Package metadata.
+    Package package = 2;
+}
+
+// Data stream defined in either top-level unit or in multiple streams in the unit.
+message DataStream {
+    // Source is the original source of the message. All values from the message are included here
+    // even if other concrete fields are defined for this message.
+    google.protobuf.Struct source = 1;
+    // Dataset for the stream.
+    string dataset = 2;
+    // Type for the stream.
+    string type = 3;
+    // Namespace for the stream.
+    string namespace = 4;
+}
+
+// Stream defined in a configuration.
+message Stream {
+    // Source is the original source of the message. All values from the message are included here
+    // even if other concrete fields are defined for this message.
+    google.protobuf.Struct source = 1;
+    string id = 2;
+    DataStream data_stream = 3;
+}
+
+// A units expected configuration.
+message UnitExpectedConfig {
+    // Source is the original source of the message. All values from the configuration are included here
+    // even if other concrete fields are defined for this message.
+    google.protobuf.Struct source = 1;
+    // Unique ID for the Unit.
+    string id = 2;
+    // Type of the unit.
+    string type = 3;
+    // Name of the unit.
+    string name = 4;
+    // Revision of the unit.
+    uint64 revision = 5;
+    // Metadata information of the unit.
+    Meta meta = 6;
+    // Unit-level data stream.
+    DataStream data_stream = 7;
+    // Multiple streams per unit.
+    repeated Stream streams = 8;
+}
+
 // A unit that is part of a collector/shipper.
 message UnitExpected {
     // Unique ID of the unit.
@@ -189,12 +262,29 @@ message UnitExpected {
     uint64 config_state_idx = 4;
     // Resulting configuration. (If the application already has the current `config_state_idx` this
     // will be empty.)
-    string config = 5;
+    UnitExpectedConfig config = 5;
+    // Log level of the unit.
+    UnitLogLevel log_level = 6;
+}
+
+// Only provided on first checkin expected response to the component.
+//
+// Includes the agent information that the component might want to use for its events.
+message CheckinAgentInfo {
+    // ID is the Elastic Agent's unique ID.
+    string id = 1;
+    // Version is the version of the running Elastic Agent.
+    string version = 2;
+    // Snapshot is true when the running Elastic Agent is a snapshot version.
+    bool snapshot = 3;
 }
 
 // A set of units and their expected states and configuration.
 message CheckinExpected {
+    // Units is the expected units the component should be running.
     repeated UnitExpected units = 1;
+    // Agent info is provided only on first CheckinExpected response to the component.
+    CheckinAgentInfo agent_info = 2;
 }
 
 // Observed status for a unit.

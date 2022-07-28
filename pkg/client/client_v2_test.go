@@ -50,20 +50,27 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 				reportedVersion.Version = observed.VersionInfo.Version
 				reportedVersion.Meta = observed.VersionInfo.Meta
 				return &proto.CheckinExpected{
+					AgentInfo: &proto.CheckinAgentInfo{
+						Id:       "elastic-agent-id",
+						Version:  "8.5.0",
+						Snapshot: true,
+					},
 					Units: []*proto.UnitExpected{
 						{
 							Id:             unitOneID,
 							Type:           proto.UnitType_OUTPUT,
 							ConfigStateIdx: 1,
-							Config:         "config",
+							Config:         &proto.UnitExpectedConfig{},
 							State:          proto.State_HEALTHY,
+							LogLevel:       proto.UnitLogLevel_INFO,
 						},
 						{
 							Id:             unitTwoID,
 							Type:           proto.UnitType_INPUT,
 							ConfigStateIdx: 1,
-							Config:         "config",
+							Config:         &proto.UnitExpectedConfig{},
 							State:          proto.State_HEALTHY,
+							LogLevel:       proto.UnitLogLevel_INFO,
 						},
 					},
 				}
@@ -153,8 +160,16 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 		}
 		return nil
 	}))
+
+	agentInfo := validClient.AgentInfo()
+	require.NotNil(t, agentInfo)
+
 	validClient.Stop()
 	cancel()
+
+	assert.Equal(t, agentInfo.ID, "elastic-agent-id")
+	assert.Equal(t, agentInfo.Version, "8.5.0")
+	assert.True(t, agentInfo.Snapshot)
 
 	assert.Equal(t, units[0].ID(), unitOneID)
 	assert.Equal(t, units[0].Type(), UnitTypeOutput)
@@ -171,8 +186,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	var m sync.Mutex
 	token := mock.NewID()
 	connected := false
-	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, "", 0, nil)
-	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, "", 0, nil)
+	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil)
+	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil)
 	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			m.Lock()
@@ -189,15 +204,21 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 								Id:             unitOne.id,
 								Type:           proto.UnitType_OUTPUT,
 								State:          proto.State_HEALTHY,
+								LogLevel:       proto.UnitLogLevel_INFO,
 								ConfigStateIdx: 1,
-								Config:         "config_unit_one",
+								Config: &proto.UnitExpectedConfig{
+									Id: "config_unit_one",
+								},
 							},
 							{
 								Id:             unitTwo.id,
 								Type:           proto.UnitType_INPUT,
 								State:          proto.State_HEALTHY,
+								LogLevel:       proto.UnitLogLevel_INFO,
 								ConfigStateIdx: 1,
-								Config:         "config_unit_two",
+								Config: &proto.UnitExpectedConfig{
+									Id: "config_unit_two",
+								},
 							},
 						},
 					}
@@ -209,15 +230,17 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 								Id:             unitOne.id,
 								Type:           proto.UnitType_OUTPUT,
 								State:          proto.State_HEALTHY,
+								LogLevel:       proto.UnitLogLevel_INFO,
 								ConfigStateIdx: 1,
-								Config:         "",
+								Config:         nil,
 							},
 							{
 								Id:             unitTwo.id,
 								Type:           proto.UnitType_INPUT,
 								State:          proto.State_STOPPED,
+								LogLevel:       proto.UnitLogLevel_INFO,
 								ConfigStateIdx: 1,
-								Config:         "",
+								Config:         nil,
 							},
 						},
 					}
@@ -229,8 +252,9 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 								Id:             unitOne.id,
 								Type:           proto.UnitType_OUTPUT,
 								State:          proto.State_HEALTHY,
+								LogLevel:       proto.UnitLogLevel_INFO,
 								ConfigStateIdx: 1,
-								Config:         "",
+								Config:         nil,
 							},
 						},
 					}
@@ -276,7 +300,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 						"custom": "payload",
 					})
 				case UnitChangedModified:
-					state, _ := change.Unit.Expected()
+					state, _, _ := change.Unit.Expected()
 					if state == UnitStateStopped {
 						change.Unit.UpdateState(UnitStateStopping, "Stopping", nil)
 						go func() {
@@ -343,8 +367,9 @@ func TestClientV2_Actions(t *testing.T) {
 							Id:             mock.NewID(),
 							Type:           proto.UnitType_OUTPUT,
 							State:          proto.State_HEALTHY,
+							LogLevel:       proto.UnitLogLevel_INFO,
 							ConfigStateIdx: 1,
-							Config:         "config",
+							Config:         &proto.UnitExpectedConfig{},
 						},
 					},
 				}
