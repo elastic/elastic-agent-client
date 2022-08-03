@@ -25,16 +25,16 @@ const (
 type UnitLogLevel proto.UnitLogLevel
 
 const (
-	// UnitLogLevelTrace is when the unit should log at trace level.
-	UnitLogLevelTrace = UnitLogLevel(proto.UnitLogLevel_TRACE)
-	// UnitLogLevelDebug is when the unit should log at debug level.
-	UnitLogLevelDebug = UnitLogLevel(proto.UnitLogLevel_DEBUG)
-	// UnitLogLevelInfo is when the unit should log at info level.
-	UnitLogLevelInfo = UnitLogLevel(proto.UnitLogLevel_INFO)
-	// UnitLogLevelWarn is when the unit should log at warn level.
-	UnitLogLevelWarn = UnitLogLevel(proto.UnitLogLevel_WARN)
 	// UnitLogLevelError is when the unit should log at error level.
 	UnitLogLevelError = UnitLogLevel(proto.UnitLogLevel_ERROR)
+	// UnitLogLevelWarn is when the unit should log at warn level.
+	UnitLogLevelWarn = UnitLogLevel(proto.UnitLogLevel_WARN)
+	// UnitLogLevelInfo is when the unit should log at info level.
+	UnitLogLevelInfo = UnitLogLevel(proto.UnitLogLevel_INFO)
+	// UnitLogLevelDebug is when the unit should log at debug level.
+	UnitLogLevelDebug = UnitLogLevel(proto.UnitLogLevel_DEBUG)
+	// UnitLogLevelTrace is when the unit should log at trace level.
+	UnitLogLevelTrace = UnitLogLevel(proto.UnitLogLevel_TRACE)
 )
 
 // UnitState is the state for the unit, used both for expected and observed state.
