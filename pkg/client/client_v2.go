@@ -36,6 +36,16 @@ type UnitChanged struct {
 	Unit *Unit
 }
 
+// AgentInfo is the information about the running Elastic Agent that the client is connected to.
+type AgentInfo struct {
+	// ID is the Elastic Agent ID.
+	ID string
+	// Version is the version of the running Elastic Agent.
+	Version string
+	// Snapshot is true when the running version of the Elastic Agent is a snapshot.
+	Snapshot bool
+}
+
 // VersionInfo is the version information for the connecting client.
 type VersionInfo struct {
 	// Name is the name of the program.
@@ -62,6 +72,10 @@ type V2 interface {
 	Errors() <-chan error
 	// Artifacts returns the artifacts client.
 	Artifacts() ArtifactsClient
+	// AgentInfo returns the information about the running Elastic Agent that the client is connected to.
+	//
+	// nil can be returned when the client has never connected.
+	AgentInfo() *AgentInfo
 }
 
 // clientV2 manages the state and communication to the Elastic Agent over the V2 control protocol.
@@ -69,6 +83,9 @@ type clientV2 struct {
 	target string
 	opts   []grpc.DialOption
 	token  string
+
+	agentInfoMu sync.RWMutex
+	agentInfo   *AgentInfo
 
 	versionInfo     VersionInfo
 	versionInfoSent bool
@@ -149,6 +166,15 @@ func (c *clientV2) Artifacts() ArtifactsClient {
 	return &artifactsClient{c}
 }
 
+// AgentInfo returns the information about the running Elastic Agent that the client is connected to.
+//
+// nil can be returned when the client has never connected.
+func (c *clientV2) AgentInfo() *AgentInfo {
+	c.agentInfoMu.RLock()
+	defer c.agentInfoMu.RUnlock()
+	return c.agentInfo
+}
+
 // startCheckin starts the go routines to send and receive check-ins
 //
 // This starts 3 go routines to manage the check-in bi-directional stream. The first
@@ -203,6 +229,15 @@ func (c *clientV2) checkinRoundTrip() {
 				}
 				close(done)
 				return
+			}
+			if expected.AgentInfo != nil {
+				c.agentInfoMu.Lock()
+				c.agentInfo = &AgentInfo{
+					ID:       expected.AgentInfo.Id,
+					Version:  expected.AgentInfo.Version,
+					Snapshot: expected.AgentInfo.Snapshot,
+				}
+				c.agentInfoMu.Unlock()
 			}
 			c.syncUnits(expected)
 		}
@@ -300,7 +335,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 		unit := c.findUnit(agentUnit.Id, UnitType(agentUnit.Type))
 		if unit == nil {
 			// new unit
-			unit = newUnit(agentUnit.Id, UnitType(agentUnit.Type), UnitState(agentUnit.State), agentUnit.Config, agentUnit.ConfigStateIdx, c)
+			unit = newUnit(agentUnit.Id, UnitType(agentUnit.Type), UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx, c)
 			c.units = append(c.units, unit)
 			c.unitsCh <- UnitChanged{
 				Type: UnitChangedAdded,
@@ -308,7 +343,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			}
 		} else {
 			// existing unit
-			if unit.updateState(UnitState(agentUnit.State), agentUnit.Config, agentUnit.ConfigStateIdx) {
+			if unit.updateState(UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx) {
 				c.unitsCh <- UnitChanged{
 					Type: UnitChangedModified,
 					Unit: unit,
