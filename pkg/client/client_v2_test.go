@@ -6,7 +6,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -495,14 +494,7 @@ func updateUnits(t *testing.T, observed *proto.CheckinObserved, units ...*Unit) 
 			if unit.id == observedUnit.Id && unit.unitType == UnitType(observedUnit.Type) {
 				unit.state = UnitState(observedUnit.State)
 				unit.stateMsg = observedUnit.Message
-				unit.statePayloadEncoded = observedUnit.Payload
-				if unit.statePayloadEncoded == nil {
-					unit.statePayload = nil
-				} else {
-					if err := json.Unmarshal(unit.statePayloadEncoded, &unit.statePayload); err != nil {
-						t.Fatal(err)
-					}
-				}
+				unit.statePayload = observedUnit.Payload
 			}
 		}
 	}

@@ -5,8 +5,10 @@
 package client
 
 import (
-	"encoding/json"
+	"reflect"
 	"sync"
+
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
@@ -70,11 +72,10 @@ type Unit struct {
 	config    *proto.UnitExpectedConfig
 	configIdx uint64
 
-	stateMu             sync.RWMutex
-	state               UnitState
-	stateMsg            string
-	statePayload        map[string]interface{}
-	statePayloadEncoded json.RawMessage
+	stateMu      sync.RWMutex
+	state        UnitState
+	stateMsg     string
+	statePayload *structpb.Struct
 
 	amx     sync.RWMutex
 	actions map[string]Action
@@ -103,15 +104,15 @@ func (u *Unit) Expected() (UnitState, UnitLogLevel, *proto.UnitExpectedConfig) {
 func (u *Unit) State() (UnitState, string, map[string]interface{}) {
 	u.stateMu.RLock()
 	defer u.stateMu.RUnlock()
-	return u.state, u.stateMsg, u.statePayload
+	return u.state, u.stateMsg, u.statePayload.AsMap()
 }
 
 // UpdateState updates the state for the unit.
 func (u *Unit) UpdateState(state UnitState, message string, payload map[string]interface{}) error {
-	var encoded json.RawMessage
+	var statePayload *structpb.Struct
 	var err error
 	if payload != nil {
-		encoded, err = json.Marshal(payload)
+		statePayload, err = structpb.NewStruct(payload)
 		if err != nil {
 			return err
 		}
@@ -127,9 +128,8 @@ func (u *Unit) UpdateState(state UnitState, message string, payload map[string]i
 		u.stateMsg = message
 		changed = true
 	}
-	u.statePayload = payload
-	if (u.statePayloadEncoded == nil && encoded != nil) || (u.statePayloadEncoded != nil && encoded == nil) || (string(u.statePayloadEncoded) != string(encoded)) {
-		u.statePayloadEncoded = encoded
+	if (u.statePayload == nil && statePayload != nil) || (u.statePayload != nil && statePayload == nil) || !reflect.DeepEqual(u.statePayload, statePayload) {
+		u.statePayload = statePayload
 		changed = true
 	}
 	if changed {
@@ -219,7 +219,7 @@ func (u *Unit) toObserved() *proto.UnitObserved {
 		ConfigStateIdx: cfgIdx,
 		State:          proto.State(u.state),
 		Message:        u.stateMsg,
-		Payload:        u.statePayloadEncoded,
+		Payload:        u.statePayload,
 	}
 }
 

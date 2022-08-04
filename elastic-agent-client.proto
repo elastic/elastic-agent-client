@@ -306,7 +306,7 @@ message UnitObserved {
     // Exposed to users to provide more detail about the state for this single unit.
     string message = 5;
     // JSON encoded payload for the state.
-    bytes payload = 6;
+    google.protobuf.Struct payload = 6;
 }
 
 // Observed version information for the running program.
