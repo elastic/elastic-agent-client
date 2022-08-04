@@ -1727,7 +1727,7 @@ type UnitObserved struct {
 	// Human readable message for the state of the unit.
 	// Exposed to users to provide more detail about the state for this single unit.
 	Message string `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`
-	// JSON encoded payload for the state.
+	// Payload for the current state.
 	Payload *structpb.Struct `protobuf:"bytes,6,opt,name=payload,proto3" json:"payload,omitempty"`
 }
 
