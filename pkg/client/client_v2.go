@@ -30,6 +30,19 @@ const (
 	UnitChangedRemoved UnitChangedType = 3
 )
 
+// String returns string representation for the unit changed type.
+func (t UnitChangedType) String() string {
+	switch t {
+	case UnitChangedAdded:
+		return "added"
+	case UnitChangedModified:
+		return "modified"
+	case UnitChangedRemoved:
+		return "removed"
+	}
+	return "unknown"
+}
+
 // UnitChanged is what is sent over the UnitChanges channel any time a unit is added, modified, or removed.
 type UnitChanged struct {
 	Type UnitChangedType

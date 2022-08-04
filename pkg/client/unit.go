@@ -23,6 +23,17 @@ const (
 	UnitTypeOutput = UnitType(proto.UnitType_OUTPUT)
 )
 
+// String returns string representation for the unit type.
+func (t UnitType) String() string {
+	switch t {
+	case UnitTypeInput:
+		return "input"
+	case UnitTypeOutput:
+		return "output"
+	}
+	return "unknown"
+}
+
 // UnitLogLevel is the log level the unit should run at.
 type UnitLogLevel proto.UnitLogLevel
 
@@ -38,6 +49,23 @@ const (
 	// UnitLogLevelTrace is when the unit should log at trace level.
 	UnitLogLevelTrace = UnitLogLevel(proto.UnitLogLevel_TRACE)
 )
+
+// String returns string representation for the unit log level.
+func (l UnitLogLevel) String() string {
+	switch l {
+	case UnitLogLevelError:
+		return "error"
+	case UnitLogLevelWarn:
+		return "warn"
+	case UnitLogLevelInfo:
+		return "info"
+	case UnitLogLevelDebug:
+		return "debug"
+	case UnitLogLevelTrace:
+		return "trace"
+	}
+	return "unknown"
+}
 
 // UnitState is the state for the unit, used both for expected and observed state.
 type UnitState proto.State
@@ -58,6 +86,27 @@ const (
 	// UnitStateStopped is when the unit is stopped.
 	UnitStateStopped = UnitState(proto.State_STOPPED)
 )
+
+// String returns string representation for the unit state.
+func (l UnitState) String() string {
+	switch l {
+	case UnitStateStarting:
+		return "starting"
+	case UnitStateConfiguring:
+		return "configuring"
+	case UnitStateHealthy:
+		return "healthy"
+	case UnitStateDegraded:
+		return "degraded"
+	case UnitStateFailed:
+		return "failed"
+	case UnitStateStopping:
+		return "stopping"
+	case UnitStateStopped:
+		return "stopped"
+	}
+	return "unknown"
+}
 
 // Unit represents a distinct item that needs to be operating with-in this process.
 //
