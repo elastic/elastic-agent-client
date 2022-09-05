@@ -3,7 +3,6 @@
     name: Ingest-manager/elastic-agent-client
     display-name: Elastic Agent Client
     description: Jenkins pipeline for the Elastic Agent Client project
-    view: Beats
     project-type: multibranch
     script-path: .ci/Jenkinsfile
     scm:
