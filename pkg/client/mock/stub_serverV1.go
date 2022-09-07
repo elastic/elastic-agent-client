@@ -23,15 +23,18 @@ type StubServerAction func(*proto.ActionResponse) error
 
 // PerformAction is the stubbed action type for the mocked server
 type PerformAction struct {
-	Name     string
-	Params   []byte
-	Callback func(map[string]interface{}, error)
-	UnitID   string
-	UnitType proto.UnitType
+	Type         proto.ActionRequest_Type
+	Name         string
+	Params       []byte
+	Callback     func(map[string]interface{}, error)
+	DiagCallback func([]*proto.ActionDiagnosticUnitResult, error)
+	UnitID       string
+	UnitType     proto.UnitType
 }
 
 type actionResultCh struct {
 	Result map[string]interface{}
+	Diag   []*proto.ActionDiagnosticUnitResult
 	Err    error
 }
 
