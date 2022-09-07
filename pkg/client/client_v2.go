@@ -94,7 +94,7 @@ type V2 interface {
 	// nil can be returned when the client has never connected.
 	AgentInfo() *AgentInfo
 	// RegisterDiagnosticHook registers a diagnostic hook function that will get called when diagnostics is called for
-	// as specific unit. Registering the hook at the client level means it will be called for every unit that has
+	// a specific unit. Registering the hook at the client level means it will be called for every unit that has
 	// diagnostics requested.
 	RegisterDiagnosticHook(name string, description string, filename string, contentType string, hook DiagnosticHook)
 }
