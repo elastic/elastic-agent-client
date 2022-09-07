@@ -565,6 +565,13 @@ func TestClientV2_DiagnosticAction(t *testing.T) {
 	unit := units[0]
 	unitsMu.Unlock()
 
+	client.RegisterDiagnosticHook("custom_component", "customer diagnostic for the component", "custom_component.txt", "plain/text", func() []byte {
+		return []byte("custom component")
+	})
+	unit.RegisterDiagnosticHook("custom_unit", "custom diagnostic for the unit", "custom_unit.txt", "plain/text", func() []byte {
+		return []byte("custom unit")
+	})
+
 	res, err := srv.PerformDiagnostic(unit.id, proto.UnitType(unit.unitType))
 	assert.NoError(t, err)
 
@@ -572,7 +579,7 @@ func TestClientV2_DiagnosticAction(t *testing.T) {
 	for _, d := range res {
 		names = append(names, d.Name)
 	}
-	assert.ElementsMatch(t, names, []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex"})
+	assert.ElementsMatch(t, names, []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex", "custom_component", "custom_unit"})
 }
 
 func storeErrors(ctx context.Context, client V2, errs *[]error, lock *sync.Mutex) {
