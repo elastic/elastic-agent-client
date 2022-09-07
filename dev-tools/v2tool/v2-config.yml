@@ -1,0 +1,26 @@
+args:
+  - loadgenerator
+rules:
+  input/loadgenerator:
+    start:
+      OnStart: {}
+    stop:
+      After:
+        time: 10s
+inputs:
+  - id: input/loadgenerator
+    name: test-integration-1
+    type: input/loadgenerator
+    start:
+      OnStart
+    stop:
+      After:
+        time: 10s
+    streams:
+      - id: test-stream-1
+        delay: 0s
+        timedelta: 1s
+        currenttime: false
+        eventscount: 1000
+        loop: false
+        outfile: /tmp/outtestcfg.log
