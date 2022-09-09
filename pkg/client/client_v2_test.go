@@ -472,6 +472,116 @@ func TestClientV2_Actions(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestClientV2_DiagnosticAction(t *testing.T) {
+	var m sync.Mutex
+	token := mock.NewID()
+	gotInit := false
+	srv := mock.StubServerV2{
+		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+			if observed.Token == token {
+				return &proto.CheckinExpected{
+					Units: []*proto.UnitExpected{
+						{
+							Id:             mock.NewID(),
+							Type:           proto.UnitType_OUTPUT,
+							State:          proto.State_HEALTHY,
+							LogLevel:       proto.UnitLogLevel_INFO,
+							ConfigStateIdx: 1,
+							Config:         &proto.UnitExpectedConfig{},
+						},
+					},
+				}
+			}
+			// disconnect
+			return nil
+		},
+		ActionImpl: func(response *proto.ActionResponse) error {
+			m.Lock()
+			defer m.Unlock()
+
+			if response.Token != token {
+				return fmt.Errorf("invalid token")
+			}
+			if response.Id == "init" {
+				gotInit = true
+			}
+			return nil
+		},
+		ActionsChan: make(chan *mock.PerformAction, 100),
+		SentActions: make(map[string]*mock.PerformAction),
+	}
+	require.NoError(t, srv.Start())
+	defer srv.Stop()
+
+	var errsMu sync.Mutex
+	var errs []error
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	storeErrors(ctx, client, &errs, &errsMu)
+
+	var unitsMu sync.Mutex
+	var units []*Unit
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case change := <-client.UnitChanges():
+				switch change.Type {
+				case UnitChangedAdded:
+					unitsMu.Lock()
+					units = append(units, change.Unit)
+					unitsMu.Unlock()
+				default:
+					panic("not implemented")
+				}
+			}
+		}
+	}()
+
+	require.NoError(t, client.Start(ctx))
+	defer client.Stop()
+	require.NoError(t, waitFor(func() error {
+		m.Lock()
+		defer m.Unlock()
+
+		if !gotInit {
+			return fmt.Errorf("server never received valid token")
+		}
+		return nil
+	}))
+	require.NoError(t, waitFor(func() error {
+		unitsMu.Lock()
+		defer unitsMu.Unlock()
+
+		if len(units) != 1 {
+			return fmt.Errorf("client never got unit")
+		}
+		return nil
+	}))
+
+	unitsMu.Lock()
+	unit := units[0]
+	unitsMu.Unlock()
+
+	client.RegisterDiagnosticHook("custom_component", "customer diagnostic for the component", "custom_component.txt", "plain/text", func() []byte {
+		return []byte("custom component")
+	})
+	unit.RegisterDiagnosticHook("custom_unit", "custom diagnostic for the unit", "custom_unit.txt", "plain/text", func() []byte {
+		return []byte("custom unit")
+	})
+
+	res, err := srv.PerformDiagnostic(unit.id, proto.UnitType(unit.unitType))
+	assert.NoError(t, err)
+
+	names := make([]string, 0, len(res))
+	for _, d := range res {
+		names = append(names, d.Name)
+	}
+	assert.ElementsMatch(t, names, []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex", "custom_component", "custom_unit"})
+}
+
 func storeErrors(ctx context.Context, client V2, errs *[]error, lock *sync.Mutex) {
 	go func() {
 		for {

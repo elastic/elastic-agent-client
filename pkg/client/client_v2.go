@@ -5,14 +5,18 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"runtime/pprof"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
@@ -89,6 +93,10 @@ type V2 interface {
 	//
 	// nil can be returned when the client has never connected.
 	AgentInfo() *AgentInfo
+	// RegisterDiagnosticHook registers a diagnostic hook function that will get called when diagnostics is called for
+	// a specific unit. Registering the hook at the client level means it will be called for every unit that has
+	// diagnostics requested.
+	RegisterDiagnosticHook(name string, description string, filename string, contentType string, hook DiagnosticHook)
 }
 
 // clientV2 manages the state and communication to the Elastic Agent over the V2 control protocol.
@@ -116,6 +124,9 @@ type clientV2 struct {
 	unitsMu sync.RWMutex
 	units   []*Unit
 
+	dmx       sync.RWMutex
+	diagHooks map[string]diagHook
+
 	storeClient    proto.ElasticAgentStoreClient
 	artifactClient proto.ElasticAgentArtifactClient
 	logClient      proto.ElasticAgentLogClient
@@ -126,7 +137,7 @@ type clientV2 struct {
 
 // NewV2 creates a client connection to Elastic Agent over the V2 control protocol.
 func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.DialOption) V2 {
-	return &clientV2{
+	c := &clientV2{
 		target:          target,
 		opts:            opts,
 		token:           token,
@@ -134,8 +145,11 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.Di
 		kickCh:          make(chan struct{}, 1),
 		errCh:           make(chan error),
 		unitsCh:         make(chan UnitChanged),
+		diagHooks:       make(map[string]diagHook),
 		minCheckTimeout: CheckinMinimumTimeout,
 	}
+	c.registerDefaultDiagnostics()
+	return c
 }
 
 // Start starts the connection to Elastic Agent.
@@ -186,6 +200,20 @@ func (c *clientV2) AgentInfo() *AgentInfo {
 	c.agentInfoMu.RLock()
 	defer c.agentInfoMu.RUnlock()
 	return c.agentInfo
+}
+
+// RegisterDiagnosticHook registers a diagnostic hook function that will get called when diagnostics is called for
+// as specific unit. Registering the hook at the client level means it will be called for every unit that has
+// diagnostics requested.
+func (c *clientV2) RegisterDiagnosticHook(name string, description string, filename string, contentType string, hook DiagnosticHook) {
+	c.dmx.Lock()
+	defer c.dmx.Unlock()
+	c.diagHooks[name] = diagHook{
+		description: description,
+		filename:    filename,
+		contentType: contentType,
+		hook:        hook,
+	}
 }
 
 // startCheckin starts the go routines to send and receive check-ins
@@ -443,14 +471,7 @@ func (c *clientV2) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 			case proto.ActionRequest_CUSTOM:
 				c.tryPerformAction(actionResults, action)
 			case proto.ActionRequest_DIAGNOSTICS:
-				// TODO: Implement the diagnostics action.
-				// At the moment it just returns action type unknown until implemented.
-				actionResults <- &proto.ActionResponse{
-					Token:  c.token,
-					Id:     action.Id,
-					Status: proto.ActionResponse_FAILED,
-					Result: ActionTypeUnknown,
-				}
+				c.tryPerformDiagnostics(actionResults, action)
 			default:
 				actionResults <- &proto.ActionResponse{
 					Token:  c.token,
@@ -579,6 +600,80 @@ func (c *clientV2) tryPerformAction(actionResults chan *proto.ActionResponse, ac
 			Result: resBytes,
 		}
 	}()
+}
+
+func (c *clientV2) tryPerformDiagnostics(actionResults chan *proto.ActionResponse, action *proto.ActionRequest) {
+	// find the unit
+	c.unitsMu.RLock()
+	unit := c.findUnit(action.UnitId, UnitType(action.UnitType))
+	c.unitsMu.RUnlock()
+	if unit == nil {
+		actionResults <- &proto.ActionResponse{
+			Token:  c.token,
+			Id:     action.Id,
+			Status: proto.ActionResponse_FAILED,
+			Result: ActionErrUnitNotFound,
+		}
+		return
+	}
+
+	// gather diagnostics hooks for this unit
+	diagHooks := make(map[string]diagHook)
+	c.dmx.RLock()
+	for n, d := range c.diagHooks {
+		diagHooks[n] = d
+	}
+	c.dmx.RUnlock()
+
+	// unit hooks after client hooks; allows unit specific to override client hooks
+	unit.dmx.RLock()
+	for n, d := range unit.diagHooks {
+		diagHooks[n] = d
+	}
+	unit.dmx.RUnlock()
+
+	// perform diagnostics in goroutine, so we don't block other work
+	go func() {
+		res := make([]*proto.ActionDiagnosticUnitResult, 0, len(diagHooks))
+		for n, d := range diagHooks {
+			content := d.hook()
+			res = append(res, &proto.ActionDiagnosticUnitResult{
+				Name:        n,
+				Filename:    d.filename,
+				Description: d.description,
+				ContentType: d.contentType,
+				Content:     content,
+				Generated:   timestamppb.New(time.Now().UTC()),
+			})
+		}
+		actionResults <- &proto.ActionResponse{
+			Token:      c.token,
+			Id:         action.Id,
+			Status:     proto.ActionResponse_SUCCESS,
+			Diagnostic: res,
+		}
+	}()
+}
+
+func (c *clientV2) registerDefaultDiagnostics() {
+	c.registerPprofDiagnostics("goroutine", "stack traces of all current goroutines")
+	c.registerPprofDiagnostics("heap", "a sampling of memory allocations of live objects")
+	c.registerPprofDiagnostics("allocs", "a sampling of all past memory allocations")
+	c.registerPprofDiagnostics("threadcreate", "stack traces that led to the creation of new OS threads")
+	c.registerPprofDiagnostics("block", "stack traces that led to blocking on synchronization primitives")
+	c.registerPprofDiagnostics("mutex", "stack traces of holders of contended mutexes")
+}
+
+func (c *clientV2) registerPprofDiagnostics(name string, description string) {
+	c.RegisterDiagnosticHook(name, description, fmt.Sprintf("%s.txt", name), "plain/text", func() []byte {
+		var w bytes.Buffer
+		err := pprof.Lookup(name).WriteTo(&w, 1)
+		if err != nil {
+			// error is returned as the content
+			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err))
+		}
+		return w.Bytes()
+	})
 }
 
 func inExpected(unit *Unit, expected []*proto.UnitExpected) bool {

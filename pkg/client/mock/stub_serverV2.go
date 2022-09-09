@@ -135,6 +135,7 @@ func (s *StubServerV2) Actions(server proto.ElasticAgent_ActionsServer) error {
 				s.SentActions[id.String()] = act
 				m.Unlock()
 				err := server.Send(&proto.ActionRequest{
+					Type:     act.Type,
 					Id:       id.String(),
 					Name:     act.Name,
 					Params:   act.Params,
@@ -169,20 +170,38 @@ func (s *StubServerV2) Actions(server proto.ElasticAgent_ActionsServer) error {
 		delete(s.SentActions, response.Id)
 		m.Unlock()
 		var result map[string]interface{}
-		err = json.Unmarshal(response.Result, &result)
-		if err != nil {
-			return err
-		}
-		if response.Status == proto.ActionResponse_FAILED {
-			error, ok := result["error"]
-			if ok {
-				err = fmt.Errorf("%s", error)
-			} else {
-				err = fmt.Errorf("unknown error")
+		if response.Result != nil {
+			err = json.Unmarshal(response.Result, &result)
+			if err != nil {
+				return err
 			}
-			action.Callback(nil, err)
+		}
+		if action.Type == proto.ActionRequest_CUSTOM {
+			if response.Status == proto.ActionResponse_FAILED {
+				error, ok := result["error"]
+				if ok {
+					err = fmt.Errorf("%s", error)
+				} else {
+					err = fmt.Errorf("unknown error")
+				}
+				action.Callback(nil, err)
+			} else {
+				action.Callback(result, nil)
+			}
+		} else if action.Type == proto.ActionRequest_DIAGNOSTICS {
+			if response.Status == proto.ActionResponse_FAILED {
+				error, ok := result["error"]
+				if ok {
+					err = fmt.Errorf("%s", error)
+				} else {
+					err = fmt.Errorf("unknown error")
+				}
+				action.DiagCallback(nil, err)
+			} else {
+				action.DiagCallback(response.Diagnostic, nil)
+			}
 		} else {
-			action.Callback(result, nil)
+			panic("unknown action type")
 		}
 	}
 }
@@ -209,6 +228,24 @@ func (s *StubServerV2) PerformAction(unitID string, unitType proto.UnitType, nam
 	}
 	res := <-resCh
 	return res.Result, res.Err
+}
+
+// PerformDiagnostic is the implementation for the V2 mock server
+func (s *StubServerV2) PerformDiagnostic(unitID string, unitType proto.UnitType) ([]*proto.ActionDiagnosticUnitResult, error) {
+	resCh := make(chan actionResultCh)
+	s.ActionsChan <- &PerformAction{
+		Type:     proto.ActionRequest_DIAGNOSTICS,
+		UnitID:   unitID,
+		UnitType: unitType,
+		DiagCallback: func(diag []*proto.ActionDiagnosticUnitResult, err error) {
+			resCh <- actionResultCh{
+				Diag: diag,
+				Err:  err,
+			}
+		},
+	}
+	res := <-resCh
+	return res.Diag, res.Err
 }
 
 // BeginTx implmenentation for the V2 stub server

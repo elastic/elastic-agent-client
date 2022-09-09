@@ -130,6 +130,9 @@ type Unit struct {
 	actions map[string]Action
 
 	client *clientV2
+
+	dmx       sync.RWMutex
+	diagHooks map[string]diagHook
 }
 
 // ID of the unit.
@@ -232,6 +235,20 @@ func (u *Unit) Logger() LogClient {
 	}
 }
 
+// RegisterDiagnosticHook registers a diagnostic hook function that will get called when diagnostics is called for
+// as this unit. Registering the hook at the unit level means it will only be called when diagnostics is requested
+// for this specific unit.
+func (u *Unit) RegisterDiagnosticHook(name string, description string, filename string, contentType string, hook DiagnosticHook) {
+	u.dmx.Lock()
+	defer u.dmx.Unlock()
+	u.diagHooks[name] = diagHook{
+		description: description,
+		filename:    filename,
+		contentType: contentType,
+		hook:        hook,
+	}
+}
+
 // updateConfig updates the configuration for this unit, triggering the delegate function if set.
 func (u *Unit) updateState(exp UnitState, logLevel UnitLogLevel, cfg *proto.UnitExpectedConfig, cfgIdx uint64) bool {
 	u.expMu.Lock()
@@ -285,5 +302,6 @@ func newUnit(id string, unitType UnitType, exp UnitState, logLevel UnitLogLevel,
 		stateMsg:  "Starting",
 		client:    client,
 		actions:   make(map[string]Action),
+		diagHooks: make(map[string]diagHook),
 	}
 }
