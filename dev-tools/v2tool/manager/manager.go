@@ -1,3 +1,7 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
 package manager
 
 import (
@@ -62,7 +66,7 @@ func InputManagerFromCfg(cfgPath string) (*InputManager, error) {
 		}
 		units = append(units, unit)
 	}
-	return &InputManager{logger: logp.L(), Units: units, clientArgs: inputMgrCfg.Args}, nil
+	return &InputManager{logger: logp.L().Named("input-manager"), Units: units, clientArgs: inputMgrCfg.Args}, nil
 }
 
 // StartInputProcess starts the V2 client
@@ -81,10 +85,11 @@ func (in *InputManager) WriteToClient(info []byte) error {
 	_, err := in.client.Stdin.Write(info)
 	if err != nil {
 		return fmt.Errorf("failed to write connection information: %w", err)
-	} else {
-		// if you remove this the V2 client won't get an EOF, be careful
-		in.client.Stdin.Close()
 	}
+
+	// if you remove this the V2 client won't get an EOF, be careful
+	in.client.Stdin.Close()
+
 	return nil
 }
 

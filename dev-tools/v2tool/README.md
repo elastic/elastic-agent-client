@@ -17,7 +17,7 @@ Flags:
 
 ## Config and rules
 
-To use it, create a `v2-config.yml` file that the `v2tool` will used to configure and start the client.
+To use it, create a `v2-config.yml` file that the `v2tool` will use to configure and start the client.
 The config must have an `args`, `rules` and `inputs` section:
 ```
 args:
@@ -40,7 +40,7 @@ inputs: # Inputs is the config for the entire application. This section can be c
 There are currently two rule types that can be used to start and stop a unit:
 
 - `OnStart`: Starts a unit when the client application first checks in.
-- `After`: Starts or stops a unit after a given internal of time
+- `After`: Starts or stops a unit after a given interval of time
 
 
 ## Usage
