@@ -20,6 +20,7 @@ type Checker interface {
 type OnStart struct {
 }
 
+// // Check to see if the unit is ready to start or stop
 func (m OnStart) Check(_ time.Time, observed *proto.UnitObserved) bool {
 	// on first checkin, the V2 server will get a nil value
 	if observed == nil {
@@ -33,6 +34,7 @@ type After struct {
 	Time time.Duration `config:"time"`
 }
 
+// Check to see if the unit is ready to start or stop
 func (m After) Check(startTime time.Time, _ *proto.UnitObserved) bool {
 	if time.Since(startTime) > m.Time {
 		return true

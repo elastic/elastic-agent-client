@@ -10,13 +10,14 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/dev-tools/v2tool/rules"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	"gopkg.in/yaml.v2"
 )
 
+// InputManager carries all the logic needed run a V2 client,
+// including process handles, and the logic for sending/updating units
 type InputManager struct {
 	logger     *logp.Logger
 	client     *process.Info
@@ -24,11 +25,7 @@ type InputManager struct {
 	clientArgs []string
 }
 
-type Rules struct {
-	Start rules.Checker
-	Stop  rules.Checker
-}
-
+// Unit represents a single V2 config unit as tracked across the lifetime of a test run with the tool.
 type Unit struct {
 	Rules RulesCfg
 	done  bool

@@ -19,7 +19,8 @@ type Config struct {
 	Args   []string            `config:"args"`
 }
 
-// SetupRules represents the raw rules config present in a config
+// RulesCfg represents the rules present in a config
+// A custom Unmarhsal function will transform the user YAML into the interface used throughout the tool runtime
 type RulesCfg struct {
 	Start rules.Rule `config:"start"`
 	Stop  rules.Rule `config:"stop"`

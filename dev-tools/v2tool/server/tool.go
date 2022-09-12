@@ -21,6 +21,7 @@ import (
 	protobuf "google.golang.org/protobuf/proto"
 )
 
+// Tool carries the main management state for the application, including both the V2 server runtime
 type Tool struct {
 	ca         *CertificateAuthority
 	pair       *Pair
@@ -29,6 +30,7 @@ type Tool struct {
 	serverName string
 }
 
+// NewToolServer initializes a new tool server instance
 func NewToolServer(inputMgr *manager.InputManager) (*Tool, error) {
 	serverName, err := genServerName()
 	if err != nil {
@@ -66,6 +68,7 @@ func NewToolServer(inputMgr *manager.InputManager) (*Tool, error) {
 	return tool, nil
 }
 
+// StartServer starts the V2 mock server and writes the connection info to the client
 func (tool *Tool) StartServer() error {
 	log := logp.L()
 	cert, err := tls.X509KeyPair(tool.pair.Crt, tool.pair.Key)
