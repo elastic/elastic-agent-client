@@ -163,12 +163,25 @@ message ActionResponse {
 
 // State codes for the current state.
 enum State {
+    // STARTING is an optional observed state indicating the unit is doing work to start before
+    // transitioning to HEALTHY.
     STARTING = 0;
+    // CONFIGURING is an optional observed state indicating the unit is started and being configured
+    // prior to transitioning to HEALTHY. Typically reported when a units current configuration does
+    // not match its expected configuration.
     CONFIGURING = 1;
+    // HEALTHY is a required observed and expected state. The agent sends an expected state of
+    // HEALTHY when a unit should be started and running.
     HEALTHY = 2;
+    // DEGRADED is an optional observed state indicating the unit experienced a non-fatal error.
     DEGRADED = 3;
+    // FAILED is an optional observed state indicating the unit experienced a fatal error.
     FAILED = 4;
+    // STOPPING is an optional observed state indicating the unit is doing the work required to STOP
+    // before transitioning to STOPPED.
     STOPPING = 5;
+    // STOPPED is a required observed and expected state. The agent sends an expected state of
+    // STOPPED when a unit should stop running.
     STOPPED = 6;
 }
 
@@ -256,7 +269,7 @@ message UnitExpected {
     string id = 1;
     // Unit type.
     UnitType type = 2;
-    // Expected state of the unit.
+    // Expected state of the unit. Will always be one of HEALTHY or STOPPED.
     State state = 3;
     // Index of the either current configuration or new configuration provided.
     uint64 config_state_idx = 4;
@@ -300,7 +313,7 @@ message UnitObserved {
     UnitType type = 2;
     // Current index of the applied configuration.
     uint64 config_state_idx = 3;
-    // State of unit.
+    // Current state of the unit.
     State state = 4;
     // Human readable message for the state of the unit.
     // Exposed to users to provide more detail about the state for this single unit.
