@@ -20,7 +20,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
-	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // UnitChangedType defines types for when units are adjusted.
@@ -386,7 +385,6 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 		} else {
 			// existing unit
 			if unit.updateState(UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx) {
-				logp.L().Debugf("Will send unit update for %s", unit.id)
 				c.unitsCh <- UnitChanged{
 					Type: UnitChangedModified,
 					Unit: unit,
