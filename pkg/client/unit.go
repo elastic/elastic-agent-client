@@ -8,10 +8,10 @@ import (
 	"reflect"
 	"sync"
 
+	gproto "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // UnitType is the type of the unit, either input or output
@@ -252,7 +252,6 @@ func (u *Unit) RegisterDiagnosticHook(name string, description string, filename 
 
 // updateConfig updates the configuration for this unit, triggering the delegate function if set.
 func (u *Unit) updateState(exp UnitState, logLevel UnitLogLevel, cfg *proto.UnitExpectedConfig, cfgIdx uint64) bool {
-	log := logp.L()
 	u.expMu.Lock()
 	defer u.expMu.Unlock()
 	changed := false
@@ -266,7 +265,7 @@ func (u *Unit) updateState(exp UnitState, logLevel UnitLogLevel, cfg *proto.Unit
 	}
 	if u.configIdx != cfgIdx {
 		u.configIdx = cfgIdx
-		if !reflect.DeepEqual(u.config.Source.AsMap(), cfg.Source.AsMap()) {
+		if !gproto.Equal(u.config.Source.ProtoReflect().Interface(), cfg.Source.ProtoReflect().Interface()) {
 			u.config = cfg
 			changed = true
 		}
