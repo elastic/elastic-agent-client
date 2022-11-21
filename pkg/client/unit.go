@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sync"
 
+	gproto "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -264,7 +265,7 @@ func (u *Unit) updateState(exp UnitState, logLevel UnitLogLevel, cfg *proto.Unit
 	}
 	if u.configIdx != cfgIdx {
 		u.configIdx = cfgIdx
-		if u.config != cfg {
+		if !gproto.Equal(u.config.Source, cfg.Source) {
 			u.config = cfg
 			changed = true
 		}
