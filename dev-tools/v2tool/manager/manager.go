@@ -69,7 +69,7 @@ func InputManagerFromCfg(cfgPath string) (*InputManager, error) {
 // StartInputProcess starts the V2 client
 func (in *InputManager) StartInputProcess(path string) error {
 	in.logger.Debugf("Client args are: %v", in.clientArgs)
-	proc, err := process.Start(path, os.Geteuid(), os.Getgid(), in.clientArgs, []string{}, attachOutErr)
+	proc, err := process.Start(path, process.WithArgs(in.clientArgs), process.WithCmdOptions(attachOutErr))
 	if err != nil {
 		return fmt.Errorf("error starting process from path %s: %w", path, err)
 	}
