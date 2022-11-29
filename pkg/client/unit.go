@@ -92,21 +92,21 @@ const (
 func (l UnitState) String() string {
 	switch l {
 	case UnitStateStarting:
-		return "starting"
+		return "STARTING"
 	case UnitStateConfiguring:
-		return "configuring"
+		return "CONFIGURING"
 	case UnitStateHealthy:
-		return "healthy"
+		return "HEALTHY"
 	case UnitStateDegraded:
-		return "degraded"
+		return "DEGRADED"
 	case UnitStateFailed:
-		return "failed"
+		return "FAILED"
 	case UnitStateStopping:
-		return "stopping"
+		return "STOPPING"
 	case UnitStateStopped:
-		return "stopped"
+		return "STOPPED"
 	}
-	return "unknown"
+	return "UNKNOWN"
 }
 
 // Unit represents a distinct item that needs to be operating with-in this process.
