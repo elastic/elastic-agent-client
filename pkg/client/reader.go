@@ -94,3 +94,11 @@ func NewV2FromReader(reader io.Reader, ver VersionInfo) (V2, []Service, error) {
 	}
 	return client, services, nil
 }
+
+// NewV2FromHardcodedConfig creates a "mock" V2 client that will allow a client to run with a hard-coded elastic-agent config.
+// This has a number of limitations, as there's no elastic-agent instance talking to the client; notably, actions and artifacts do not work.
+// This is primarily intended for debugging and development, and the elastic-agent.yml file should contain only the units needed by the client, as the logic
+// that routes a unit to a given input lives in the elastic-agent itself.
+func NewV2FromHardcodedConfig(filename string, _ VersionInfo) (V2, error) {
+	return newV2Reader(filename)
+}

@@ -7,6 +7,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
@@ -63,6 +64,11 @@ type storeClient struct {
 
 // BeginTx starts a transaction for the key-value store.
 func (c *storeClient) BeginTx(ctx context.Context, write bool) (StoreTxClient, error) {
+	// would like to find a less annoying way to bypass the client, but I'm not sure what uses the store,
+	// so not sure of the best way to nil it out.
+	if c.client.filemode {
+		return nil, fmt.Errorf(" client store is disabled: in file-only mode")
+	}
 	txType := proto.StoreTxType_READ_ONLY
 	if write {
 		txType = proto.StoreTxType_READ_WRITE

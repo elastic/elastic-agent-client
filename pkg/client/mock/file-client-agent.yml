@@ -1,0 +1,29 @@
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+    api-key: "example-key"
+    username: "elastic"
+    password: "changeme"
+
+inputs:
+  - type: system/metrics
+    data_stream:
+      namespace: default
+      type: metrics
+    use_output: default
+    streams:
+      - metricset: cpu
+        data_stream:
+          dataset: system.cpu
+          type: metrics
+      - metricset: memory
+        type: metrics
+        data_stream:
+          dataset: system.memory
+      - metricset: network
+        data_stream:
+          dataset: system.network
+      - metricset: filesystem
+        data_stream:
+          dataset: system.filesystem

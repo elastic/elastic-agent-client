@@ -24,6 +24,10 @@ type artifactsClient struct {
 
 // Fetch fetches the artifact from the artifact store.
 func (c *artifactsClient) Fetch(ctx context.Context, id string, sha256 string) ([]byte, error) {
+	// noop on filemode
+	if c.client.filemode {
+		return []byte{}, nil
+	}
 	var data bytes.Buffer
 	client, err := c.client.artifactClient.Fetch(ctx, &proto.ArtifactFetchRequest{
 		Token:  c.client.token,

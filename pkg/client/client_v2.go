@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 // UnitChangedType defines types for when units are adjusted.
@@ -101,6 +102,7 @@ type V2 interface {
 
 // clientV2 manages the state and communication to the Elastic Agent over the V2 control protocol.
 type clientV2 struct {
+	log    *logp.Logger
 	target string
 	opts   []grpc.DialOption
 	token  string
@@ -133,11 +135,17 @@ type clientV2 struct {
 
 	// overridden in tests to make fast
 	minCheckTimeout time.Duration
+
+	// fields for the file-only mode
+	filemode    bool
+	fileInputs  []*proto.UnitExpectedConfig
+	fileOutputs []*proto.UnitExpectedConfig
 }
 
 // NewV2 creates a client connection to Elastic Agent over the V2 control protocol.
 func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.DialOption) V2 {
 	c := &clientV2{
+		log:             logp.L(),
 		target:          target,
 		opts:            opts,
 		token:           token,
@@ -154,6 +162,10 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.Di
 
 // Start starts the connection to Elastic Agent.
 func (c *clientV2) Start(ctx context.Context) error {
+	if c.filemode {
+		go c.sendFileUnits()
+		return nil
+	}
 	c.ctx, c.cancel = context.WithCancel(ctx)
 	conn, err := grpc.DialContext(ctx, c.target, c.opts...)
 	if err != nil {
@@ -364,6 +376,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			c.units[i] = unit
 			i++
 		} else {
+			c.log.Debugf("Unit Sync: %s Unit REMOVED: %s", unit.Type().String(), unit.id)
 			c.unitsCh <- UnitChanged{
 				Type: UnitChangedRemoved,
 				Unit: unit,
@@ -378,6 +391,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			// new unit
 			unit = newUnit(agentUnit.Id, UnitType(agentUnit.Type), UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx, c)
 			c.units = append(c.units, unit)
+			c.log.Debugf("Unit Sync: %s Unit ADDED: %s", unit.Type().String(), unit.id)
 			c.unitsCh <- UnitChanged{
 				Type: UnitChangedAdded,
 				Unit: unit,
@@ -385,6 +399,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 		} else {
 			// existing unit
 			if unit.updateState(UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx) {
+				c.log.Debugf("Unit Sync: %s Unit MODIFIED: %s", unit.Type().String(), unit.id)
 				c.unitsCh <- UnitChanged{
 					Type: UnitChangedModified,
 					Unit: unit,
@@ -674,6 +689,38 @@ func (c *clientV2) registerPprofDiagnostics(name string, description string) {
 		}
 		return w.Bytes()
 	})
+}
+
+func (c *clientV2) sendFileUnits() {
+	// send the output unit
+	for _, outUnit := range c.fileOutputs {
+		unit := newUnit(fmt.Sprintf("file-%s", outUnit.GetType()),
+			UnitTypeOutput,
+			UnitStateHealthy,
+			UnitLogLevelDebug,
+			outUnit,
+			0, c)
+		c.log.Debugf("Unit Sync: %s Unit ADDED: %s", unit.Type().String(), unit.id)
+		c.unitsCh <- UnitChanged{
+			Type: UnitChangedAdded,
+			Unit: unit,
+		}
+	}
+
+	// send input units
+	for _, inUnit := range c.fileInputs {
+		unit := newUnit(fmt.Sprintf("file-%s", inUnit.GetType()),
+			UnitTypeInput,
+			UnitStateHealthy,
+			UnitLogLevelDebug,
+			inUnit,
+			0, c)
+		c.log.Debugf("Unit Sync: %s Unit ADDED: %s", unit.Type().String(), unit.id)
+		c.unitsCh <- UnitChanged{
+			Type: UnitChangedAdded,
+			Unit: unit,
+		}
+	}
 }
 
 func inExpected(unit *Unit, expected []*proto.UnitExpected) bool {

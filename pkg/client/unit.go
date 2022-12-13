@@ -229,6 +229,9 @@ func (u *Unit) Artifacts() ArtifactsClient {
 
 // Logger returns the log client.
 func (u *Unit) Logger() LogClient {
+	if u.client.filemode {
+		return newFilemodeLogger()
+	}
 	return &logClient{
 		client:   u.client,
 		unitID:   u.id,
