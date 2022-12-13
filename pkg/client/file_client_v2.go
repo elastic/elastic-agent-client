@@ -88,6 +88,7 @@ type fileLogger struct {
 	log logp.Logger
 }
 
+// a dummy logger for the filemode client that
 func newFilemodeLogger() LogClient {
 	return fileLogger{
 		log: *logp.L(),
