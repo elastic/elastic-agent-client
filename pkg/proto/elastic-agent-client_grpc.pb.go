@@ -56,7 +56,7 @@ func NewElasticAgentClient(cc grpc.ClientConnInterface) ElasticAgentClient {
 }
 
 func (c *elasticAgentClient) Checkin(ctx context.Context, opts ...grpc.CallOption) (ElasticAgent_CheckinClient, error) {
-	stream, err := c.cc.NewStream(ctx, &ElasticAgent_ServiceDesc.Streams[0], "/agent.client.v2.ElasticAgent/Checkin", opts...)
+	stream, err := c.cc.NewStream(ctx, &ElasticAgent_ServiceDesc.Streams[0], "/agent.control.v2.ElasticAgent/Checkin", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (x *elasticAgentCheckinClient) Recv() (*StateExpected, error) {
 }
 
 func (c *elasticAgentClient) CheckinV2(ctx context.Context, opts ...grpc.CallOption) (ElasticAgent_CheckinV2Client, error) {
-	stream, err := c.cc.NewStream(ctx, &ElasticAgent_ServiceDesc.Streams[1], "/agent.client.v2.ElasticAgent/CheckinV2", opts...)
+	stream, err := c.cc.NewStream(ctx, &ElasticAgent_ServiceDesc.Streams[1], "/agent.control.v2.ElasticAgent/CheckinV2", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (x *elasticAgentCheckinV2Client) Recv() (*CheckinExpected, error) {
 }
 
 func (c *elasticAgentClient) Actions(ctx context.Context, opts ...grpc.CallOption) (ElasticAgent_ActionsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &ElasticAgent_ServiceDesc.Streams[2], "/agent.client.v2.ElasticAgent/Actions", opts...)
+	stream, err := c.cc.NewStream(ctx, &ElasticAgent_ServiceDesc.Streams[2], "/agent.control.v2.ElasticAgent/Actions", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +282,7 @@ func (x *elasticAgentActionsServer) Recv() (*ActionResponse, error) {
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ElasticAgent_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "agent.client.v2.ElasticAgent",
+	ServiceName: "agent.control.v2.ElasticAgent",
 	HandlerType: (*ElasticAgentServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
@@ -334,7 +334,7 @@ func NewElasticAgentStoreClient(cc grpc.ClientConnInterface) ElasticAgentStoreCl
 
 func (c *elasticAgentStoreClient) BeginTx(ctx context.Context, in *StoreBeginTxRequest, opts ...grpc.CallOption) (*StoreBeginTxResponse, error) {
 	out := new(StoreBeginTxResponse)
-	err := c.cc.Invoke(ctx, "/agent.client.v2.ElasticAgentStore/BeginTx", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/agent.control.v2.ElasticAgentStore/BeginTx", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +343,7 @@ func (c *elasticAgentStoreClient) BeginTx(ctx context.Context, in *StoreBeginTxR
 
 func (c *elasticAgentStoreClient) GetKey(ctx context.Context, in *StoreGetKeyRequest, opts ...grpc.CallOption) (*StoreGetKeyResponse, error) {
 	out := new(StoreGetKeyResponse)
-	err := c.cc.Invoke(ctx, "/agent.client.v2.ElasticAgentStore/GetKey", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/agent.control.v2.ElasticAgentStore/GetKey", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -352,7 +352,7 @@ func (c *elasticAgentStoreClient) GetKey(ctx context.Context, in *StoreGetKeyReq
 
 func (c *elasticAgentStoreClient) SetKey(ctx context.Context, in *StoreSetKeyRequest, opts ...grpc.CallOption) (*StoreSetKeyResponse, error) {
 	out := new(StoreSetKeyResponse)
-	err := c.cc.Invoke(ctx, "/agent.client.v2.ElasticAgentStore/SetKey", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/agent.control.v2.ElasticAgentStore/SetKey", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +361,7 @@ func (c *elasticAgentStoreClient) SetKey(ctx context.Context, in *StoreSetKeyReq
 
 func (c *elasticAgentStoreClient) DeleteKey(ctx context.Context, in *StoreDeleteKeyRequest, opts ...grpc.CallOption) (*StoreDeleteKeyResponse, error) {
 	out := new(StoreDeleteKeyResponse)
-	err := c.cc.Invoke(ctx, "/agent.client.v2.ElasticAgentStore/DeleteKey", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/agent.control.v2.ElasticAgentStore/DeleteKey", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +370,7 @@ func (c *elasticAgentStoreClient) DeleteKey(ctx context.Context, in *StoreDelete
 
 func (c *elasticAgentStoreClient) CommitTx(ctx context.Context, in *StoreCommitTxRequest, opts ...grpc.CallOption) (*StoreCommitTxResponse, error) {
 	out := new(StoreCommitTxResponse)
-	err := c.cc.Invoke(ctx, "/agent.client.v2.ElasticAgentStore/CommitTx", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/agent.control.v2.ElasticAgentStore/CommitTx", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +379,7 @@ func (c *elasticAgentStoreClient) CommitTx(ctx context.Context, in *StoreCommitT
 
 func (c *elasticAgentStoreClient) DiscardTx(ctx context.Context, in *StoreDiscardTxRequest, opts ...grpc.CallOption) (*StoreDiscardTxResponse, error) {
 	out := new(StoreDiscardTxResponse)
-	err := c.cc.Invoke(ctx, "/agent.client.v2.ElasticAgentStore/DiscardTx", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/agent.control.v2.ElasticAgentStore/DiscardTx", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -448,7 +448,7 @@ func _ElasticAgentStore_BeginTx_Handler(srv interface{}, ctx context.Context, de
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/agent.client.v2.ElasticAgentStore/BeginTx",
+		FullMethod: "/agent.control.v2.ElasticAgentStore/BeginTx",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ElasticAgentStoreServer).BeginTx(ctx, req.(*StoreBeginTxRequest))
@@ -466,7 +466,7 @@ func _ElasticAgentStore_GetKey_Handler(srv interface{}, ctx context.Context, dec
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/agent.client.v2.ElasticAgentStore/GetKey",
+		FullMethod: "/agent.control.v2.ElasticAgentStore/GetKey",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ElasticAgentStoreServer).GetKey(ctx, req.(*StoreGetKeyRequest))
@@ -484,7 +484,7 @@ func _ElasticAgentStore_SetKey_Handler(srv interface{}, ctx context.Context, dec
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/agent.client.v2.ElasticAgentStore/SetKey",
+		FullMethod: "/agent.control.v2.ElasticAgentStore/SetKey",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ElasticAgentStoreServer).SetKey(ctx, req.(*StoreSetKeyRequest))
@@ -502,7 +502,7 @@ func _ElasticAgentStore_DeleteKey_Handler(srv interface{}, ctx context.Context, 
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/agent.client.v2.ElasticAgentStore/DeleteKey",
+		FullMethod: "/agent.control.v2.ElasticAgentStore/DeleteKey",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ElasticAgentStoreServer).DeleteKey(ctx, req.(*StoreDeleteKeyRequest))
@@ -520,7 +520,7 @@ func _ElasticAgentStore_CommitTx_Handler(srv interface{}, ctx context.Context, d
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/agent.client.v2.ElasticAgentStore/CommitTx",
+		FullMethod: "/agent.control.v2.ElasticAgentStore/CommitTx",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ElasticAgentStoreServer).CommitTx(ctx, req.(*StoreCommitTxRequest))
@@ -538,7 +538,7 @@ func _ElasticAgentStore_DiscardTx_Handler(srv interface{}, ctx context.Context, 
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/agent.client.v2.ElasticAgentStore/DiscardTx",
+		FullMethod: "/agent.control.v2.ElasticAgentStore/DiscardTx",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ElasticAgentStoreServer).DiscardTx(ctx, req.(*StoreDiscardTxRequest))
@@ -550,7 +550,7 @@ func _ElasticAgentStore_DiscardTx_Handler(srv interface{}, ctx context.Context, 
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ElasticAgentStore_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "agent.client.v2.ElasticAgentStore",
+	ServiceName: "agent.control.v2.ElasticAgentStore",
 	HandlerType: (*ElasticAgentStoreServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -602,7 +602,7 @@ func NewElasticAgentArtifactClient(cc grpc.ClientConnInterface) ElasticAgentArti
 }
 
 func (c *elasticAgentArtifactClient) Fetch(ctx context.Context, in *ArtifactFetchRequest, opts ...grpc.CallOption) (ElasticAgentArtifact_FetchClient, error) {
-	stream, err := c.cc.NewStream(ctx, &ElasticAgentArtifact_ServiceDesc.Streams[0], "/agent.client.v2.ElasticAgentArtifact/Fetch", opts...)
+	stream, err := c.cc.NewStream(ctx, &ElasticAgentArtifact_ServiceDesc.Streams[0], "/agent.control.v2.ElasticAgentArtifact/Fetch", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -690,7 +690,7 @@ func (x *elasticAgentArtifactFetchServer) Send(m *ArtifactFetchResponse) error {
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ElasticAgentArtifact_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "agent.client.v2.ElasticAgentArtifact",
+	ServiceName: "agent.control.v2.ElasticAgentArtifact",
 	HandlerType: (*ElasticAgentArtifactServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
@@ -721,7 +721,7 @@ func NewElasticAgentLogClient(cc grpc.ClientConnInterface) ElasticAgentLogClient
 
 func (c *elasticAgentLogClient) Log(ctx context.Context, in *LogMessageRequest, opts ...grpc.CallOption) (*LogMessageResponse, error) {
 	out := new(LogMessageResponse)
-	err := c.cc.Invoke(ctx, "/agent.client.v2.ElasticAgentLog/Log", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/agent.control.v2.ElasticAgentLog/Log", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -767,7 +767,7 @@ func _ElasticAgentLog_Log_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/agent.client.v2.ElasticAgentLog/Log",
+		FullMethod: "/agent.control.v2.ElasticAgentLog/Log",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ElasticAgentLogServer).Log(ctx, req.(*LogMessageRequest))
@@ -779,7 +779,7 @@ func _ElasticAgentLog_Log_Handler(srv interface{}, ctx context.Context, dec func
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ElasticAgentLog_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "agent.client.v2.ElasticAgentLog",
+	ServiceName: "agent.control.v2.ElasticAgentLog",
 	HandlerType: (*ElasticAgentLogServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
