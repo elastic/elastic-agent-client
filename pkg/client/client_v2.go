@@ -359,6 +359,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 	c.unitsMu.Lock()
 	defer c.unitsMu.Unlock()
 	i := 0
+	removed := false
 	for _, unit := range c.units {
 		if inExpected(unit, expected.Units) {
 			c.units[i] = unit
@@ -368,6 +369,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				Type: UnitChangedRemoved,
 				Unit: unit,
 			}
+			removed = true
 		}
 	}
 	// resize so units that no longer exist are removed from the slice
@@ -391,6 +393,11 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				}
 			}
 		}
+	}
+	if removed {
+		// unit removed send updated observed change so agent is notified now
+		// otherwise it will not be notified until the next checkin timeout
+		c.unitChanged()
 	}
 }
 
