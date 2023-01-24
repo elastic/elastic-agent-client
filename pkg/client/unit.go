@@ -265,7 +265,7 @@ func (u *Unit) updateState(exp UnitState, logLevel UnitLogLevel, cfg *proto.Unit
 	}
 	if u.configIdx != cfgIdx {
 		u.configIdx = cfgIdx
-		if !gproto.Equal(u.config.Source, cfg.Source) {
+		if !gproto.Equal(u.config.GetSource(), cfg.GetSource()) {
 			u.config = cfg
 			changed = true
 		}
