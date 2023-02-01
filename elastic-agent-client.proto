@@ -261,6 +261,8 @@ message UnitExpectedConfig {
     DataStream data_stream = 7;
     // Multiple streams per unit.
     repeated Stream streams = 8;
+    // Features configure, enable and disable optional features.
+    google.protobuf.Struct features = 9;
 }
 
 // A unit that is part of a collector/shipper.
