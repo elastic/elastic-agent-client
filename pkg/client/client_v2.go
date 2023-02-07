@@ -356,7 +356,6 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 
 // syncUnits syncs the expected units with the current state.
 func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
-	// here!!! send happens here
 	c.unitsMu.Lock()
 	defer c.unitsMu.Unlock()
 	i := 0
