@@ -294,11 +294,12 @@ message CheckinAgentInfo {
     bool snapshot = 3;
 }
 
-message Feature {
-    // The original unparsed configuration
-    google.protobuf.Struct source = 1;
-    // Pull out the enabled flag for convenience since it is always necessary.
-    bool enabled = 2;
+message Features {
+    FQDNFeature fqdn = 1;
+}
+
+message FQDNFeature {
+    bool enabled = 1;
 }
 
 // A set of units and their expected states and configuration.
@@ -308,7 +309,7 @@ message CheckinExpected {
     // Agent info is provided only on first CheckinExpected response to the component.
     CheckinAgentInfo agent_info = 2;
 
-    map<string, Feature> features = 3;
+    Features features = 3;
 }
 
 // Observed status for a unit.

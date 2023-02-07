@@ -185,8 +185,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	var m sync.Mutex
 	token := mock.NewID()
 	connected := false
-	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil)
-	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil)
+	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, UnitLogLevelInfo, nil, nil, 0, nil)
+	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, nil, 0, nil)
 	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			m.Lock()
@@ -299,7 +299,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 						"custom": "payload",
 					})
 				case UnitChangedModified:
-					state, _, _ := change.Unit.Expected()
+					state, _, _, _ := change.Unit.Expected()
 					if state == UnitStateStopped {
 						change.Unit.UpdateState(UnitStateStopping, "Stopping", nil)
 						go func() {

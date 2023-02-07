@@ -121,6 +121,7 @@ type Unit struct {
 	logLevel        UnitLogLevel
 	config          *proto.UnitExpectedConfig
 	configIdx       uint64
+	features        *proto.Features
 
 	stateMu      sync.RWMutex
 	state        UnitState
@@ -146,11 +147,11 @@ func (u *Unit) Type() UnitType {
 	return u.unitType
 }
 
-// Expected returns the expected state and config for the unit.
-func (u *Unit) Expected() (UnitState, UnitLogLevel, *proto.UnitExpectedConfig) {
+// Expected returns the expected state, log leve, features and config for the unit.
+func (u *Unit) Expected() (UnitState, UnitLogLevel, *proto.Features, *proto.UnitExpectedConfig) {
 	u.expectedStateMu.RLock()
 	defer u.expectedStateMu.RUnlock()
-	return u.expectedState, u.logLevel, u.config
+	return u.expectedState, u.logLevel, u.features, u.config
 }
 
 // State returns the currently reported state for the unit.
@@ -252,31 +253,40 @@ func (u *Unit) RegisterDiagnosticHook(name string, description string, filename 
 	}
 }
 
-// updateState updates the configuration for this unit, triggering the delegate
-// function if set.
+// updateState updates the configuration for this unit, triggering the delegate function if set.
 func (u *Unit) updateState(
 	exp UnitState,
 	logLevel UnitLogLevel,
+	features *proto.Features,
 	cfg *proto.UnitExpectedConfig,
-	cfgIdx uint64) bool {
+	cfgIdx uint64,
+) bool {
+
 	u.expectedStateMu.Lock()
 	defer u.expectedStateMu.Unlock()
 	changed := false
+
 	if u.expectedState != exp {
 		u.expectedState = exp
 		changed = true
 	}
+
 	if u.logLevel != logLevel {
 		u.logLevel = logLevel
 		changed = true
 	}
+
 	if u.configIdx != cfgIdx {
 		u.configIdx = cfgIdx
-		if !gproto.Equal(u.config.GetSource(), cfg.GetSource()) {
+		if !gproto.Equal(u.config.GetSource(), cfg.GetSource()) ||
+			!gproto.Equal(u.features, features) {
 			u.config = cfg
+			u.features = features
+
 			changed = true
 		}
 	}
+
 	return changed
 }
 
@@ -298,12 +308,22 @@ func (u *Unit) toObserved() *proto.UnitObserved {
 }
 
 // newUnit creates a new unit that needs to be created in this process.
-func newUnit(id string, unitType UnitType, exp UnitState, logLevel UnitLogLevel, cfg *proto.UnitExpectedConfig, cfgIdx uint64, client *clientV2) *Unit {
+func newUnit(
+	id string,
+	unitType UnitType,
+	exp UnitState,
+	logLevel UnitLogLevel,
+	features *proto.Features,
+	cfg *proto.UnitExpectedConfig,
+	cfgIdx uint64,
+	client *clientV2) *Unit {
+
 	return &Unit{
 		id:            id,
 		unitType:      unitType,
 		config:        cfg,
 		configIdx:     cfgIdx,
+		features:      features,
 		expectedState: exp,
 		logLevel:      logLevel,
 		state:         UnitStateStarting,

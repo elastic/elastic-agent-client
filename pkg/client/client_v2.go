@@ -356,7 +356,7 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 
 // syncUnits syncs the expected units with the current state.
 func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
-	// here!!! send hapens here
+	// here!!! send happens here
 	c.unitsMu.Lock()
 	defer c.unitsMu.Unlock()
 	i := 0
@@ -379,7 +379,14 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 		unit := c.findUnit(agentUnit.Id, UnitType(agentUnit.Type))
 		if unit == nil {
 			// new unit
-			unit = newUnit(agentUnit.Id, UnitType(agentUnit.Type), UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx, c)
+			unit = newUnit(
+				agentUnit.Id,
+				UnitType(agentUnit.Type),
+				UnitState(agentUnit.State),
+				UnitLogLevel(agentUnit.LogLevel),
+				expected.Features,
+				agentUnit.Config,
+				agentUnit.ConfigStateIdx, c)
 			c.units = append(c.units, unit)
 			c.changesCh <- UnitChanged{
 				Type: UnitChangedAdded,
@@ -387,7 +394,12 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			}
 		} else {
 			// existing unit
-			if unit.updateState(UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx) {
+			if unit.updateState(
+				UnitState(agentUnit.State),
+				UnitLogLevel(agentUnit.LogLevel),
+				expected.Features,
+				agentUnit.Config,
+				agentUnit.ConfigStateIdx) {
 				c.changesCh <- UnitChanged{
 					Type: UnitChangedModified,
 					Unit: unit,
