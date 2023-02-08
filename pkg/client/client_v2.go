@@ -16,41 +16,37 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	gproto "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 )
 
-// UnitChangedType defines types for when units are adjusted.
-type UnitChangedType int
+// ChangeType defines types for when units are adjusted.
+type ChangeType int
 
+//go:generate stringer -type=ChangeType -linecomment -output client_v2_strings.go
 const (
-	// UnitChangedAdded is when a new unit is added.
-	UnitChangedAdded UnitChangedType = 1
-	// UnitChangedModified is when an existing unit is modified.
-	UnitChangedModified UnitChangedType = 2
-	// UnitChangedRemoved is when an existing unit is removed.
-	UnitChangedRemoved UnitChangedType = 3
+	// ChangeUnitAdded is when a new unit is added.
+	ChangeUnitAdded ChangeType = iota // unit_added
+	// ChangeUnitModified is when an existing unit is modified.
+	ChangeUnitModified // unit_modified
+	// ChangeUnitRemoved is when an existing unit is removed.
+	ChangeUnitRemoved // unit_removed
+	// ChangeFeatureModified is when a feature flag is modified.
+	ChangeFeatureModified // feature_modified
 )
 
-// String returns string representation for the unit changed type.
-func (t UnitChangedType) String() string {
-	switch t {
-	case UnitChangedAdded:
-		return "added"
-	case UnitChangedModified:
-		return "modified"
-	case UnitChangedRemoved:
-		return "removed"
-	}
-	return "unknown"
-}
-
-// UnitChanged is what is sent over the UnitChanges channel any time a unit is added, modified, or removed.
-type UnitChanged struct {
-	Type UnitChangedType
+// Changes is what is sent over the Changes channel any time a change happens:
+//   - a unit is added, modified, or removed
+//   - a feature flag config or state changes
+type Changes struct {
+	Type ChangeType
+	// Unit is any change in a unit.
 	Unit *Unit
+	// Features are all the feature flags and their configs.
+	Features *proto.Features
 }
 
 // AgentInfo is the information about the running Elastic Agent that the client is connected to.
@@ -82,7 +78,7 @@ type V2 interface {
 	// UnitChanges returns the channel the client sends change notifications to.
 	//
 	// User of this client must read from this channel, or it will block the client.
-	UnitChanges() <-chan UnitChanged
+	Changes() <-chan Changes
 	// Errors returns channel of errors that occurred during communication.
 	//
 	// User of this client must read from this channel, or it will block the client.
@@ -121,6 +117,8 @@ type clientV2 struct {
 	kickSendObservedCh chan struct{}
 	errCh              chan error
 	changesCh          chan UnitChanged
+	featuresMu         sync.Mutex
+	features           *proto.Features
 	unitsMu            sync.RWMutex
 	units              []*Unit
 
@@ -147,6 +145,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.Di
 		changesCh:          make(chan UnitChanged),
 		diagHooks:          make(map[string]diagHook),
 		minCheckTimeout:    CheckinMinimumTimeout,
+		features:           &proto.Features{},
 	}
 	c.registerDefaultDiagnostics()
 	return c
@@ -280,7 +279,7 @@ func (c *clientV2) checkinRoundTrip() {
 				}
 				c.agentInfoMu.Unlock()
 			}
-			c.syncUnits(expected)
+			c.sync(expected)
 		}
 	}()
 
@@ -354,7 +353,29 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 	return client.Send(msg)
 }
 
-// syncUnits syncs the expected units with the current state.
+// sync syncs the expected state with the current state.
+func (c *clientV2) sync(expected *proto.CheckinExpected) {
+	c.syncUnits(expected)
+
+}
+func (c *clientV2) syncFeatures(expected *proto.CheckinExpected) {
+	c.featuresMu.Lock()
+	defer c.featuresMu.Unlock()
+
+	if c.features.ConfigStateIdx != expected.Features.ConfigStateIdx {
+		c.features.ConfigStateIdx = expected.Features.ConfigStateIdx
+
+		if !gproto.Equal(c.features, expected.Features) {
+			c.features = expected.Features
+
+			c.changesCh <- Changes{
+				Type:     ChangeFeatureModified,
+				Features: expected.Features,
+			}
+		}
+	}
+}
+
 func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 	c.unitsMu.Lock()
 	defer c.unitsMu.Unlock()
@@ -372,6 +393,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			removed = true
 		}
 	}
+
 	// resize so units that no longer exist are removed from the slice
 	c.units = c.units[:i]
 	for _, agentUnit := range expected.Units {
@@ -383,9 +405,9 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				UnitType(agentUnit.Type),
 				UnitState(agentUnit.State),
 				UnitLogLevel(agentUnit.LogLevel),
-				expected.Features,
 				agentUnit.Config,
-				agentUnit.ConfigStateIdx, c)
+				agentUnit.ConfigStateIdx,
+				c)
 			c.units = append(c.units, unit)
 			c.changesCh <- UnitChanged{
 				Type: UnitChangedAdded,
@@ -396,7 +418,6 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			if unit.updateState(
 				UnitState(agentUnit.State),
 				UnitLogLevel(agentUnit.LogLevel),
-				expected.Features,
 				agentUnit.Config,
 				agentUnit.ConfigStateIdx) {
 				c.changesCh <- UnitChanged{

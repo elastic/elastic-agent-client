@@ -292,10 +292,17 @@ message CheckinAgentInfo {
     bool snapshot = 3;
 }
 
+// Feature flags configurations.
+// Added on Elastic Agent v8.7.1.
 message Features {
-    FQDNFeature fqdn = 1;
+    // Index of the either current configuration or new configuration provided.
+    uint64 config_state_idx = 1;
+
+    FQDNFeature fqdn = 2;
 }
 
+// FQDN feature flag indicates to use FQDN for host.name instead of hostname.
+// Added on Elastic Agent v8.7.1.
 message FQDNFeature {
     bool enabled = 1;
 }
@@ -307,6 +314,8 @@ message CheckinExpected {
     // Agent info is provided only on first CheckinExpected response to the component.
     CheckinAgentInfo agent_info = 2;
 
+    // Features are the expected feature flags configurations.
+    // Added on Elastic Agent v8.7.1.
     Features features = 3;
 }
 

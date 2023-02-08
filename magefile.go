@@ -8,6 +8,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -21,6 +22,7 @@ const (
 	goLicenserRepo    = "github.com/elastic/go-licenser"
 	goProtocGenGo     = "google.golang.org/protobuf/cmd/protoc-gen-go@v1.28"
 	goProtocGenGoGRPC = "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2"
+	stringerRepo      = "golang.org/x/tools/cmd/stringer@v0.5.0"
 )
 
 // Aliases for commands required by master makefile
@@ -54,9 +56,14 @@ func (Prepare) InstallGoLint() error {
 	return GoGet(goLintRepo)
 }
 
-// All runs prepare:installGoLicenser and prepare:installGoLint.
+// InstallStringer install go stringer to generate String methods for constants.
+func (Prepare) InstallStringer() error {
+	return GoInstall(stringerRepo)
+}
+
+// All runs prepare:installGoLicenser, prepare:installGoLint and prepare:installGoLint.
 func (Prepare) All() {
-	mg.SerialDeps(Prepare.InstallGoLicenser, Prepare.InstallGoLint)
+	mg.SerialDeps(Prepare.InstallGoLicenser, Prepare.InstallGoLint, Prepare.InstallStringer)
 }
 
 // Prepare installs the required GRPC tools for generation to occur.
@@ -67,14 +74,38 @@ func (Update) Prepare() error {
 	return GoInstall(goProtocGenGoGRPC)
 }
 
-// Generate generates the GRPC code.
+// Generate generates the necessary GRPC and Go code. It generates both,
+// then reports all errors if any.
 func (Update) Generate() error {
 	defer mg.SerialDeps(Format.All)
-	return sh.RunV(
+
+	errGRPC := sh.RunV(
 		"protoc",
-		"--go_out=pkg/proto", "--go_opt=paths=source_relative",
-		"--go-grpc_out=pkg/proto", "--go-grpc_opt=paths=source_relative",
+		"--go_out=pkg/proto",
+		"--go_opt=paths=source_relative",
+		"--go-grpc_out=pkg/proto",
+		"--go-grpc_opt=paths=source_relative",
 		"elastic-agent-client.proto")
+	if errGRPC != nil {
+		errGRPC = fmt.Errorf("failed to generate GRPC code: %w")
+	}
+
+	errGenerate := sh.RunV("go", "generate", "./...")
+	if errGenerate != nil {
+		errGenerate = fmt.Errorf("failed to run go generate: %w")
+	}
+
+	switch {
+	case errGRPC != nil && errGenerate != nil:
+		return fmt.Errorf("all code generation failed: '%v' and '%v'",
+			errGRPC, errGenerate)
+	case errGRPC != nil:
+		return errGRPC
+	case errGenerate != nil:
+		return errGenerate
+	}
+
+	return nil
 }
 
 // All runs update:prepare then update:generate.

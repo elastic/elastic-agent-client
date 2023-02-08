@@ -257,7 +257,6 @@ func (u *Unit) RegisterDiagnosticHook(name string, description string, filename 
 func (u *Unit) updateState(
 	exp UnitState,
 	logLevel UnitLogLevel,
-	features *proto.Features,
 	cfg *proto.UnitExpectedConfig,
 	cfgIdx uint64,
 ) bool {
@@ -278,11 +277,8 @@ func (u *Unit) updateState(
 
 	if u.configIdx != cfgIdx {
 		u.configIdx = cfgIdx
-		if !gproto.Equal(u.config.GetSource(), cfg.GetSource()) ||
-			!gproto.Equal(u.features, features) {
+		if !gproto.Equal(u.config.GetSource(), cfg.GetSource()) {
 			u.config = cfg
-			u.features = features
-
 			changed = true
 		}
 	}
@@ -313,7 +309,6 @@ func newUnit(
 	unitType UnitType,
 	exp UnitState,
 	logLevel UnitLogLevel,
-	features *proto.Features,
 	cfg *proto.UnitExpectedConfig,
 	cfgIdx uint64,
 	client *clientV2) *Unit {
@@ -323,7 +318,6 @@ func newUnit(
 		unitType:      unitType,
 		config:        cfg,
 		configIdx:     cfgIdx,
-		features:      features,
 		expectedState: exp,
 		logLevel:      logLevel,
 		state:         UnitStateStarting,

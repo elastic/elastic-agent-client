@@ -130,9 +130,9 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-validClient.UnitChanges():
+			case change := <-validClient.Changes():
 				switch change.Type {
-				case UnitChangedAdded:
+				case ChangeUnitAdded:
 					unitsMu.Lock()
 					units = append(units, change.Unit)
 					unitsMu.Unlock()
@@ -185,8 +185,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	var m sync.Mutex
 	token := mock.NewID()
 	connected := false
-	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, UnitLogLevelInfo, nil, nil, 0, nil)
-	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, nil, 0, nil)
+	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil)
+	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil)
 	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			m.Lock()
@@ -289,17 +289,17 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.UnitChanges():
+			case change := <-client.Changes():
 				switch change.Type {
-				case UnitChangedAdded:
+				case ChangeUnitAdded:
 					unitsMu.Lock()
 					units[change.Unit.ID()] = change.Unit
 					unitsMu.Unlock()
 					change.Unit.UpdateState(UnitStateHealthy, "Healthy", map[string]interface{}{
 						"custom": "payload",
 					})
-				case UnitChangedModified:
-					state, _, _, _ := change.Unit.Expected()
+				case ChangeUnitModified:
+					state, _, _ := change.Unit.Expected()
 					if state == UnitStateStopped {
 						change.Unit.UpdateState(UnitStateStopping, "Stopping", nil)
 						go func() {
@@ -307,7 +307,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 							change.Unit.UpdateState(UnitStateStopped, "Stopped", nil)
 						}()
 					}
-				case UnitChangedRemoved:
+				case ChangeUnitRemoved:
 					unitsMu.Lock()
 					delete(units, change.Unit.ID())
 					unitsMu.Unlock()
@@ -408,9 +408,9 @@ func TestClientV2_Actions(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.UnitChanges():
+			case change := <-client.Changes():
 				switch change.Type {
-				case UnitChangedAdded:
+				case ChangeUnitAdded:
 					unitsMu.Lock()
 					units = append(units, change.Unit)
 					unitsMu.Unlock()
@@ -527,9 +527,9 @@ func TestClientV2_DiagnosticAction(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.UnitChanges():
+			case change := <-client.Changes():
 				switch change.Type {
-				case UnitChangedAdded:
+				case ChangeUnitAdded:
 					unitsMu.Lock()
 					units = append(units, change.Unit)
 					unitsMu.Unlock()
