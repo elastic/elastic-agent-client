@@ -295,9 +295,6 @@ message CheckinAgentInfo {
 // Feature flags configurations.
 // Added on Elastic Agent v8.7.1.
 message Features {
-    // Index of the either current configuration or new configuration provided.
-    uint64 config_state_idx = 1;
-
     FQDNFeature fqdn = 2;
 }
 

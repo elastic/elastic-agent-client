@@ -253,37 +253,38 @@ func (u *Unit) RegisterDiagnosticHook(name string, description string, filename 
 	}
 }
 
-// updateState updates the configuration for this unit, triggering the delegate function if set.
+// updateState updates the configuration for this unit, triggering the delegate
+// function if set.
 func (u *Unit) updateState(
 	exp UnitState,
 	logLevel UnitLogLevel,
 	cfg *proto.UnitExpectedConfig,
 	cfgIdx uint64,
-) bool {
+) Trigger {
+
+	var triggers Trigger
 
 	u.expectedStateMu.Lock()
 	defer u.expectedStateMu.Unlock()
-	changed := false
-
 	if u.expectedState != exp {
 		u.expectedState = exp
-		changed = true
+		triggers |= TriggerStateChange
 	}
 
 	if u.logLevel != logLevel {
 		u.logLevel = logLevel
-		changed = true
+		triggers |= TriggerLogLevel
 	}
 
 	if u.configIdx != cfgIdx {
 		u.configIdx = cfgIdx
 		if !gproto.Equal(u.config.GetSource(), cfg.GetSource()) {
 			u.config = cfg
-			changed = true
+			triggers |= TriggerConfig
 		}
 	}
 
-	return changed
+	return triggers
 }
 
 // toObserved returns the observed unit protocol to send over the stream.

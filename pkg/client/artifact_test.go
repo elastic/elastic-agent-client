@@ -65,9 +65,9 @@ func TestArtifact(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.Changes():
+			case change := <-client.UnitChanged():
 				switch change.Type {
-				case ChangeUnitAdded:
+				case UnitChangedAdded:
 					unitsMu.Lock()
 					units = append(units, change.Unit)
 					unitsMu.Unlock()

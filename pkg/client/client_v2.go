@@ -16,33 +16,46 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	gproto "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 )
 
-// ChangeType defines types for when units are adjusted.
-type ChangeType int
-
-//go:generate stringer -type=ChangeType -linecomment -output client_v2_strings.go
-const (
-	// ChangeUnitAdded is when a new unit is added.
-	ChangeUnitAdded ChangeType = iota // unit_added
-	// ChangeUnitModified is when an existing unit is modified.
-	ChangeUnitModified // unit_modified
-	// ChangeUnitRemoved is when an existing unit is removed.
-	ChangeUnitRemoved // unit_removed
-	// ChangeFeatureModified is when a feature flag is modified.
-	ChangeFeatureModified // feature_modified
+//go:generate stringer -type=ChangeType,Trigger -linecomment -output client_v2_strings.go
+type (
+	// ChangeType defines types for when units are adjusted.
+	ChangeType int
+	// Trigger indicates what triggered a change
+	Trigger int
 )
 
-// Changes is what is sent over the Changes channel any time a change happens:
+const (
+	// UnitChangedAdded is when a new unit is added.
+	UnitChangedAdded ChangeType = iota // unit_added
+	// UnitChangedModified is when an existing unit is modified.
+	UnitChangedModified // unit_modified
+	// UnitChangedRemoved is when an existing unit is removed.
+	UnitChangedRemoved // unit_removed
+)
+
+const (
+	// TriggerConfig indicates a change in config triggered the change.
+	TriggerConfig Trigger = iota // config_change_triggered
+	// TriggerFeature indicates a change in the features triggered the change.
+	TriggerFeature // feature_change_triggered
+	// TriggerLogLevel indicates a change the log level triggered the change.
+	TriggerLogLevel // log_level_triggered
+	// TriggerStateChange indicates when a unit state has ganged.
+	TriggerStateChange // state_change_triggered
+)
+
+// UnitChanged is what is sent over the UnitChanged channel any time a change happens:
 //   - a unit is added, modified, or removed
 //   - a feature flag config or state changes
-type Changes struct {
-	Type ChangeType
+type UnitChanged struct {
+	Type     ChangeType
+	Triggers []Trigger
 	// Unit is any change in a unit.
 	Unit *Unit
 	// Features are all the feature flags and their configs.
@@ -78,7 +91,7 @@ type V2 interface {
 	// UnitChanges returns the channel the client sends change notifications to.
 	//
 	// User of this client must read from this channel, or it will block the client.
-	Changes() <-chan Changes
+	UnitChanged() <-chan UnitChanged
 	// Errors returns channel of errors that occurred during communication.
 	//
 	// User of this client must read from this channel, or it will block the client.
@@ -270,15 +283,6 @@ func (c *clientV2) checkinRoundTrip() {
 				close(done)
 				return
 			}
-			if expected.AgentInfo != nil {
-				c.agentInfoMu.Lock()
-				c.agentInfo = &AgentInfo{
-					ID:       expected.AgentInfo.Id,
-					Version:  expected.AgentInfo.Version,
-					Snapshot: expected.AgentInfo.Snapshot,
-				}
-				c.agentInfoMu.Unlock()
-			}
 			c.sync(expected)
 		}
 	}()
@@ -355,25 +359,23 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 
 // sync syncs the expected state with the current state.
 func (c *clientV2) sync(expected *proto.CheckinExpected) {
-	c.syncUnits(expected)
-
-}
-func (c *clientV2) syncFeatures(expected *proto.CheckinExpected) {
-	c.featuresMu.Lock()
-	defer c.featuresMu.Unlock()
-
-	if c.features.ConfigStateIdx != expected.Features.ConfigStateIdx {
-		c.features.ConfigStateIdx = expected.Features.ConfigStateIdx
-
-		if !gproto.Equal(c.features, expected.Features) {
-			c.features = expected.Features
-
-			c.changesCh <- Changes{
-				Type:     ChangeFeatureModified,
-				Features: expected.Features,
-			}
+	if expected.AgentInfo != nil {
+		c.agentInfoMu.Lock()
+		c.agentInfo = &AgentInfo{
+			ID:       expected.AgentInfo.Id,
+			Version:  expected.AgentInfo.Version,
+			Snapshot: expected.AgentInfo.Snapshot,
 		}
+		c.agentInfoMu.Unlock()
 	}
+
+	if expected.Features != nil {
+		c.featuresMu.Lock()
+		c.features = &proto.Features{Fqdn: expected.Features.Fqdn}
+		c.featuresMu.Unlock()
+	}
+
+	c.syncUnits(expected)
 }
 
 func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
@@ -415,7 +417,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			}
 		} else {
 			// existing unit
-			if unit.updateState(
+			triggers := unit.updateState(
 				UnitState(agentUnit.State),
 				UnitLogLevel(agentUnit.LogLevel),
 				agentUnit.Config,

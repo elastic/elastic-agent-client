@@ -130,9 +130,9 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-validClient.Changes():
+			case change := <-validClient.UnitChanged():
 				switch change.Type {
-				case ChangeUnitAdded:
+				case UnitChangedAdded:
 					unitsMu.Lock()
 					units = append(units, change.Unit)
 					unitsMu.Unlock()
@@ -289,16 +289,16 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.Changes():
+			case change := <-client.UnitChanged():
 				switch change.Type {
-				case ChangeUnitAdded:
+				case UnitChangedAdded:
 					unitsMu.Lock()
 					units[change.Unit.ID()] = change.Unit
 					unitsMu.Unlock()
 					change.Unit.UpdateState(UnitStateHealthy, "Healthy", map[string]interface{}{
 						"custom": "payload",
 					})
-				case ChangeUnitModified:
+				case UnitChangedModified:
 					state, _, _ := change.Unit.Expected()
 					if state == UnitStateStopped {
 						change.Unit.UpdateState(UnitStateStopping, "Stopping", nil)
@@ -307,7 +307,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 							change.Unit.UpdateState(UnitStateStopped, "Stopped", nil)
 						}()
 					}
-				case ChangeUnitRemoved:
+				case UnitChangedRemoved:
 					unitsMu.Lock()
 					delete(units, change.Unit.ID())
 					unitsMu.Unlock()
@@ -408,9 +408,9 @@ func TestClientV2_Actions(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.Changes():
+			case change := <-client.UnitChanged():
 				switch change.Type {
-				case ChangeUnitAdded:
+				case UnitChangedAdded:
 					unitsMu.Lock()
 					units = append(units, change.Unit)
 					unitsMu.Unlock()
@@ -527,9 +527,9 @@ func TestClientV2_DiagnosticAction(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.Changes():
+			case change := <-client.UnitChanged():
 				switch change.Type {
-				case ChangeUnitAdded:
+				case UnitChangedAdded:
 					unitsMu.Lock()
 					units = append(units, change.Unit)
 					unitsMu.Unlock()
