@@ -34,11 +34,12 @@ func _() {
 	_ = x[TriggerConfig-0]
 	_ = x[TriggerFeature-1]
 	_ = x[TriggerLogLevel-2]
+	_ = x[TriggerStateChange-3]
 }
 
-const _Trigger_name = "config_change_triggeredfeature_change_triggeredlog_level_triggered"
+const _Trigger_name = "config_change_triggeredfeature_change_triggeredlog_level_triggeredstate_change_triggered"
 
-var _Trigger_index = [...]uint8{0, 23, 47, 66}
+var _Trigger_index = [...]uint8{0, 23, 47, 66, 88}
 
 func (i Trigger) String() string {
 	if i < 0 || i >= Trigger(len(_Trigger_index)-1) {
