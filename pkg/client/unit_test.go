@@ -37,7 +37,7 @@ func TestUnitUpdateWithSameMap(t *testing.T) {
 
 	// This should return false, as the two underlying maps in `source` are the same
 	result := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, newUnit, 2)
-	require.False(t, result)
+	require.Empty(t, result)
 }
 
 func TestUnitUpdateWithNewMap(t *testing.T) {
@@ -57,15 +57,15 @@ func TestUnitUpdateWithNewMap(t *testing.T) {
 
 	// This should return true, as we have an actually new map
 	result := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, newUnit, 2)
-	require.True(t, result)
+	require.NotEmpty(t, result)
 }
 
 func TestUnitUpdateLog(t *testing.T) {
 	result := defaultTest.updateState(UnitStateHealthy, UnitLogLevelInfo, &proto.UnitExpectedConfig{}, 2)
-	require.True(t, result)
+	require.NotEmpty(t, result)
 }
 
 func TestUnitUpdateState(t *testing.T) {
 	result := defaultTest.updateState(UnitStateStopped, UnitLogLevelInfo, &proto.UnitExpectedConfig{}, 2)
-	require.True(t, result)
+	require.NotEmpty(t, result)
 }
