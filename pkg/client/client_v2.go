@@ -50,16 +50,21 @@ const (
 	TriggerStateChange // state_change_triggered
 )
 
+// FeatureFQDN indicates if the FQDN should be used instead of hostname for host.name.
+// See proto.FQDNFeature for details.
 type FeatureFQDN struct {
 	Enabled bool
 }
+
+// Features are configurations for all the features (flag) available.
+// See proto.Features for details.
 type Features struct {
 	FQDN FeatureFQDN
 }
 
 // UnitChanged is what is sent over the UnitChanged channel any time a change happens:
 //   - a unit is added, modified, or removed
-//   - a feature flag config or state changes
+//   - a feature changes
 type UnitChanged struct {
 	Type     ChangeType
 	Triggers []Trigger
@@ -458,12 +463,16 @@ func (c *clientV2) syncFeatures(
 	c.featuresMu.Lock()
 	defer c.featuresMu.Unlock()
 
-	if expected.Features != nil &&
-		c.features.FQDN.Enabled != expected.Features.Fqdn.Enabled {
-		c.features.FQDN.Enabled = expected.Features.Fqdn.Enabled
-		changed.Features.FQDN.Enabled = c.features.FQDN.Enabled
-		changed.Triggers = append(changed.Triggers, TriggerFeature)
-	}
+	// Why did it not work?!
+	// the agent should be sending it every time... and I think it's
+	// it works for metricbeat, and there are mora than one unit on metricbeat as well
+	
+	// if expected.Features != nil &&
+	// 	c.features.FQDN.Enabled != expected.Features.Fqdn.Enabled {
+	c.features.FQDN.Enabled = expected.Features.Fqdn.Enabled
+	changed.Features.FQDN.Enabled = c.features.FQDN.Enabled
+	changed.Triggers = append(changed.Triggers, TriggerFeature)
+	// }
 
 	return changed
 }
