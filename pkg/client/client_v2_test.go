@@ -37,6 +37,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	gotValid := false
 	unitOneID := mock.NewID()
 	unitTwoID := mock.NewID()
+	wantFQDN := true
 	reportedVersion := VersionInfo{}
 	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
@@ -53,6 +54,9 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 						Id:       "elastic-agent-id",
 						Version:  "8.5.0",
 						Snapshot: true,
+					},
+					Features: &proto.Features{
+						Fqdn: &proto.FQDNFeature{Enabled: wantFQDN},
 					},
 					Units: []*proto.UnitExpected{
 						{
@@ -125,12 +129,19 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	// receive the units
 	var unitsMu sync.Mutex
 	var units []*Unit
+	var gotFQDN bool
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case change := <-validClient.UnitChanged():
+				for _, t := range change.Triggers {
+					if t == TriggerFeature {
+						gotFQDN = change.Features.FQDN.Enabled
+					}
+				}
+
 				switch change.Type {
 				case UnitChangedAdded:
 					unitsMu.Lock()
@@ -170,10 +181,13 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	assert.Equal(t, agentInfo.Version, "8.5.0")
 	assert.True(t, agentInfo.Snapshot)
 
+	assert.Equal(t, wantFQDN, gotFQDN)
+
 	assert.Equal(t, units[0].ID(), unitOneID)
 	assert.Equal(t, units[0].Type(), UnitTypeOutput)
 	assert.Equal(t, units[1].ID(), unitTwoID)
 	assert.Equal(t, units[1].Type(), UnitTypeInput)
+
 	assert.Equal(t, reportedVersion.Name, "program")
 	assert.Equal(t, reportedVersion.Version, "v1.0.0")
 	assert.Equal(t, reportedVersion.Meta, map[string]string{
@@ -187,6 +201,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	connected := false
 	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil)
 	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil)
+	wantFQDN := true
 	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			m.Lock()
@@ -224,6 +239,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				} else if (unitOne.state == UnitStateHealthy && unitTwo.state == UnitStateHealthy) || (unitOne.state == UnitStateHealthy && unitTwo.state == UnitStateStopping) {
 					// stop second input
 					return &proto.CheckinExpected{
+						Features: &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -246,6 +262,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				} else if unitOne.state == UnitStateHealthy && unitTwo.state == UnitStateStopped {
 					// input stopped, remove the unit
 					return &proto.CheckinExpected{
+						Features: &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -284,12 +301,20 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	// receive the units
 	var unitsMu sync.Mutex
 	units := make(map[string]*Unit)
+	var gotFQDN bool
+	var gotTriggers []Trigger
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case change := <-client.UnitChanged():
+				for _, t := range change.Triggers {
+					if t == TriggerFeature {
+						gotFQDN = change.Features.FQDN.Enabled
+					}
+				}
+
 				switch change.Type {
 				case UnitChangedAdded:
 					unitsMu.Lock()
@@ -300,6 +325,9 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 					})
 				case UnitChangedModified:
 					state, _, _ := change.Unit.Expected()
+					gotFQDN = change.Features.FQDN.Enabled
+					gotTriggers = change.Triggers
+
 					if state == UnitStateStopped {
 						change.Unit.UpdateState(UnitStateStopping, "Stopping", nil)
 						go func() {
@@ -347,6 +375,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 		return nil
 	}))
 
+	assert.Equal(t, wantFQDN, gotFQDN)
+	assert.Contains(t, gotTriggers, TriggerFeature)
 	assert.Equal(t, UnitStateHealthy, unitOne.state)
 	assert.Equal(t, "Healthy", unitOne.stateMsg)
 	assert.Equal(t, UnitStateStopped, unitTwo.state)

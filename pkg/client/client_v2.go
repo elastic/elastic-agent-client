@@ -50,6 +50,13 @@ const (
 	TriggerStateChange // state_change_triggered
 )
 
+type FeatureFQDN struct {
+	Enabled bool
+}
+type Features struct {
+	FQDN FeatureFQDN
+}
+
 // UnitChanged is what is sent over the UnitChanged channel any time a change happens:
 //   - a unit is added, modified, or removed
 //   - a feature flag config or state changes
@@ -59,7 +66,7 @@ type UnitChanged struct {
 	// Unit is any change in a unit.
 	Unit *Unit
 	// Features are all the feature flags and their configs.
-	Features *proto.Features
+	Features Features
 }
 
 // AgentInfo is the information about the running Elastic Agent that the client is connected to.
@@ -131,7 +138,7 @@ type clientV2 struct {
 	errCh              chan error
 	changesCh          chan UnitChanged
 	featuresMu         sync.Mutex
-	features           *proto.Features
+	features           Features
 	unitsMu            sync.RWMutex
 	units              []*Unit
 
@@ -158,7 +165,6 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.Di
 		changesCh:          make(chan UnitChanged),
 		diagHooks:          make(map[string]diagHook),
 		minCheckTimeout:    CheckinMinimumTimeout,
-		features:           &proto.Features{},
 	}
 	c.registerDefaultDiagnostics()
 	return c
@@ -369,12 +375,6 @@ func (c *clientV2) sync(expected *proto.CheckinExpected) {
 		c.agentInfoMu.Unlock()
 	}
 
-	if expected.Features != nil {
-		c.featuresMu.Lock()
-		c.features = &proto.Features{Fqdn: expected.Features.Fqdn}
-		c.featuresMu.Unlock()
-	}
-
 	c.syncUnits(expected)
 }
 
@@ -388,10 +388,14 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			c.units[i] = unit
 			i++
 		} else {
-			c.changesCh <- UnitChanged{
+			changed := UnitChanged{
 				Type: UnitChangedRemoved,
 				Unit: unit,
 			}
+
+			changed = c.syncFeatures(expected, changed)
+
+			c.changesCh <- changed
 			removed = true
 		}
 	}
@@ -411,10 +415,15 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				agentUnit.ConfigStateIdx,
 				c)
 			c.units = append(c.units, unit)
-			c.changesCh <- UnitChanged{
+
+			changed := UnitChanged{
 				Type: UnitChangedAdded,
 				Unit: unit,
 			}
+
+			changed = c.syncFeatures(expected, changed)
+
+			c.changesCh <- changed
 		} else {
 			// existing unit
 			triggers := unit.updateState(
@@ -422,18 +431,41 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				UnitLogLevel(agentUnit.LogLevel),
 				agentUnit.Config,
 				agentUnit.ConfigStateIdx) {
-				c.changesCh <- UnitChanged{
-					Type: UnitChangedModified,
-					Unit: unit,
+
+				changed := UnitChanged{
+					Triggers: triggers,
+					Type:     UnitChangedModified,
+					Unit:     unit,
 				}
+
+				changed = c.syncFeatures(expected, changed)
+
+				c.changesCh <- changed
 			}
 		}
 	}
+
 	if removed {
 		// unit removed send updated observed change so agent is notified now
 		// otherwise it will not be notified until the next checkin timeout
 		c.unitChanged()
 	}
+}
+
+func (c *clientV2) syncFeatures(
+	expected *proto.CheckinExpected, changed UnitChanged) UnitChanged {
+
+	c.featuresMu.Lock()
+	defer c.featuresMu.Unlock()
+
+	if expected.Features != nil &&
+		c.features.FQDN.Enabled != expected.Features.Fqdn.Enabled {
+		c.features.FQDN.Enabled = expected.Features.Fqdn.Enabled
+		changed.Features.FQDN.Enabled = c.features.FQDN.Enabled
+		changed.Triggers = append(changed.Triggers, TriggerFeature)
+	}
+
+	return changed
 }
 
 // findUnit finds an existing unit.
