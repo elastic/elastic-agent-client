@@ -472,12 +472,14 @@ func (c *clientV2) syncFeatures(
 	// the agent should be sending it every time... and I think it's
 	// it works for metricbeat, and there are mora than one unit on metricbeat as well
 
-	if expected.Features != nil &&
-		c.features.FQDN.Enabled != expected.Features.Fqdn.Enabled {
-		c.features.FQDN.Enabled = expected.Features.Fqdn.Enabled
-		changed.Features.FQDN.Enabled = c.features.FQDN.Enabled
-		changed.Triggers = append(changed.Triggers, TriggerFeature)
-	}
+	// if expected.Features != nil &&
+	// 	c.features.FQDN.Enabled != expected.Features.Fqdn.Enabled {
+
+	c.features.FQDN.Enabled = expected.Features.Fqdn.Enabled
+	changed.Features.FQDN.Enabled = c.features.FQDN.Enabled
+	changed.Triggers = append(changed.Triggers, TriggerFeature)
+	
+	// }
 
 	return changed
 }
