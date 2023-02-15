@@ -27,7 +27,7 @@ type (
 	// ChangeType defines types for when units are adjusted.
 	ChangeType int
 	// Trigger indicates what triggered a change
-	Trigger int
+	Trigger uint
 )
 
 const (
@@ -40,38 +40,26 @@ const (
 )
 
 const (
-	// TriggerConfig indicates a change in config triggered the change.
-	TriggerConfig Trigger = iota // config_change_triggered
-	// TriggerFeature indicates a change in the features triggered the change.
-	TriggerFeature // feature_change_triggered
-	// TriggerLogLevel indicates a change the log level triggered the change.
-	TriggerLogLevel // log_level_triggered
-	// TriggerStateChange indicates when a unit state has ganged.
-	TriggerStateChange // state_change_triggered
+	// TriggeredConfigChange indicates a change in config triggered the change.
+	TriggeredConfigChange Trigger = 1 << iota // config_change_triggered
+	// TriggeredFeatureChange indicates a change in the features triggered the change.
+	TriggeredFeatureChange // feature_change_triggered
+	// TriggeredLogLevelChange indicates a change the log level triggered the change.
+	TriggeredLogLevelChange // log_level_triggered
+	// TriggeredStateChange indicates when a unit state has ganged.
+	TriggeredStateChange // state_change_triggered
 )
-
-// FeatureFQDN indicates if the FQDN should be used instead of hostname for host.name.
-// See proto.FQDNFeature for details.
-type FeatureFQDN struct {
-	Enabled bool
-}
-
-// Features are configurations for all the features (flag) available.
-// See proto.Features for details.
-type Features struct {
-	FQDN FeatureFQDN
-}
 
 // UnitChanged is what is sent over the UnitChanged channel any time a change happens:
 //   - a unit is added, modified, or removed
 //   - a feature changes
 type UnitChanged struct {
 	Type     ChangeType
-	Triggers []Trigger
+	Triggers Trigger
 	// Unit is any change in a unit.
 	Unit *Unit
 	// Features are all the feature flags and their configs.
-	Features Features
+	Features *proto.Features
 }
 
 // AgentInfo is the information about the running Elastic Agent that the client is connected to.
@@ -103,7 +91,7 @@ type V2 interface {
 	// UnitChanges returns the channel the client sends change notifications to.
 	//
 	// User of this client must read from this channel, or it will block the client.
-	UnitChanged() <-chan UnitChanged
+	UnitChanges() <-chan UnitChanged
 	// Errors returns channel of errors that occurred during communication.
 	//
 	// User of this client must read from this channel, or it will block the client.
@@ -143,7 +131,7 @@ type clientV2 struct {
 	errCh              chan error
 	changesCh          chan UnitChanged
 	featuresMu         sync.Mutex
-	features           Features
+	features           *proto.Features
 	unitsMu            sync.RWMutex
 	units              []*Unit
 
@@ -449,7 +437,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				Unit:     unit,
 			})
 
-			if len(changed.Triggers) >= 0 { // a.k.a something changed
+			if changed.Triggers > 0 { // a.k.a something changed
 				c.changesCh <- changed
 			}
 		}
@@ -468,18 +456,13 @@ func (c *clientV2) syncFeatures(
 	c.featuresMu.Lock()
 	defer c.featuresMu.Unlock()
 
-	// Why did it not work?!
-	// the agent should be sending it every time... and I think it's
-	// it works for metricbeat, and there are mora than one unit on metricbeat as well
+	if expected.Features != nil &&
+		c.features.Fqdn.Enabled != expected.Features.Fqdn.Enabled {
 
-	// if expected.Features != nil &&
-	// 	c.features.FQDN.Enabled != expected.Features.Fqdn.Enabled {
-
-	c.features.FQDN.Enabled = expected.Features.Fqdn.Enabled
-	changed.Features.FQDN.Enabled = c.features.FQDN.Enabled
-	changed.Triggers = append(changed.Triggers, TriggerFeature)
-	
-	// }
+		c.features.Fqdn.Enabled = expected.Features.Fqdn.Enabled
+		changed.Features.Fqdn.Enabled = c.features.Fqdn.Enabled
+		changed.Triggers |= TriggeredFeatureChange
+	}
 
 	return changed
 }

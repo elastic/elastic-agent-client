@@ -135,11 +135,9 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-validClient.UnitChanged():
-				for _, t := range change.Triggers {
-					if t == TriggerFeature {
-						gotFQDN = change.Features.FQDN.Enabled
-					}
+			case change := <-validClient.UnitChanges():
+				if change.Triggers&TriggeredFeatureChange == TriggeredFeatureChange {
+					gotFQDN = change.Features.FQDN.Enabled
 				}
 
 				switch change.Type {
@@ -302,17 +300,15 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	var unitsMu sync.Mutex
 	units := make(map[string]*Unit)
 	var gotFQDN bool
-	var gotTriggers []Trigger
+	var gotTriggers Trigger
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.UnitChanged():
-				for _, t := range change.Triggers {
-					if t == TriggerFeature {
-						gotFQDN = change.Features.FQDN.Enabled
-					}
+			case change := <-client.UnitChanges():
+				if change.Triggers&TriggeredFeatureChange == TriggeredFeatureChange {
+					gotFQDN = change.Features.FQDN.Enabled
 				}
 
 				switch change.Type {
@@ -376,7 +372,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	}))
 
 	assert.Equal(t, wantFQDN, gotFQDN)
-	assert.Contains(t, gotTriggers, TriggerFeature)
+	assert.Contains(t, gotTriggers, TriggeredFeatureChange)
 	assert.Equal(t, UnitStateHealthy, unitOne.state)
 	assert.Equal(t, "Healthy", unitOne.stateMsg)
 	assert.Equal(t, UnitStateStopped, unitTwo.state)
@@ -438,7 +434,7 @@ func TestClientV2_Actions(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.UnitChanged():
+			case change := <-client.UnitChanges():
 				switch change.Type {
 				case UnitChangedAdded:
 					unitsMu.Lock()
@@ -557,7 +553,7 @@ func TestClientV2_DiagnosticAction(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.UnitChanged():
+			case change := <-client.UnitChanges():
 				switch change.Type {
 				case UnitChangedAdded:
 					unitsMu.Lock()

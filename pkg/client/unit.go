@@ -259,8 +259,7 @@ func (u *Unit) updateState(
 	exp UnitState,
 	logLevel UnitLogLevel,
 	cfg *proto.UnitExpectedConfig,
-	cfgIdx uint64,
-) Trigger {
+	cfgIdx uint64) Trigger {
 
 	var triggers Trigger
 
@@ -268,19 +267,19 @@ func (u *Unit) updateState(
 	defer u.expectedStateMu.Unlock()
 	if u.expectedState != exp {
 		u.expectedState = exp
-		triggers |= TriggerStateChange
+		triggers |= TriggeredStateChange
 	}
 
 	if u.logLevel != logLevel {
 		u.logLevel = logLevel
-		triggers |= TriggerLogLevel
+		triggers |= TriggeredLogLevelChange
 	}
 
 	if u.configIdx != cfgIdx {
 		u.configIdx = cfgIdx
 		if !gproto.Equal(u.config.GetSource(), cfg.GetSource()) {
 			u.config = cfg
-			triggers |= TriggerConfig
+			triggers |= TriggeredConfigChange
 		}
 	}
 

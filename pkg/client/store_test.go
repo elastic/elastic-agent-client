@@ -65,7 +65,7 @@ func TestStore(t *testing.T) {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-client.UnitChanged():
+			case change := <-client.UnitChanges():
 				switch change.Type {
 				case UnitChangedAdded:
 					unitsMu.Lock()
