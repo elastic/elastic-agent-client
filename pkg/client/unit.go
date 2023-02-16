@@ -118,10 +118,14 @@ type Unit struct {
 
 	expectedStateMu sync.RWMutex
 	expectedState   UnitState
-	logLevel        UnitLogLevel
-	config          *proto.UnitExpectedConfig
-	configIdx       uint64
-	features        *proto.Features
+
+	logLevel  UnitLogLevel
+	config    *proto.UnitExpectedConfig
+	configIdx uint64
+
+	// do I need a mutex?
+	features    *proto.Features
+	featuresIdx uint64 // do I really need it?
 
 	stateMu      sync.RWMutex
 	state        UnitState
@@ -147,11 +151,24 @@ func (u *Unit) Type() UnitType {
 	return u.unitType
 }
 
+type Expected struct {
+	Config   *proto.UnitExpectedConfig
+	Features *proto.Features
+	LogLevel UnitLogLevel
+	State    UnitState
+}
+
 // Expected returns the expected state, log leve, features and config for the unit.
-func (u *Unit) Expected() (UnitState, UnitLogLevel, *proto.Features, *proto.UnitExpectedConfig) {
+func (u *Unit) Expected() Expected {
 	u.expectedStateMu.RLock()
 	defer u.expectedStateMu.RUnlock()
-	return u.expectedState, u.logLevel, u.features, u.config
+
+	return Expected{
+		Config:   u.config,
+		Features: u.features,
+		LogLevel: u.logLevel,
+		State:    u.expectedState,
+	}
 }
 
 // State returns the currently reported state for the unit.
@@ -313,7 +330,7 @@ func newUnit(
 	cfgIdx uint64,
 	client *clientV2) *Unit {
 
-	return &Unit{
+	unit := Unit{
 		id:            id,
 		unitType:      unitType,
 		config:        cfg,
@@ -326,4 +343,9 @@ func newUnit(
 		actions:       make(map[string]Action),
 		diagHooks:     make(map[string]diagHook),
 	}
+
+	if client != nil {
+		unit.features = client.features
+	}
+	return &unit
 }

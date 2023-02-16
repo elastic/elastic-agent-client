@@ -31,31 +31,33 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[TriggeredConfigChange-1]
-	_ = x[TriggeredFeatureChange-2]
-	_ = x[TriggeredLogLevelChange-4]
-	_ = x[TriggeredStateChange-8]
+	_ = x[TriggeredNothing-0]
+	_ = x[TriggeredConfigChange-2]
+	_ = x[TriggeredFeatureChange-4]
+	_ = x[TriggeredLogLevelChange-8]
+	_ = x[TriggeredStateChange-16]
 }
 
 const (
-	_Trigger_name_0 = "config_change_triggeredfeature_change_triggered"
-	_Trigger_name_1 = "log_level_triggered"
-	_Trigger_name_2 = "state_change_triggered"
-)
-
-var (
-	_Trigger_index_0 = [...]uint8{0, 23, 47}
+	_Trigger_name_0 = "nothing_triggered"
+	_Trigger_name_1 = "config_change_triggered"
+	_Trigger_name_2 = "feature_change_triggered"
+	_Trigger_name_3 = "log_level_triggered"
+	_Trigger_name_4 = "state_change_triggered"
 )
 
 func (i Trigger) String() string {
 	switch {
-	case 1 <= i && i <= 2:
-		i -= 1
-		return _Trigger_name_0[_Trigger_index_0[i]:_Trigger_index_0[i+1]]
-	case i == 4:
+	case i == 0:
+		return _Trigger_name_0
+	case i == 2:
 		return _Trigger_name_1
-	case i == 8:
+	case i == 4:
 		return _Trigger_name_2
+	case i == 8:
+		return _Trigger_name_3
+	case i == 16:
+		return _Trigger_name_4
 	default:
 		return "Trigger(" + strconv.FormatInt(int64(i), 10) + ")"
 	}

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	gproto "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -40,6 +41,10 @@ const (
 )
 
 const (
+	// TriggeredNothing is Trigger zero value, nothing was triggered.
+	// It exists only for completeness and documentation purposes.
+	TriggeredNothing Trigger = 0 // nothing_triggered
+
 	// TriggeredConfigChange indicates a change in config triggered the change.
 	TriggeredConfigChange Trigger = 1 << iota // config_change_triggered
 	// TriggeredFeatureChange indicates a change in the features triggered the change.
@@ -132,6 +137,7 @@ type clientV2 struct {
 	changesCh          chan UnitChanged
 	featuresMu         sync.Mutex
 	features           *proto.Features
+	featuresIdx        uint64
 	unitsMu            sync.RWMutex
 	units              []*Unit
 
@@ -158,6 +164,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.Di
 		changesCh:          make(chan UnitChanged),
 		diagHooks:          make(map[string]diagHook),
 		minCheckTimeout:    CheckinMinimumTimeout,
+		features:           &proto.Features{Fqdn: &proto.FQDNFeature{}},
 	}
 	c.registerDefaultDiagnostics()
 	return c
@@ -431,11 +438,20 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 					Unit:     unit,
 				}
 
-			changed := c.syncFeatures(expected, UnitChanged{
+			changed := UnitChanged{
 				Triggers: triggers,
 				Type:     UnitChangedModified,
 				Unit:     unit,
-			})
+			}
+
+			if unit.featuresIdx != c.featuresIdx {
+				unit.featuresIdx = c.featuresIdx
+
+				if !gproto.Equal(unit.features, c.features) {
+					unit.features = c.features
+					changed.Triggers |= TriggeredFeatureChange
+				}
+			}
 
 			if changed.Triggers > 0 { // a.k.a something changed
 				c.changesCh <- changed
