@@ -62,26 +62,26 @@ func (t Trigger) String() string {
 		return "nothing_triggered"
 	}
 
-	if t&TriggeredConfigChange == TriggeredConfigChange {
-		t &= ^TriggeredConfigChange
+	current := t
+	if current&TriggeredConfigChange == TriggeredConfigChange {
+		current &= ^TriggeredConfigChange
 		triggers = append(triggers, "config_change_triggered")
 	}
-	if t&TriggeredFeatureChange == TriggeredFeatureChange {
-		t &= ^TriggeredConfigChange
+	if current&TriggeredFeatureChange == TriggeredFeatureChange {
+		current &= ^TriggeredFeatureChange
 		triggers = append(triggers, "feature_change_triggered")
 	}
-	if t&TriggeredLogLevelChange == TriggeredLogLevelChange {
-		t &= ^TriggeredConfigChange
+	if current&TriggeredLogLevelChange == TriggeredLogLevelChange {
+		current &= ^TriggeredLogLevelChange
 		triggers = append(triggers, "log_level_triggered")
 	}
-	if t&TriggeredStateChange == TriggeredStateChange {
-		t &= ^TriggeredConfigChange
+	if current&TriggeredStateChange == TriggeredStateChange {
+		current &= ^TriggeredStateChange
 		triggers = append(triggers, "state_change_triggered")
 	}
 
-	if t != 0 {
-		return fmt.Sprintf("invalid triggers: %s and %d leftover",
-			strings.Join(triggers, ", "), t)
+	if current != 0 {
+		return fmt.Sprintf("invalid trigger value: %d", t)
 	}
 
 	return strings.Join(triggers, ", ")
