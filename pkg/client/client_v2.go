@@ -375,6 +375,11 @@ func (c *clientV2) sync(expected *proto.CheckinExpected) {
 		c.agentInfoMu.Unlock()
 	}
 
+	if expected.Features != nil {
+		c.features = expected.Features
+		c.featuresIdx = expected.FeaturesIdx
+	}
+
 	c.syncUnits(expected)
 }
 
@@ -392,8 +397,6 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				Type: UnitChangedRemoved,
 				Unit: unit,
 			}
-
-			changed = c.syncFeatures(expected, changed)
 
 			c.changesCh <- changed
 			removed = true
@@ -417,11 +420,11 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			c.units = append(c.units, unit)
 
 			changed := UnitChanged{
-				Type: UnitChangedAdded,
-				Unit: unit,
+				Type:     UnitChangedAdded,
+				Unit:     unit,
+				Triggers: TriggeredFeatureChange,
+				Features: expected.Features,
 			}
-
-			changed = c.syncFeatures(expected, changed)
 
 			c.changesCh <- changed
 		} else {
@@ -444,11 +447,10 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				Unit:     unit,
 			}
 
-			if unit.featuresIdx != c.featuresIdx {
-				unit.featuresIdx = c.featuresIdx
-
-				if !gproto.Equal(unit.features, c.features) {
-					unit.features = c.features
+			if unit.featuresIdx != expected.FeaturesIdx {
+				unit.featuresIdx = expected.FeaturesIdx
+				if !gproto.Equal(unit.features, expected.Features) {
+					unit.features = expected.Features
 					changed.Triggers |= TriggeredFeatureChange
 				}
 			}
@@ -464,23 +466,6 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 		// otherwise it will not be notified until the next checkin timeout
 		c.unitChanged()
 	}
-}
-
-func (c *clientV2) syncFeatures(
-	expected *proto.CheckinExpected, changed UnitChanged) UnitChanged {
-
-	c.featuresMu.Lock()
-	defer c.featuresMu.Unlock()
-
-	if expected.Features != nil &&
-		c.features.Fqdn.Enabled != expected.Features.Fqdn.Enabled {
-
-		c.features.Fqdn.Enabled = expected.Features.Fqdn.Enabled
-		changed.Features.Fqdn.Enabled = c.features.Fqdn.Enabled
-		changed.Triggers |= TriggeredFeatureChange
-	}
-
-	return changed
 }
 
 // findUnit finds an existing unit.
