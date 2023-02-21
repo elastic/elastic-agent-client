@@ -37,28 +37,3 @@ func _() {
 	_ = x[TriggeredLogLevelChange-8]
 	_ = x[TriggeredStateChange-16]
 }
-
-const (
-	_Trigger_name_0 = "nothing_triggered"
-	_Trigger_name_1 = "config_change_triggered"
-	_Trigger_name_2 = "feature_change_triggered"
-	_Trigger_name_3 = "log_level_triggered"
-	_Trigger_name_4 = "state_change_triggered"
-)
-
-func (i Trigger) String() string {
-	switch {
-	case i == 0:
-		return _Trigger_name_0
-	case i == 2:
-		return _Trigger_name_1
-	case i == 4:
-		return _Trigger_name_2
-	case i == 8:
-		return _Trigger_name_3
-	case i == 16:
-		return _Trigger_name_4
-	default:
-		return "Trigger(" + strconv.FormatInt(int64(i), 10) + ")"
-	}
-}

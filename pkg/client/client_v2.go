@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 )
 
-//go:generate stringer -type=ChangeType,Trigger -linecomment -output client_v2_strings.go
+//go:generate stringer -type=ChangeType -linecomment -output client_v2_strings.go
 type (
 	// ChangeType defines types for when units are adjusted.
 	ChangeType int
@@ -54,6 +55,37 @@ const (
 	// TriggeredStateChange indicates when a unit state has ganged.
 	TriggeredStateChange // state_change_triggered
 )
+
+func (t Trigger) String() string {
+	var triggers []string
+	if t == 0 {
+		return "nothing_triggered"
+	}
+
+	if t&TriggeredConfigChange == TriggeredConfigChange {
+		t &= ^TriggeredConfigChange
+		triggers = append(triggers, "config_change_triggered")
+	}
+	if t&TriggeredFeatureChange == TriggeredFeatureChange {
+		t &= ^TriggeredConfigChange
+		triggers = append(triggers, "feature_change_triggered")
+	}
+	if t&TriggeredLogLevelChange == TriggeredLogLevelChange {
+		t &= ^TriggeredConfigChange
+		triggers = append(triggers, "log_level_triggered")
+	}
+	if t&TriggeredStateChange == TriggeredStateChange {
+		t &= ^TriggeredConfigChange
+		triggers = append(triggers, "state_change_triggered")
+	}
+
+	if t != 0 {
+		return fmt.Sprintf("invalid triggers: %s and %d leftover",
+			strings.Join(triggers, ", "), t)
+	}
+
+	return strings.Join(triggers, ", ")
+}
 
 // UnitChanged is what is sent over the UnitChanged channel any time a change happens:
 //   - a unit is added, modified, or removed
@@ -396,6 +428,10 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			changed := UnitChanged{
 				Type: UnitChangedRemoved,
 				Unit: unit,
+				// When a unity is removed, no change to other units but the
+				// features changed as well.
+				Triggers: TriggeredFeatureChange,
+				Features: expected.Features,
 			}
 
 			c.changesCh <- changed
