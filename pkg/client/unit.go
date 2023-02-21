@@ -151,6 +151,7 @@ func (u *Unit) Type() UnitType {
 	return u.unitType
 }
 
+// Expected contains the expected state, log level, features and config for a unit.
 type Expected struct {
 	Config   *proto.UnitExpectedConfig
 	Features *proto.Features
@@ -158,7 +159,7 @@ type Expected struct {
 	State    UnitState
 }
 
-// Expected returns the expected state, log leve, features and config for the unit.
+// Expected returns the expected state, log level, features and config for the unit.
 func (u *Unit) Expected() Expected {
 	u.expectedStateMu.RLock()
 	defer u.expectedStateMu.RUnlock()
