@@ -137,7 +137,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 				return
 			case change := <-validClient.UnitChanges():
 				if change.Triggers&TriggeredFeatureChange == TriggeredFeatureChange {
-					gotFQDN = change.Features.FQDN.Enabled
+					gotFQDN = change.Features.Fqdn.Enabled
 				}
 
 				switch change.Type {
@@ -308,7 +308,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				return
 			case change := <-client.UnitChanges():
 				if change.Triggers&TriggeredFeatureChange == TriggeredFeatureChange {
-					gotFQDN = change.Features.FQDN.Enabled
+					gotFQDN = change.Features.Fqdn.Enabled
 				}
 
 				switch change.Type {
@@ -320,11 +320,11 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 						"custom": "payload",
 					})
 				case UnitChangedModified:
-					state, _, _ := change.Unit.Expected()
-					gotFQDN = change.Features.FQDN.Enabled
+					expected := change.Unit.Expected()
+					gotFQDN = change.Features.Fqdn.Enabled
 					gotTriggers = change.Triggers
 
-					if state == UnitStateStopped {
+					if expected.State == UnitStateStopped {
 						change.Unit.UpdateState(UnitStateStopping, "Stopping", nil)
 						go func() {
 							time.Sleep(100 * time.Millisecond)
@@ -606,6 +606,10 @@ func TestClientV2_DiagnosticAction(t *testing.T) {
 		names = append(names, d.Name)
 	}
 	assert.ElementsMatch(t, names, []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex", "custom_component", "custom_unit"})
+}
+
+func TestTrigger_String(t *testing.T) {
+
 }
 
 func storeErrors(ctx context.Context, client V2, errs *[]error, lock *sync.Mutex) {
