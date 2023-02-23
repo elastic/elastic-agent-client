@@ -483,10 +483,12 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				Unit:     unit,
 			}
 
+			// the problem seems to be here
 			if unit.featuresIdx != expected.FeaturesIdx {
 				unit.featuresIdx = expected.FeaturesIdx
 				if !gproto.Equal(unit.features, expected.Features) {
 					unit.features = expected.Features
+					changed.Features = expected.Features
 					changed.Triggers |= TriggeredFeatureChange
 				}
 			}
