@@ -293,7 +293,6 @@ message CheckinAgentInfo {
 }
 
 // Feature flags configurations.
-// Added on Elastic Agent v8.7.1.
 message Features {
     // Source is the original source of the features. All values from the features
     // are included here even if other concrete fields are defined for this message.
@@ -303,7 +302,6 @@ message Features {
 }
 
 // FQDN feature flag indicates to use FQDN for host.name instead of hostname.
-// Added on Elastic Agent v8.7.1.
 message FQDNFeature {
     bool enabled = 1;
 }

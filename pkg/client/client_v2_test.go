@@ -609,7 +609,38 @@ func TestClientV2_DiagnosticAction(t *testing.T) {
 }
 
 func TestTrigger_String(t *testing.T) {
+	tcs := []struct {
+		Name    string
+		Trigger Trigger
+		Want    string
+	}{
+		{
+			Name: "nothing triggered, zero value",
+			Want: "nothing_triggered",
+		},
+		{
+			Name:    "one change: feature_change_triggered",
+			Trigger: TriggeredFeatureChange,
+			Want:    "feature_change_triggered",
+		},
+		{
+			Name:    "two changes: feature_change_triggered, state_change_triggered",
+			Trigger: TriggeredFeatureChange | TriggeredStateChange,
+			Want:    "feature_change_triggered, state_change_triggered",
+		},
+		{
+			Name:    "invalid trigger value",
+			Trigger: 1618,
+			Want:    "invalid trigger value: 1618",
+		},
+	}
 
+	for _, tc := range tcs {
+		t.Run(tc.Name, func(t *testing.T) {
+			got := tc.Trigger.String()
+			assert.Equal(t, got, tc.Want)
+		})
+	}
 }
 
 func storeErrors(ctx context.Context, client V2, errs *[]error, lock *sync.Mutex) {

@@ -425,16 +425,10 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			c.units[i] = unit
 			i++
 		} else {
-			changed := UnitChanged{
+			c.changesCh <- UnitChanged{
 				Type: UnitChangedRemoved,
 				Unit: unit,
-				// When a unity is removed, no change to other units but the
-				// features changed as well.
-				Triggers: TriggeredFeatureChange,
-				Features: expected.Features,
 			}
-
-			c.changesCh <- changed
 			removed = true
 		}
 	}

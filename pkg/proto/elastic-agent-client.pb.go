@@ -1662,7 +1662,6 @@ func (x *CheckinAgentInfo) GetSnapshot() bool {
 }
 
 // Feature flags configurations.
-// Added on Elastic Agent v8.7.1.
 type Features struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1721,7 +1720,6 @@ func (x *Features) GetFqdn() *FQDNFeature {
 }
 
 // FQDN feature flag indicates to use FQDN for host.name instead of hostname.
-// Added on Elastic Agent v8.7.1.
 type FQDNFeature struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
