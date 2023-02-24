@@ -24,17 +24,16 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 )
 
-//go:generate stringer -type=ChangeType -linecomment -output client_v2_strings.go
 type (
-	// ChangeType defines types for when units are adjusted.
-	ChangeType int
+	// UnitChangedType defines types for when units are adjusted.
+	UnitChangedType int
 	// Trigger indicates what triggered a change
 	Trigger uint
 )
 
 const (
 	// UnitChangedAdded is when a new unit is added.
-	UnitChangedAdded ChangeType = iota // unit_added
+	UnitChangedAdded UnitChangedType = iota // unit_added
 	// UnitChangedModified is when an existing unit is modified.
 	UnitChangedModified // unit_modified
 	// UnitChangedRemoved is when an existing unit is removed.
@@ -87,11 +86,25 @@ func (t Trigger) String() string {
 	return strings.Join(triggers, ", ")
 }
 
+// String returns a string representation for the unit changed type.
+func (t UnitChangedType) String() string {
+	switch t {
+	case UnitChangedAdded:
+		return "added"
+	case UnitChangedModified:
+		return "modified"
+	case UnitChangedRemoved:
+		return "removed"
+	}
+
+	return "unknown"
+}
+
 // UnitChanged is what is sent over the UnitChanged channel any time a change happens:
 //   - a unit is added, modified, or removed
 //   - a feature changes
 type UnitChanged struct {
-	Type     ChangeType
+	Type     UnitChangedType
 	Triggers Trigger
 	// Unit is any change in a unit.
 	Unit *Unit
