@@ -211,6 +211,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				if unitOne.state == UnitStateStarting && unitTwo.state == UnitStateStarting {
 					// first checkin; create units
 					return &proto.CheckinExpected{
+						Features: &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
