@@ -211,7 +211,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				if unitOne.state == UnitStateStarting && unitTwo.state == UnitStateStarting {
 					// first checkin; create units
 					return &proto.CheckinExpected{
-						Features: &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
+						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: false}},
+						FeaturesIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -238,7 +239,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				} else if (unitOne.state == UnitStateHealthy && unitTwo.state == UnitStateHealthy) || (unitOne.state == UnitStateHealthy && unitTwo.state == UnitStateStopping) {
 					// stop second input
 					return &proto.CheckinExpected{
-						Features: &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
+						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
+						FeaturesIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -261,7 +263,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				} else if unitOne.state == UnitStateHealthy && unitTwo.state == UnitStateStopped {
 					// input stopped, remove the unit
 					return &proto.CheckinExpected{
-						Features: &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
+						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
+						FeaturesIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -373,7 +376,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	}))
 
 	assert.Equal(t, wantFQDN, gotFQDN)
-	assert.Contains(t, gotTriggers, TriggeredFeatureChange)
+	assert.Equal(t, gotTriggers&TriggeredFeatureChange, TriggeredFeatureChange)
 	assert.Equal(t, UnitStateHealthy, unitOne.state)
 	assert.Equal(t, "Healthy", unitOne.stateMsg)
 	assert.Equal(t, UnitStateStopped, unitTwo.state)
