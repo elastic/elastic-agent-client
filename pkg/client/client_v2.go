@@ -86,6 +86,8 @@ func (t Trigger) String() string {
 	return strings.Join(triggers, ", ")
 }
 
+func (t Trigger) GoString() string { return t.String() }
+
 // String returns a string representation for the unit changed type.
 func (t UnitChangedType) String() string {
 	switch t {
@@ -98,6 +100,10 @@ func (t UnitChangedType) String() string {
 	}
 
 	return "unknown"
+}
+
+func (t UnitChangedType) GoString() string {
+	return t.String()
 }
 
 // UnitChanged is what is sent over the UnitChanged channel any time a change happens:
@@ -463,10 +469,13 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			c.units = append(c.units, unit)
 
 			changed := UnitChanged{
-				Type:     UnitChangedAdded,
-				Unit:     unit,
-				Triggers: TriggeredFeatureChange,
-				Features: expected.Features,
+				Type: UnitChangedAdded,
+				Unit: unit,
+			}
+
+			if expected.Features != nil {
+				changed.Triggers = TriggeredFeatureChange
+				changed.Features = expected.Features
 			}
 
 			c.changesCh <- changed
