@@ -86,6 +86,7 @@ func (t Trigger) String() string {
 	return strings.Join(triggers, ", ")
 }
 
+// GoString is the same as String, but for the %#v format.
 func (t Trigger) GoString() string { return t.String() }
 
 // String returns a string representation for the unit changed type.
@@ -102,6 +103,7 @@ func (t UnitChangedType) String() string {
 	return "unknown"
 }
 
+// GoString is the same as String, but for the %#v format.
 func (t UnitChangedType) GoString() string {
 	return t.String()
 }
