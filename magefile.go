@@ -22,7 +22,6 @@ const (
 	goLicenserRepo    = "github.com/elastic/go-licenser"
 	goProtocGenGo     = "google.golang.org/protobuf/cmd/protoc-gen-go@v1.28"
 	goProtocGenGoGRPC = "google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2"
-	stringerRepo      = "golang.org/x/tools/cmd/stringer@v0.5.0"
 )
 
 // Aliases for commands required by master makefile
@@ -56,14 +55,9 @@ func (Prepare) InstallGoLint() error {
 	return GoGet(goLintRepo)
 }
 
-// InstallStringer install go stringer to generate String methods for constants.
-func (Prepare) InstallStringer() error {
-	return GoInstall(stringerRepo)
-}
-
 // All runs prepare:installGoLicenser, prepare:installGoLint and prepare:installGoLint.
 func (Prepare) All() {
-	mg.SerialDeps(Prepare.InstallGoLicenser, Prepare.InstallGoLint, Prepare.InstallStringer)
+	mg.SerialDeps(Prepare.InstallGoLicenser, Prepare.InstallGoLint)
 }
 
 // Prepare installs the required GRPC tools for generation to occur.
