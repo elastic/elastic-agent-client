@@ -10,10 +10,11 @@ import (
 	"os/exec"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/pkg/core/process"
-	"gopkg.in/yaml.v2"
 )
 
 // InputManager carries all the logic needed run a V2 client,

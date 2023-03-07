@@ -116,11 +116,11 @@ type Unit struct {
 	id       string
 	unitType UnitType
 
-	expMu     sync.RWMutex
-	exp       UnitState
-	logLevel  UnitLogLevel
-	config    *proto.UnitExpectedConfig
-	configIdx uint64
+	expectedStateMu sync.RWMutex
+	expectedState   UnitState
+	logLevel        UnitLogLevel
+	config          *proto.UnitExpectedConfig
+	configIdx       uint64
 
 	stateMu      sync.RWMutex
 	state        UnitState
@@ -148,9 +148,9 @@ func (u *Unit) Type() UnitType {
 
 // Expected returns the expected state and config for the unit.
 func (u *Unit) Expected() (UnitState, UnitLogLevel, *proto.UnitExpectedConfig) {
-	u.expMu.RLock()
-	defer u.expMu.RUnlock()
-	return u.exp, u.logLevel, u.config
+	u.expectedStateMu.RLock()
+	defer u.expectedStateMu.RUnlock()
+	return u.expectedState, u.logLevel, u.config
 }
 
 // State returns the currently reported state for the unit.
@@ -181,7 +181,9 @@ func (u *Unit) UpdateState(state UnitState, message string, payload map[string]i
 		u.stateMsg = message
 		changed = true
 	}
-	if (u.statePayload == nil && statePayload != nil) || (u.statePayload != nil && statePayload == nil) || !reflect.DeepEqual(u.statePayload, statePayload) {
+	if (u.statePayload == nil && statePayload != nil) ||
+		(u.statePayload != nil && statePayload == nil) ||
+		!reflect.DeepEqual(u.statePayload, statePayload) {
 		u.statePayload = statePayload
 		changed = true
 	}
@@ -250,13 +252,18 @@ func (u *Unit) RegisterDiagnosticHook(name string, description string, filename 
 	}
 }
 
-// updateConfig updates the configuration for this unit, triggering the delegate function if set.
-func (u *Unit) updateState(exp UnitState, logLevel UnitLogLevel, cfg *proto.UnitExpectedConfig, cfgIdx uint64) bool {
-	u.expMu.Lock()
-	defer u.expMu.Unlock()
+// updateState updates the configuration for this unit, triggering the delegate
+// function if set.
+func (u *Unit) updateState(
+	exp UnitState,
+	logLevel UnitLogLevel,
+	cfg *proto.UnitExpectedConfig,
+	cfgIdx uint64) bool {
+	u.expectedStateMu.Lock()
+	defer u.expectedStateMu.Unlock()
 	changed := false
-	if u.exp != exp {
-		u.exp = exp
+	if u.expectedState != exp {
+		u.expectedState = exp
 		changed = true
 	}
 	if u.logLevel != logLevel {
@@ -275,9 +282,9 @@ func (u *Unit) updateState(exp UnitState, logLevel UnitLogLevel, cfg *proto.Unit
 
 // toObserved returns the observed unit protocol to send over the stream.
 func (u *Unit) toObserved() *proto.UnitObserved {
-	u.expMu.RLock()
+	u.expectedStateMu.RLock()
 	cfgIdx := u.configIdx
-	u.expMu.RUnlock()
+	u.expectedStateMu.RUnlock()
 	u.stateMu.RLock()
 	defer u.stateMu.RUnlock()
 	return &proto.UnitObserved{
@@ -293,16 +300,16 @@ func (u *Unit) toObserved() *proto.UnitObserved {
 // newUnit creates a new unit that needs to be created in this process.
 func newUnit(id string, unitType UnitType, exp UnitState, logLevel UnitLogLevel, cfg *proto.UnitExpectedConfig, cfgIdx uint64, client *clientV2) *Unit {
 	return &Unit{
-		id:        id,
-		unitType:  unitType,
-		config:    cfg,
-		configIdx: cfgIdx,
-		exp:       exp,
-		logLevel:  logLevel,
-		state:     UnitStateStarting,
-		stateMsg:  "Starting",
-		client:    client,
-		actions:   make(map[string]Action),
-		diagHooks: make(map[string]diagHook),
+		id:            id,
+		unitType:      unitType,
+		config:        cfg,
+		configIdx:     cfgIdx,
+		expectedState: exp,
+		logLevel:      logLevel,
+		state:         UnitStateStarting,
+		stateMsg:      "Starting",
+		client:        client,
+		actions:       make(map[string]Action),
+		diagHooks:     make(map[string]diagHook),
 	}
 }
