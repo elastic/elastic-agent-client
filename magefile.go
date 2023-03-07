@@ -55,7 +55,7 @@ func (Prepare) InstallGoLint() error {
 	return GoGet(goLintRepo)
 }
 
-// All runs prepare:installGoLicenser, prepare:installGoLint and prepare:installGoLint.
+// All runs prepare:installGoLicenser and prepare:installGoLint.
 func (Prepare) All() {
 	mg.SerialDeps(Prepare.InstallGoLicenser, Prepare.InstallGoLint)
 }
