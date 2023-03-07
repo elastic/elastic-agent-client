@@ -79,7 +79,7 @@ type V2 interface {
 	Start(ctx context.Context) error
 	// Stop stops the connection to Elastic Agent.
 	Stop()
-	// UnitChanges returns channel client send unit change notifications to.
+	// UnitChanges returns the channel the client sends change notifications to.
 	//
 	// User of this client must read from this channel, or it will block the client.
 	UnitChanges() <-chan UnitChanged
@@ -87,7 +87,7 @@ type V2 interface {
 	//
 	// User of this client must read from this channel, or it will block the client.
 	Errors() <-chan error
-	// Artifacts returns the artifacts client.
+	// Artifacts returns the artifacts' client.
 	Artifacts() ArtifactsClient
 	// AgentInfo returns the information about the running Elastic Agent that the client is connected to.
 	//
@@ -118,11 +118,11 @@ type clientV2 struct {
 	cfgMu  sync.RWMutex
 	obsMu  sync.RWMutex
 
-	kickCh  chan struct{}
-	errCh   chan error
-	unitsCh chan UnitChanged
-	unitsMu sync.RWMutex
-	units   []*Unit
+	kickSendObservedCh chan struct{}
+	errCh              chan error
+	changesCh          chan UnitChanged
+	unitsMu            sync.RWMutex
+	units              []*Unit
 
 	dmx       sync.RWMutex
 	diagHooks map[string]diagHook
@@ -138,15 +138,15 @@ type clientV2 struct {
 // NewV2 creates a client connection to Elastic Agent over the V2 control protocol.
 func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.DialOption) V2 {
 	c := &clientV2{
-		target:          target,
-		opts:            opts,
-		token:           token,
-		versionInfo:     versionInfo,
-		kickCh:          make(chan struct{}, 1),
-		errCh:           make(chan error),
-		unitsCh:         make(chan UnitChanged),
-		diagHooks:       make(map[string]diagHook),
-		minCheckTimeout: CheckinMinimumTimeout,
+		target:             target,
+		opts:               opts,
+		token:              token,
+		versionInfo:        versionInfo,
+		kickSendObservedCh: make(chan struct{}, 1),
+		errCh:              make(chan error),
+		changesCh:          make(chan UnitChanged),
+		diagHooks:          make(map[string]diagHook),
+		minCheckTimeout:    CheckinMinimumTimeout,
 	}
 	c.registerDefaultDiagnostics()
 	return c
@@ -180,7 +180,7 @@ func (c *clientV2) Stop() {
 
 // UnitChanges returns channel client send unit change notifications to.
 func (c *clientV2) UnitChanges() <-chan UnitChanged {
-	return c.unitsCh
+	return c.changesCh
 }
 
 // Errors returns channel of errors that occurred during communication.
@@ -303,7 +303,7 @@ func (c *clientV2) checkinRoundTrip() {
 			select {
 			case <-done:
 				return
-			case <-c.kickCh:
+			case <-c.kickSendObservedCh:
 				if err := c.sendObserved(checkinClient); err != nil {
 					if !errors.Is(err, io.EOF) {
 						c.errCh <- err
@@ -365,7 +365,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			c.units[i] = unit
 			i++
 		} else {
-			c.unitsCh <- UnitChanged{
+			c.changesCh <- UnitChanged{
 				Type: UnitChangedRemoved,
 				Unit: unit,
 			}
@@ -380,14 +380,14 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			// new unit
 			unit = newUnit(agentUnit.Id, UnitType(agentUnit.Type), UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx, c)
 			c.units = append(c.units, unit)
-			c.unitsCh <- UnitChanged{
+			c.changesCh <- UnitChanged{
 				Type: UnitChangedAdded,
 				Unit: unit,
 			}
 		} else {
 			// existing unit
 			if unit.updateState(UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx) {
-				c.unitsCh <- UnitChanged{
+				c.changesCh <- UnitChanged{
 					Type: UnitChangedModified,
 					Unit: unit,
 				}
@@ -413,8 +413,8 @@ func (c *clientV2) findUnit(id string, unitType UnitType) *Unit {
 
 // unitChanged triggers the send goroutine to send a new observed state
 func (c *clientV2) unitChanged() {
-	if len(c.kickCh) <= 0 {
-		c.kickCh <- struct{}{}
+	if len(c.kickSendObservedCh) <= 0 {
+		c.kickSendObservedCh <- struct{}{}
 	}
 }
 

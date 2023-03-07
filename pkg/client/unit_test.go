@@ -13,10 +13,10 @@ import (
 )
 
 var defaultTest = Unit{
-	exp:       UnitStateHealthy,
-	logLevel:  UnitLogLevelDebug,
-	configIdx: 1,
-	config:    &proto.UnitExpectedConfig{},
+	expectedState: UnitStateHealthy,
+	logLevel:      UnitLogLevelDebug,
+	configIdx:     1,
+	config:        &proto.UnitExpectedConfig{},
 }
 
 func TestUnitUpdateWithSameMap(t *testing.T) {
