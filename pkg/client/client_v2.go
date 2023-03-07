@@ -487,13 +487,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				UnitState(agentUnit.State),
 				UnitLogLevel(agentUnit.LogLevel),
 				agentUnit.Config,
-				agentUnit.ConfigStateIdx) {
-
-				changed := UnitChanged{
-					Triggers: triggers,
-					Type:     UnitChangedModified,
-					Unit:     unit,
-				}
+				agentUnit.ConfigStateIdx)
 
 			changed := UnitChanged{
 				Triggers: triggers,
