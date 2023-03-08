@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
-	gproto "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -116,8 +115,6 @@ type UnitChanged struct {
 	Triggers Trigger
 	// Unit is any change in a unit.
 	Unit *Unit
-	// Features are all the feature flags and their configs.
-	Features *proto.Features
 }
 
 // AgentInfo is the information about the running Elastic Agent that the client is connected to.
@@ -469,7 +466,6 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 
 			if expected.Features != nil {
 				changed.Triggers = TriggeredFeatureChange
-				changed.Features = expected.Features
 			}
 
 			c.changesCh <- changed
@@ -478,6 +474,8 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			triggers := unit.updateState(
 				UnitState(agentUnit.State),
 				UnitLogLevel(agentUnit.LogLevel),
+				expected.FeaturesIdx,
+				expected.Features,
 				agentUnit.Config,
 				agentUnit.ConfigStateIdx)
 
@@ -487,17 +485,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				Unit:     unit,
 			}
 
-			if unit.featuresIdx != expected.FeaturesIdx {
-				unit.featuresIdx = expected.FeaturesIdx
-				if expected.Features != nil &&
-					!gproto.Equal(unit.features, expected.Features) {
-					unit.features = expected.Features
-					changed.Features = expected.Features
-					changed.Triggers |= TriggeredFeatureChange
-				}
-			}
-
-			if changed.Triggers > 0 { // a.k.a something changed
+			if changed.Triggers > TriggeredNothing { // a.k.a something changed
 				c.changesCh <- changed
 			}
 		}

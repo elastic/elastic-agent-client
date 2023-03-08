@@ -276,6 +276,8 @@ func (u *Unit) RegisterDiagnosticHook(name string, description string, filename 
 func (u *Unit) updateState(
 	exp UnitState,
 	logLevel UnitLogLevel,
+	expFeaturesIdx uint64,
+	expFeatures *proto.Features,
 	cfg *proto.UnitExpectedConfig,
 	cfgIdx uint64) Trigger {
 
@@ -291,6 +293,15 @@ func (u *Unit) updateState(
 	if u.logLevel != logLevel {
 		u.logLevel = logLevel
 		triggers |= TriggeredLogLevelChange
+	}
+
+	if u.featuresIdx != expFeaturesIdx {
+		u.featuresIdx = expFeaturesIdx
+		if expFeatures != nil &&
+			!gproto.Equal(u.features, expFeatures) {
+			u.features = expFeatures
+			triggers |= TriggeredFeatureChange
+		}
 	}
 
 	if u.configIdx != cfgIdx {
