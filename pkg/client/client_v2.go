@@ -188,9 +188,6 @@ type clientV2 struct {
 	kickSendObservedCh chan struct{}
 	errCh              chan error
 	changesCh          chan UnitChanged
-	featuresMu         sync.Mutex
-	features           *proto.Features
-	featuresIdx        uint64
 	unitsMu            sync.RWMutex
 	units              []*Unit
 
@@ -217,7 +214,6 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.Di
 		changesCh:          make(chan UnitChanged),
 		diagHooks:          make(map[string]diagHook),
 		minCheckTimeout:    CheckinMinimumTimeout,
-		features:           &proto.Features{Fqdn: &proto.FQDNFeature{}},
 	}
 	c.registerDefaultDiagnostics()
 	return c
@@ -426,11 +422,6 @@ func (c *clientV2) sync(expected *proto.CheckinExpected) {
 			Snapshot: expected.AgentInfo.Snapshot,
 		}
 		c.agentInfoMu.Unlock()
-	}
-
-	if expected.Features != nil {
-		c.features = expected.Features
-		c.featuresIdx = expected.FeaturesIdx
 	}
 
 	c.syncUnits(expected)
