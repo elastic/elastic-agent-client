@@ -137,7 +137,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 				return
 			case change := <-validClient.UnitChanges():
 				if change.Triggers&TriggeredFeatureChange == TriggeredFeatureChange {
-					gotFQDN = change.Features.Fqdn.Enabled
+					gotFQDN = change.Unit.Expected().Features.Fqdn.Enabled
 				}
 
 				switch change.Type {
@@ -312,7 +312,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				return
 			case change := <-client.UnitChanges():
 				if change.Triggers&TriggeredFeatureChange == TriggeredFeatureChange {
-					gotFQDN = change.Features.Fqdn.Enabled
+					gotFQDN = change.Unit.Expected().Features.Fqdn.Enabled
 				}
 
 				switch change.Type {
@@ -325,7 +325,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 					})
 				case UnitChangedModified:
 					expected := change.Unit.Expected()
-					gotFQDN = change.Features.Fqdn.Enabled
+					gotFQDN = expected.Features.Fqdn.Enabled
 					gotTriggers = change.Triggers
 
 					if expected.State == UnitStateStopped {

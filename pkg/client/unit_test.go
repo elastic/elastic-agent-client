@@ -17,6 +17,8 @@ import (
 var defaultTest = Unit{
 	expectedState: UnitStateHealthy,
 	logLevel:      UnitLogLevelDebug,
+	featuresIdx:   0,
+	features:      nil,
 	configIdx:     1,
 	config:        &proto.UnitExpectedConfig{},
 }
@@ -37,7 +39,7 @@ func TestUnitUpdateWithSameMap(t *testing.T) {
 	require.NoError(t, err)
 
 	// This should return TriggeredNothing, as the two underlying maps in `source` are the same
-	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, newUnit, 2)
+	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, 0, nil, newUnit, 2)
 	assert.Equal(t, TriggeredNothing, got)
 }
 
@@ -57,16 +59,21 @@ func TestUnitUpdateWithNewMap(t *testing.T) {
 	require.NoError(t, err)
 
 	// This should return TriggeredConfigChange, as we have an actually new map
-	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, newUnit, 2)
+	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, 0, nil, newUnit, 2)
 	assert.Equal(t, TriggeredConfigChange, got)
 }
 
 func TestUnitUpdateLog(t *testing.T) {
-	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelInfo, &proto.UnitExpectedConfig{}, 2)
+	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelInfo, 0, nil, &proto.UnitExpectedConfig{}, 2)
 	assert.Equal(t, TriggeredLogLevelChange, got)
 }
 
+func TestUnitUpdateFeatureFlags(t *testing.T) {
+	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelInfo, 1, &proto.Features{}, &proto.UnitExpectedConfig{}, 2)
+	assert.Equal(t, TriggeredFeatureChange, got)
+}
+
 func TestUnitUpdateState(t *testing.T) {
-	got := defaultTest.updateState(UnitStateStopped, UnitLogLevelInfo, &proto.UnitExpectedConfig{}, 2)
+	got := defaultTest.updateState(UnitStateStopped, UnitLogLevelInfo, 1, &proto.Features{}, &proto.UnitExpectedConfig{}, 2)
 	assert.Equal(t, TriggeredStateChange, got)
 }
