@@ -467,6 +467,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				UnitLogLevel(agentUnit.LogLevel),
 				agentUnit.Config,
 				agentUnit.ConfigStateIdx,
+				expected.Features,
 				c)
 			c.units = append(c.units, unit)
 

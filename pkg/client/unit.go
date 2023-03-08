@@ -329,6 +329,7 @@ func newUnit(
 	logLevel UnitLogLevel,
 	cfg *proto.UnitExpectedConfig,
 	cfgIdx uint64,
+	features *proto.Features,
 	client *clientV2) *Unit {
 
 	unit := Unit{
@@ -338,6 +339,7 @@ func newUnit(
 		configIdx:     cfgIdx,
 		expectedState: exp,
 		logLevel:      logLevel,
+		features:      features,
 		state:         UnitStateStarting,
 		stateMsg:      "Starting",
 		client:        client,
@@ -345,8 +347,5 @@ func newUnit(
 		diagHooks:     make(map[string]diagHook),
 	}
 
-	if client != nil {
-		unit.features = client.features
-	}
 	return &unit
 }
