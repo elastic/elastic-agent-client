@@ -32,7 +32,7 @@ type (
 
 const (
 	// UnitChangedAdded is when a new unit is added.
-	UnitChangedAdded UnitChangedType = iota // unit_added
+	UnitChangedAdded UnitChangedType = iota + 1 // unit_added
 	// UnitChangedModified is when an existing unit is modified.
 	UnitChangedModified // unit_modified
 	// UnitChangedRemoved is when an existing unit is removed.
