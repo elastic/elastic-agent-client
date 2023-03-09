@@ -26,7 +26,8 @@ import (
 type (
 	// UnitChangedType defines types for when units are adjusted.
 	UnitChangedType int
-	// Trigger indicates what triggered a change
+	// Trigger indicates what triggered a change. This is a bitmask as
+	// a unit change can have one or more triggers that caused the change.
 	Trigger uint
 )
 
@@ -45,12 +46,16 @@ const (
 	TriggeredNothing Trigger = 0 // nothing_triggered
 
 	// TriggeredConfigChange indicates a change in config triggered the change.
+	// This constant represents a single bit in a bitmask. @see Trigger.
 	TriggeredConfigChange Trigger = 1 << iota // config_change_triggered
 	// TriggeredFeatureChange indicates a change in the features triggered the change.
+	// This constant represents a single bit in a bitmask. @see Trigger.
 	TriggeredFeatureChange // feature_change_triggered
 	// TriggeredLogLevelChange indicates a change the log level triggered the change.
+	// This constant represents a single bit in a bitmask. @see Trigger.
 	TriggeredLogLevelChange // log_level_triggered
 	// TriggeredStateChange indicates when a unit state has ganged.
+	// This constant represents a single bit in a bitmask. @see Trigger.
 	TriggeredStateChange // state_change_triggered
 )
 
