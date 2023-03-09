@@ -292,12 +292,32 @@ message CheckinAgentInfo {
     bool snapshot = 3;
 }
 
+// Feature flags configurations.
+message Features {
+    // Source is the original source of the features. All values from the features
+    // are included here even if other concrete fields are defined for this message.
+    google.protobuf.Struct source = 1;
+
+    FQDNFeature fqdn = 2;
+}
+
+// FQDN feature flag indicates to use FQDN for host.name instead of hostname.
+message FQDNFeature {
+    bool enabled = 1;
+}
+
 // A set of units and their expected states and configuration.
 message CheckinExpected {
     // Units is the expected units the component should be running.
     repeated UnitExpected units = 1;
     // Agent info is provided only on first CheckinExpected response to the component.
     CheckinAgentInfo agent_info = 2;
+
+    // Features are the expected feature flags configurations.
+    // Added on Elastic Agent v8.7.1.
+    Features features = 3;
+    // Index of the either current features configuration or new the configuration provided.
+    uint64 features_idx = 4;
 }
 
 // Observed status for a unit.
@@ -344,6 +364,12 @@ message CheckinObserved {
     // Version information about the running program. Should always be included on first checkin, and not again unless
     // one of the values have changed.
     optional CheckinObservedVersionInfo version_info = 3;
+
+    // Features are the expected feature flags configurations.
+    // Added on Elastic Agent v8.7.1.
+    Features features = 4;
+    // Index of the either current features configuration or new the configuration provided.
+    uint64 features_idx = 5;
 }
 
 service ElasticAgent {

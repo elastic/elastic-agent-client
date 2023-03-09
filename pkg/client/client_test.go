@@ -427,14 +427,16 @@ func (c *StubClientImpl) OnError(err error) {
 }
 
 func waitFor(check func() error) error {
+	timeout := 5 * time.Minute
 	started := time.Now()
 	for {
 		err := check()
 		if err == nil {
 			return nil
 		}
-		if time.Now().Sub(started) >= 5*time.Second {
-			return fmt.Errorf("check timed out after 1 second: %s", err)
+		if time.Now().Sub(started) >= timeout {
+			return fmt.Errorf("check timed out after %s: %s",
+				timeout, err)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

@@ -118,9 +118,14 @@ type Unit struct {
 
 	expectedStateMu sync.RWMutex
 	expectedState   UnitState
-	logLevel        UnitLogLevel
-	config          *proto.UnitExpectedConfig
-	configIdx       uint64
+
+	logLevel  UnitLogLevel
+	config    *proto.UnitExpectedConfig
+	configIdx uint64
+
+	// do I need a mutex?
+	features    *proto.Features
+	featuresIdx uint64 // do I really need it?
 
 	stateMu      sync.RWMutex
 	state        UnitState
@@ -146,11 +151,25 @@ func (u *Unit) Type() UnitType {
 	return u.unitType
 }
 
-// Expected returns the expected state and config for the unit.
-func (u *Unit) Expected() (UnitState, UnitLogLevel, *proto.UnitExpectedConfig) {
+// Expected contains the expected state, log level, features and config for a unit.
+type Expected struct {
+	Config   *proto.UnitExpectedConfig
+	Features *proto.Features
+	LogLevel UnitLogLevel
+	State    UnitState
+}
+
+// Expected returns the expected state, log level, features and config for the unit.
+func (u *Unit) Expected() Expected {
 	u.expectedStateMu.RLock()
 	defer u.expectedStateMu.RUnlock()
-	return u.expectedState, u.logLevel, u.config
+
+	return Expected{
+		Config:   u.config,
+		Features: u.features,
+		LogLevel: u.logLevel,
+		State:    u.expectedState,
+	}
 }
 
 // State returns the currently reported state for the unit.
@@ -257,27 +276,43 @@ func (u *Unit) RegisterDiagnosticHook(name string, description string, filename 
 func (u *Unit) updateState(
 	exp UnitState,
 	logLevel UnitLogLevel,
+	expFeaturesIdx uint64,
+	expFeatures *proto.Features,
 	cfg *proto.UnitExpectedConfig,
-	cfgIdx uint64) bool {
+	cfgIdx uint64) Trigger {
+
+	var triggers Trigger
+
 	u.expectedStateMu.Lock()
 	defer u.expectedStateMu.Unlock()
-	changed := false
 	if u.expectedState != exp {
 		u.expectedState = exp
-		changed = true
+		triggers |= TriggeredStateChange
 	}
+
 	if u.logLevel != logLevel {
 		u.logLevel = logLevel
-		changed = true
+		triggers |= TriggeredLogLevelChange
 	}
+
+	if u.featuresIdx != expFeaturesIdx {
+		u.featuresIdx = expFeaturesIdx
+		if expFeatures != nil &&
+			!gproto.Equal(u.features, expFeatures) {
+			u.features = expFeatures
+			triggers |= TriggeredFeatureChange
+		}
+	}
+
 	if u.configIdx != cfgIdx {
 		u.configIdx = cfgIdx
 		if !gproto.Equal(u.config.GetSource(), cfg.GetSource()) {
 			u.config = cfg
-			changed = true
+			triggers |= TriggeredConfigChange
 		}
 	}
-	return changed
+
+	return triggers
 }
 
 // toObserved returns the observed unit protocol to send over the stream.
@@ -298,18 +333,30 @@ func (u *Unit) toObserved() *proto.UnitObserved {
 }
 
 // newUnit creates a new unit that needs to be created in this process.
-func newUnit(id string, unitType UnitType, exp UnitState, logLevel UnitLogLevel, cfg *proto.UnitExpectedConfig, cfgIdx uint64, client *clientV2) *Unit {
-	return &Unit{
+func newUnit(
+	id string,
+	unitType UnitType,
+	exp UnitState,
+	logLevel UnitLogLevel,
+	cfg *proto.UnitExpectedConfig,
+	cfgIdx uint64,
+	features *proto.Features,
+	client *clientV2) *Unit {
+
+	unit := Unit{
 		id:            id,
 		unitType:      unitType,
 		config:        cfg,
 		configIdx:     cfgIdx,
 		expectedState: exp,
 		logLevel:      logLevel,
+		features:      features,
 		state:         UnitStateStarting,
 		stateMsg:      "Starting",
 		client:        client,
 		actions:       make(map[string]Action),
 		diagHooks:     make(map[string]diagHook),
 	}
+
+	return &unit
 }

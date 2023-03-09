@@ -6,15 +6,19 @@ package client
 import (
 	"testing"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gproto "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 var defaultTest = Unit{
 	expectedState: UnitStateHealthy,
 	logLevel:      UnitLogLevelDebug,
+	featuresIdx:   0,
+	features:      nil,
 	configIdx:     1,
 	config:        &proto.UnitExpectedConfig{},
 }
@@ -34,9 +38,9 @@ func TestUnitUpdateWithSameMap(t *testing.T) {
 	_, err = gproto.Marshal(newUnit)
 	require.NoError(t, err)
 
-	// This should return false, as the two underlying maps in `source` are the same
-	result := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, newUnit, 2)
-	require.False(t, result)
+	// This should return TriggeredNothing, as the two underlying maps in `source` are the same
+	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, 0, nil, newUnit, 2)
+	assert.Equal(t, TriggeredNothing, got)
 }
 
 func TestUnitUpdateWithNewMap(t *testing.T) {
@@ -54,17 +58,22 @@ func TestUnitUpdateWithNewMap(t *testing.T) {
 	_, err = gproto.Marshal(newUnit)
 	require.NoError(t, err)
 
-	// This should return true, as we have an actually new map
-	result := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, newUnit, 2)
-	require.True(t, result)
+	// This should return TriggeredConfigChange, as we have an actually new map
+	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, 0, nil, newUnit, 2)
+	assert.Equal(t, TriggeredConfigChange, got)
 }
 
 func TestUnitUpdateLog(t *testing.T) {
-	result := defaultTest.updateState(UnitStateHealthy, UnitLogLevelInfo, &proto.UnitExpectedConfig{}, 2)
-	require.True(t, result)
+	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelInfo, 0, nil, &proto.UnitExpectedConfig{}, 2)
+	assert.Equal(t, TriggeredLogLevelChange, got)
+}
+
+func TestUnitUpdateFeatureFlags(t *testing.T) {
+	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelInfo, 1, &proto.Features{}, &proto.UnitExpectedConfig{}, 2)
+	assert.Equal(t, TriggeredFeatureChange, got)
 }
 
 func TestUnitUpdateState(t *testing.T) {
-	result := defaultTest.updateState(UnitStateStopped, UnitLogLevelInfo, &proto.UnitExpectedConfig{}, 2)
-	require.True(t, result)
+	got := defaultTest.updateState(UnitStateStopped, UnitLogLevelInfo, 1, &proto.Features{}, &proto.UnitExpectedConfig{}, 2)
+	assert.Equal(t, TriggeredStateChange, got)
 }

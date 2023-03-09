@@ -37,6 +37,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	gotValid := false
 	unitOneID := mock.NewID()
 	unitTwoID := mock.NewID()
+	wantFQDN := true
 	reportedVersion := VersionInfo{}
 	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
@@ -53,6 +54,9 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 						Id:       "elastic-agent-id",
 						Version:  "8.5.0",
 						Snapshot: true,
+					},
+					Features: &proto.Features{
+						Fqdn: &proto.FQDNFeature{Enabled: wantFQDN},
 					},
 					Units: []*proto.UnitExpected{
 						{
@@ -125,12 +129,17 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	// receive the units
 	var unitsMu sync.Mutex
 	var units []*Unit
+	var gotFQDN bool
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case change := <-validClient.UnitChanges():
+				if change.Triggers&TriggeredFeatureChange == TriggeredFeatureChange {
+					gotFQDN = change.Unit.Expected().Features.Fqdn.Enabled
+				}
+
 				switch change.Type {
 				case UnitChangedAdded:
 					unitsMu.Lock()
@@ -170,10 +179,13 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	assert.Equal(t, agentInfo.Version, "8.5.0")
 	assert.True(t, agentInfo.Snapshot)
 
+	assert.Equal(t, wantFQDN, gotFQDN)
+
 	assert.Equal(t, units[0].ID(), unitOneID)
 	assert.Equal(t, units[0].Type(), UnitTypeOutput)
 	assert.Equal(t, units[1].ID(), unitTwoID)
 	assert.Equal(t, units[1].Type(), UnitTypeInput)
+
 	assert.Equal(t, reportedVersion.Name, "program")
 	assert.Equal(t, reportedVersion.Version, "v1.0.0")
 	assert.Equal(t, reportedVersion.Meta, map[string]string{
@@ -185,8 +197,9 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	var m sync.Mutex
 	token := mock.NewID()
 	connected := false
-	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil)
-	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil)
+	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil)
+	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil)
+	wantFQDN := true
 	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			m.Lock()
@@ -198,6 +211,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				if unitOne.state == UnitStateStarting && unitTwo.state == UnitStateStarting {
 					// first checkin; create units
 					return &proto.CheckinExpected{
+						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: false}},
+						FeaturesIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -224,6 +239,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				} else if (unitOne.state == UnitStateHealthy && unitTwo.state == UnitStateHealthy) || (unitOne.state == UnitStateHealthy && unitTwo.state == UnitStateStopping) {
 					// stop second input
 					return &proto.CheckinExpected{
+						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
+						FeaturesIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -246,6 +263,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 				} else if unitOne.state == UnitStateHealthy && unitTwo.state == UnitStateStopped {
 					// input stopped, remove the unit
 					return &proto.CheckinExpected{
+						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
+						FeaturesIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -284,12 +303,18 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	// receive the units
 	var unitsMu sync.Mutex
 	units := make(map[string]*Unit)
+	var gotFQDN bool
+	var gotTriggers Trigger
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case change := <-client.UnitChanges():
+				if change.Triggers&TriggeredFeatureChange == TriggeredFeatureChange {
+					gotFQDN = change.Unit.Expected().Features.Fqdn.Enabled
+				}
+
 				switch change.Type {
 				case UnitChangedAdded:
 					unitsMu.Lock()
@@ -299,8 +324,11 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 						"custom": "payload",
 					})
 				case UnitChangedModified:
-					state, _, _ := change.Unit.Expected()
-					if state == UnitStateStopped {
+					expected := change.Unit.Expected()
+					gotFQDN = expected.Features.Fqdn.Enabled
+					gotTriggers = change.Triggers
+
+					if expected.State == UnitStateStopped {
 						change.Unit.UpdateState(UnitStateStopping, "Stopping", nil)
 						go func() {
 							time.Sleep(100 * time.Millisecond)
@@ -347,6 +375,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 		return nil
 	}))
 
+	assert.Equal(t, wantFQDN, gotFQDN)
+	assert.Equal(t, gotTriggers&TriggeredFeatureChange, TriggeredFeatureChange)
 	assert.Equal(t, UnitStateHealthy, unitOne.state)
 	assert.Equal(t, "Healthy", unitOne.stateMsg)
 	assert.Equal(t, UnitStateStopped, unitTwo.state)
@@ -580,6 +610,41 @@ func TestClientV2_DiagnosticAction(t *testing.T) {
 		names = append(names, d.Name)
 	}
 	assert.ElementsMatch(t, names, []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex", "custom_component", "custom_unit"})
+}
+
+func TestTrigger_String(t *testing.T) {
+	tcs := []struct {
+		Name    string
+		Trigger Trigger
+		Want    string
+	}{
+		{
+			Name: "nothing triggered, zero value",
+			Want: "nothing_triggered",
+		},
+		{
+			Name:    "one change: feature_change_triggered",
+			Trigger: TriggeredFeatureChange,
+			Want:    "feature_change_triggered",
+		},
+		{
+			Name:    "two changes: feature_change_triggered, state_change_triggered",
+			Trigger: TriggeredFeatureChange | TriggeredStateChange,
+			Want:    "feature_change_triggered, state_change_triggered",
+		},
+		{
+			Name:    "invalid trigger value",
+			Trigger: 1618,
+			Want:    "invalid trigger value: 1618",
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.Name, func(t *testing.T) {
+			got := tc.Trigger.String()
+			assert.Equal(t, got, tc.Want)
+		})
+	}
 }
 
 func storeErrors(ctx context.Context, client V2, errs *[]error, lock *sync.Mutex) {

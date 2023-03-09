@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,19 +23,77 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 )
 
-// UnitChangedType defines types for when units are adjusted.
-type UnitChangedType int
+type (
+	// UnitChangedType defines types for when units are adjusted.
+	UnitChangedType int
+	// Trigger indicates what triggered a change. This is a bitmask as
+	// a unit change can have one or more triggers that caused the change.
+	Trigger uint
+)
 
 const (
 	// UnitChangedAdded is when a new unit is added.
-	UnitChangedAdded UnitChangedType = 1
+	UnitChangedAdded UnitChangedType = iota + 1 // unit_added
 	// UnitChangedModified is when an existing unit is modified.
-	UnitChangedModified UnitChangedType = 2
+	UnitChangedModified // unit_modified
 	// UnitChangedRemoved is when an existing unit is removed.
-	UnitChangedRemoved UnitChangedType = 3
+	UnitChangedRemoved // unit_removed
 )
 
-// String returns string representation for the unit changed type.
+const (
+	// TriggeredNothing is Trigger zero value, nothing was triggered.
+	// It exists only for completeness and documentation purposes.
+	TriggeredNothing Trigger = 0 // nothing_triggered
+
+	// TriggeredConfigChange indicates a change in config triggered the change.
+	// This constant represents a single bit in a bitmask. @see Trigger.
+	TriggeredConfigChange Trigger = 1 << iota // config_change_triggered
+	// TriggeredFeatureChange indicates a change in the features triggered the change.
+	// This constant represents a single bit in a bitmask. @see Trigger.
+	TriggeredFeatureChange // feature_change_triggered
+	// TriggeredLogLevelChange indicates a change the log level triggered the change.
+	// This constant represents a single bit in a bitmask. @see Trigger.
+	TriggeredLogLevelChange // log_level_triggered
+	// TriggeredStateChange indicates when a unit state has ganged.
+	// This constant represents a single bit in a bitmask. @see Trigger.
+	TriggeredStateChange // state_change_triggered
+)
+
+func (t Trigger) String() string {
+	var triggers []string
+	if t == 0 {
+		return "nothing_triggered"
+	}
+
+	current := t
+	if current&TriggeredConfigChange == TriggeredConfigChange {
+		current &= ^TriggeredConfigChange
+		triggers = append(triggers, "config_change_triggered")
+	}
+	if current&TriggeredFeatureChange == TriggeredFeatureChange {
+		current &= ^TriggeredFeatureChange
+		triggers = append(triggers, "feature_change_triggered")
+	}
+	if current&TriggeredLogLevelChange == TriggeredLogLevelChange {
+		current &= ^TriggeredLogLevelChange
+		triggers = append(triggers, "log_level_triggered")
+	}
+	if current&TriggeredStateChange == TriggeredStateChange {
+		current &= ^TriggeredStateChange
+		triggers = append(triggers, "state_change_triggered")
+	}
+
+	if current != 0 {
+		return fmt.Sprintf("invalid trigger value: %d", t)
+	}
+
+	return strings.Join(triggers, ", ")
+}
+
+// GoString is the same as String, but for the %#v format.
+func (t Trigger) GoString() string { return t.String() }
+
+// String returns a string representation for the unit changed type.
 func (t UnitChangedType) String() string {
 	switch t {
 	case UnitChangedAdded:
@@ -44,12 +103,22 @@ func (t UnitChangedType) String() string {
 	case UnitChangedRemoved:
 		return "removed"
 	}
+
 	return "unknown"
 }
 
-// UnitChanged is what is sent over the UnitChanges channel any time a unit is added, modified, or removed.
+// GoString is the same as String, but for the %#v format.
+func (t UnitChangedType) GoString() string {
+	return t.String()
+}
+
+// UnitChanged is what is sent over the UnitChanged channel any time a change happens:
+//   - a unit is added, modified, or removed
+//   - a feature changes
 type UnitChanged struct {
-	Type UnitChangedType
+	Type     UnitChangedType
+	Triggers Trigger
+	// Unit is any change in a unit.
 	Unit *Unit
 }
 
@@ -271,16 +340,7 @@ func (c *clientV2) checkinRoundTrip() {
 				close(done)
 				return
 			}
-			if expected.AgentInfo != nil {
-				c.agentInfoMu.Lock()
-				c.agentInfo = &AgentInfo{
-					ID:       expected.AgentInfo.Id,
-					Version:  expected.AgentInfo.Version,
-					Snapshot: expected.AgentInfo.Snapshot,
-				}
-				c.agentInfoMu.Unlock()
-			}
-			c.syncUnits(expected)
+			c.sync(expected)
 		}
 	}()
 
@@ -354,7 +414,21 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 	return client.Send(msg)
 }
 
-// syncUnits syncs the expected units with the current state.
+// sync syncs the expected state with the current state.
+func (c *clientV2) sync(expected *proto.CheckinExpected) {
+	if expected.AgentInfo != nil {
+		c.agentInfoMu.Lock()
+		c.agentInfo = &AgentInfo{
+			ID:       expected.AgentInfo.Id,
+			Version:  expected.AgentInfo.Version,
+			Snapshot: expected.AgentInfo.Snapshot,
+		}
+		c.agentInfoMu.Unlock()
+	}
+
+	c.syncUnits(expected)
+}
+
 func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 	c.unitsMu.Lock()
 	defer c.unitsMu.Unlock()
@@ -372,28 +446,56 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			removed = true
 		}
 	}
+
 	// resize so units that no longer exist are removed from the slice
 	c.units = c.units[:i]
 	for _, agentUnit := range expected.Units {
 		unit := c.findUnit(agentUnit.Id, UnitType(agentUnit.Type))
 		if unit == nil {
 			// new unit
-			unit = newUnit(agentUnit.Id, UnitType(agentUnit.Type), UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx, c)
+			unit = newUnit(
+				agentUnit.Id,
+				UnitType(agentUnit.Type),
+				UnitState(agentUnit.State),
+				UnitLogLevel(agentUnit.LogLevel),
+				agentUnit.Config,
+				agentUnit.ConfigStateIdx,
+				expected.Features,
+				c)
 			c.units = append(c.units, unit)
-			c.changesCh <- UnitChanged{
+
+			changed := UnitChanged{
 				Type: UnitChangedAdded,
 				Unit: unit,
 			}
+
+			if expected.Features != nil {
+				changed.Triggers = TriggeredFeatureChange
+			}
+
+			c.changesCh <- changed
 		} else {
 			// existing unit
-			if unit.updateState(UnitState(agentUnit.State), UnitLogLevel(agentUnit.LogLevel), agentUnit.Config, agentUnit.ConfigStateIdx) {
-				c.changesCh <- UnitChanged{
-					Type: UnitChangedModified,
-					Unit: unit,
-				}
+			triggers := unit.updateState(
+				UnitState(agentUnit.State),
+				UnitLogLevel(agentUnit.LogLevel),
+				expected.FeaturesIdx,
+				expected.Features,
+				agentUnit.Config,
+				agentUnit.ConfigStateIdx)
+
+			changed := UnitChanged{
+				Triggers: triggers,
+				Type:     UnitChangedModified,
+				Unit:     unit,
+			}
+
+			if changed.Triggers > TriggeredNothing { // a.k.a something changed
+				c.changesCh <- changed
 			}
 		}
 	}
+
 	if removed {
 		// unit removed send updated observed change so agent is notified now
 		// otherwise it will not be notified until the next checkin timeout

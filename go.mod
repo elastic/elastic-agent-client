@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent-client/v7
 
-go 1.17
+go 1.18
 
 require (
 	github.com/gofrs/uuid v4.2.0+incompatible
