@@ -193,6 +193,7 @@ type clientV2 struct {
 	unitsMu            sync.RWMutex
 	units              []*Unit
 
+	featuresMu  sync.RWMutex
 	features    *proto.Features
 	featuresIdx uint64
 
@@ -401,6 +402,10 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 		observed = append(observed, unit.toObserved())
 	}
 	c.unitsMu.RUnlock()
+
+	c.featuresMu.RLock()
+	defer c.featuresMu.RUnlock()
+
 	msg := &proto.CheckinObserved{
 		Token:       c.token,
 		Units:       observed,
@@ -505,6 +510,8 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 	// the same information on the client so we can send it up as part of the
 	// observed on c so we can send up as part of the observed state in the next
 	// checkin.
+	c.featuresMu.Lock()
+	defer c.featuresMu.Unlock()
 	c.features = expected.Features
 	c.featuresIdx = expected.FeaturesIdx
 
