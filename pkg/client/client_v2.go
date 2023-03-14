@@ -507,9 +507,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 	}
 
 	// Now that we've propagated feature flags' information to units, record
-	// the same information on the client so we can send it up as part of the
-	// observed on c so we can send up as part of the observed state in the next
-	// checkin.
+	// the same information on the client so we can send it up as part of the observed state in the next checkin.
 	c.featuresMu.Lock()
 	defer c.featuresMu.Unlock()
 	c.features = expected.Features
