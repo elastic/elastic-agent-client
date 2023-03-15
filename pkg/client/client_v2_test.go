@@ -7,6 +7,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -645,6 +646,113 @@ func TestTrigger_String(t *testing.T) {
 			assert.Equal(t, got, tc.Want)
 		})
 	}
+}
+
+func TestClientV2_Checkin_FeatureFlags(t *testing.T) {
+	var m sync.Mutex
+	token := mock.NewID()
+	unit := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil)
+	connected := false
+	checkinCounter := 0
+	featuresIdx := rand.Uint64()
+
+	srv := mock.StubServerV2{
+		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+			m.Lock()
+			defer m.Unlock()
+
+			if observed.Token == token {
+				connected = true
+
+				switch checkinCounter {
+				case 0:
+					// first checkin
+					require.Equal(t, uint64(0), observed.FeaturesIdx)
+
+					checkinCounter++
+					return &proto.CheckinExpected{
+						FeaturesIdx: featuresIdx,
+						Units: []*proto.UnitExpected{
+							{
+								Id:             unit.id,
+								Type:           proto.UnitType_INPUT,
+								State:          proto.State_HEALTHY,
+								LogLevel:       proto.UnitLogLevel_INFO,
+								ConfigStateIdx: 1,
+								Config: &proto.UnitExpectedConfig{
+									Id: "config_unit",
+								},
+							},
+						},
+					}
+
+				case 1:
+					// second checkin
+					require.Equal(t, featuresIdx, observed.FeaturesIdx)
+					checkinCounter++
+				}
+			}
+			// disconnect
+			return nil
+		},
+		ActionImpl: func(response *proto.ActionResponse) error {
+			// actions not tested here
+			return nil
+		},
+		ActionsChan: make(chan *mock.PerformAction, 100),
+	}
+	require.NoError(t, srv.Start())
+	defer srv.Stop()
+
+	var errsMu sync.Mutex
+	var errs []error
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials())).(*clientV2)
+	storeErrors(ctx, client, &errs, &errsMu)
+
+	// receive the units
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case change := <-client.UnitChanges():
+				switch change.Type {
+				case UnitChangedAdded:
+					err := change.Unit.UpdateState(UnitStateHealthy, "Healthy", map[string]interface{}{
+						"custom": "payload",
+					})
+					require.NoError(t, err)
+				}
+			}
+		}
+	}()
+
+	require.NoError(t, client.Start(ctx))
+	defer client.Stop()
+
+	require.NoError(t, waitFor(func() error {
+		m.Lock()
+		defer m.Unlock()
+
+		if !connected {
+			return fmt.Errorf("server never received valid token")
+		}
+
+		expectedCheckinCounter := 2
+		if checkinCounter < expectedCheckinCounter {
+			return fmt.Errorf(
+				"server did not receive expected number of checkins = %d; actual checkins received = %d",
+				expectedCheckinCounter,
+				checkinCounter,
+			)
+		}
+
+		return nil
+	}))
+
+	require.Empty(t, errs)
 }
 
 func storeErrors(ctx context.Context, client V2, errs *[]error, lock *sync.Mutex) {
