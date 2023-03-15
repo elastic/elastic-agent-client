@@ -193,6 +193,9 @@ type clientV2 struct {
 	unitsMu            sync.RWMutex
 	units              []*Unit
 
+	featuresMu  sync.RWMutex
+	featuresIdx uint64
+
 	dmx       sync.RWMutex
 	diagHooks map[string]diagHook
 
@@ -398,9 +401,14 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 		observed = append(observed, unit.toObserved())
 	}
 	c.unitsMu.RUnlock()
+
+	c.featuresMu.RLock()
+	defer c.featuresMu.RUnlock()
+
 	msg := &proto.CheckinObserved{
 		Token:       c.token,
 		Units:       observed,
+		FeaturesIdx: c.featuresIdx,
 		VersionInfo: nil,
 	}
 	if !c.versionInfoSent {
@@ -496,11 +504,19 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 		}
 	}
 
+	// Now that we've propagated feature flags' information to units, record
+	// the featuresIdx on the client so we can send it up as part of the observed
+	// state in the next checkin.
+	c.featuresMu.Lock()
+	defer c.featuresMu.Unlock()
+	c.featuresIdx = expected.FeaturesIdx
+
 	if removed {
 		// unit removed send updated observed change so agent is notified now
 		// otherwise it will not be notified until the next checkin timeout
 		c.unitChanged()
 	}
+
 }
 
 // findUnit finds an existing unit.
