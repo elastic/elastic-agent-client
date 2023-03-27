@@ -1,0 +1,64 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+// This file preserves the messages used with thee deprecated elastic agent Checkin V1 RPC for reference.
+syntax = "proto3";
+
+package proto;
+
+option cc_enable_arenas = true;
+option go_package = "pkg/proto;proto";
+
+// A status observed message is streamed from the application to Elastic Agent.
+//
+// This message contains the currently applied `config_state_idx` (0 in the case of initial start, 1 is the first
+// applied config index) along with the status of the application. In the case that the sent `config_state_idx`
+// doesn't match the expected `config_state_idx` that Elastic Agent expects, the application is always marked as
+// `CONFIGURING`.
+message StateObserved {
+    // Status codes for the current state.
+    enum Status {
+        // Application is starting.
+        STARTING = 0;
+        // Application is currently configuring.
+        CONFIGURING = 1;
+        // Application is in healthy state.
+        HEALTHY = 2;
+        // Application is working but in a degraded state.
+        DEGRADED = 3;
+        // Application is failing completely.
+        FAILED = 4;
+        // Application is stopping.
+        STOPPING = 5;
+    }
+    // Token that is used to uniquely identify the application to agent. When agent started this
+    // application it would have provided it this token.
+    string token = 1;
+    // Current index of the applied configuration.
+    uint64 config_state_idx = 2;
+    // Status code.
+    Status status = 3;
+    // Message for the health status.
+    string message = 4;
+    // JSON encoded payload for the status.
+    string payload = 5;
+}
+
+// A state expected message is streamed from the Elastic Agent to the application informing the application
+// what Elastic Agent expects the applications state to be.
+message StateExpected {
+    enum State {
+        // Expects that the application is running.
+        RUNNING = 0;
+        // Expects that the application is stopping.
+        STOPPING = 1;
+    }
+    // Expected state of the application.
+    State state = 1;
+    // Index of the either current configuration or new configuration provided.
+    uint64 config_state_idx = 2;
+    // Resulting configuration. (If the application already has the current `config_state_idx` this
+    // will be empty.)
+    string config = 3;
+}
