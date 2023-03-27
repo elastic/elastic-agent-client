@@ -12,100 +12,32 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "elastic-agent-client-deprecated.proto";
 
-// Services that the client is allowed to use over the connection.
-enum ConnInfoServices {
-    // V1 checkin service.
-    Checkin = 0;
-    // V2 checkin service.
-    CheckinV2 = 1;
-    // Key-value store service.
-    Store = 2;
-    // Artifact store service.
-    Artifact = 3;
-    // Log service.
-    Log = 4;
-}
+service ElasticAgent {
+    // Called by the client to provide the Elastic Agent the state of the application over the V2 protocol.
+    //
+    // A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the
+    // set of units automatically marked as FAILED, and after 60 seconds the Elastic Agent will
+    // force kill the entire process and restart it.
+    rpc CheckinV2(stream CheckinObserved) returns (stream CheckinExpected);
 
-// Connection information sent to the application on startup so it knows how to connected back to the Elastic Agent.
-//
-// This is normally sent through stdin and should never be sent across a network un-encrypted.
-message ConnInfo {
-    // GRPC connection address.
-    string addr = 1;
-    // Server name to use when connecting over TLS.
-    string server_name = 2;
-    // Token that the application should send as the unique identifier when connecting over the GRPC.
-    string token = 3;
-    // CA certificate.
-    bytes ca_cert = 4;
-    // Peer certificate.
-    bytes peer_cert = 5;
-    // Peer private key.
-    bytes peer_key = 6;
-    // Allowed services that spawned process can use. (only used in V2)
-    repeated ConnInfoServices services = 7;
-}
+    // Called by the client on connection to the GRPC allowing the Elastic Agent to stream action
+    // requests to the application and the application stream back responses to those requests.
+    //
+    // Request and response is swapped here because the Elastic Agent sends the requests in a stream
+    // to the connected process. The order of response from the process does not matter, it is acceptable
+    // for the response order to be different then the request order.
+    rpc Actions(stream ActionResponse) returns (stream ActionRequest);
 
-// A action request is streamed from the Elastic Agent to the application so an action can be performed
-// by the connected application.
-message ActionRequest {
-    // Type of action being performed.
-    enum Type {
-        // Custom action (registered by the unit)
-        CUSTOM = 0;
-        // Defined diagnostics action.
-        DIAGNOSTICS = 1;
-    }
-    // Unique ID of the action.
-    string id = 1;
-    // Name of the action (name is ignored for DIAGNOSTICS).
-    string name = 2;
-    // JSON encoded parameters for the action.
-    bytes params = 3;
-    // Unique ID of the unit (only used with V2).
-    string unit_id = 4;
-    // Type of the unit (only used with V2).
-    UnitType unit_type = 5;
-    // Type of action to be performed (only used with V2).
-    Type type = 6;
-}
-
-message ActionDiagnosticUnitResult {
-    // Human readable name of the diagnostic result content.
-    string name = 1;
-    // Filename to use to store the diagnostic to the disk.
-    string filename = 2;
-    // Human readable description of the information this diagnostic provides.
-    string description = 3;
-    // Content-Type of the resulting content.
-    string content_type = 4;
-    // Actual file content.
-    bytes content = 5;
-    // Timestamp the content was generated at.
-    google.protobuf.Timestamp generated = 6;
-}
-
-// An action response is streamed from the application back to the Elastic Agent to provide a result to
-// an action request.
-message ActionResponse {
-    // Status result of the action.
-    enum Status {
-        // Action was successful.
-        SUCCESS = 0;
-        // Action has failed.
-        FAILED = 1;
-    }
-    // Token that is used to uniquely identify the application to agent. When agent started this
-    // application it would have provided it this token.
-    string token = 1;
-    // Unique ID of the action.
-    string id = 2;
-    // Status of the action.
-    Status status = 3;
-    // JSON encoded result for the action (empty when diagnostic action response).
-    bytes result = 4;
-    // Specific result for diagnostics action. (only used in V2)
-    repeated ActionDiagnosticUnitResult diagnostic = 5;
+    // DEPRECATED: DO NOT USE
+    //
+    // Called by the client to provide the Elastic Agent the state of the application.
+    //
+    // A `StateObserved` must be streamed at least every 30 seconds or it will result in the
+    // application be automatically marked as FAILED, and after 60 seconds the Elastic Agent will
+    // force kill the entire process and restart it.
+    //
+    // Messages definitions are preserved in elastic-agent-client-deprecated.proto.
+    rpc Checkin(stream StateObserved) returns (stream StateExpected);
 }
 
 // State codes for the current state.
@@ -319,28 +251,98 @@ message CheckinObserved {
     uint64 features_idx = 5;
 }
 
-service ElasticAgent {
-    // Called by the client to provide the Elastic Agent the state of the application over the V2 protocol.
-    //
-    // A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the
-    // set of units automatically marked as FAILED, and after 60 seconds the Elastic Agent will
-    // force kill the entire process and restart it.
-    rpc CheckinV2(stream CheckinObserved) returns (stream CheckinExpected);
+// A action request is streamed from the Elastic Agent to the application so an action can be performed
+// by the connected application.
+message ActionRequest {
+    // Type of action being performed.
+    enum Type {
+        // Custom action (registered by the unit)
+        CUSTOM = 0;
+        // Defined diagnostics action.
+        DIAGNOSTICS = 1;
+    }
+    // Unique ID of the action.
+    string id = 1;
+    // Name of the action (name is ignored for DIAGNOSTICS).
+    string name = 2;
+    // JSON encoded parameters for the action.
+    bytes params = 3;
+    // Unique ID of the unit (only used with V2).
+    string unit_id = 4;
+    // Type of the unit (only used with V2).
+    UnitType unit_type = 5;
+    // Type of action to be performed (only used with V2).
+    Type type = 6;
+}
 
-    // Called by the client on connection to the GRPC allowing the Elastic Agent to stream action
-    // requests to the application and the application stream back responses to those requests.
-    //
-    // Request and response is swapped here because the Elastic Agent sends the requests in a stream
-    // to the connected process. The order of response from the process does not matter, it is acceptable
-    // for the response order to be different then the request order.
-    rpc Actions(stream ActionResponse) returns (stream ActionRequest);
+message ActionDiagnosticUnitResult {
+    // Human readable name of the diagnostic result content.
+    string name = 1;
+    // Filename to use to store the diagnostic to the disk.
+    string filename = 2;
+    // Human readable description of the information this diagnostic provides.
+    string description = 3;
+    // Content-Type of the resulting content.
+    string content_type = 4;
+    // Actual file content.
+    bytes content = 5;
+    // Timestamp the content was generated at.
+    google.protobuf.Timestamp generated = 6;
+}
 
-    // DEPRECATED: DO NOT USE
-    //
-    // Called by the client to provide the Elastic Agent the state of the application.
-    //
-    // A `StateObserved` must be streamed at least every 30 seconds or it will result in the
-    // application be automatically marked as FAILED, and after 60 seconds the Elastic Agent will
-    // force kill the entire process and restart it.
-    rpc Checkin(stream StateObserved) returns (stream StateExpected);
+// An action response is streamed from the application back to the Elastic Agent to provide a result to
+// an action request.
+message ActionResponse {
+    // Status result of the action.
+    enum Status {
+        // Action was successful.
+        SUCCESS = 0;
+        // Action has failed.
+        FAILED = 1;
+    }
+    // Token that is used to uniquely identify the application to agent. When agent started this
+    // application it would have provided it this token.
+    string token = 1;
+    // Unique ID of the action.
+    string id = 2;
+    // Status of the action.
+    Status status = 3;
+    // JSON encoded result for the action (empty when diagnostic action response).
+    bytes result = 4;
+    // Specific result for diagnostics action. (only used in V2)
+    repeated ActionDiagnosticUnitResult diagnostic = 5;
+}
+
+// Services that the client is allowed to use over the connection.
+enum ConnInfoServices {
+    // V1 checkin service.
+    Checkin = 0;
+    // V2 checkin service.
+    CheckinV2 = 1;
+    // Key-value store service.
+    Store = 2;
+    // Artifact store service.
+    Artifact = 3;
+    // Log service.
+    Log = 4;
+}
+
+// Connection information sent to the application on startup so it knows how to connected back to the Elastic Agent.
+//
+// This is normally sent through stdin and should never be sent across a network un-encrypted.
+message ConnInfo {
+    // GRPC connection address.
+    string addr = 1;
+    // Server name to use when connecting over TLS.
+    string server_name = 2;
+    // Token that the application should send as the unique identifier when connecting over the GRPC.
+    string token = 3;
+    // CA certificate.
+    bytes ca_cert = 4;
+    // Peer certificate.
+    bytes peer_cert = 5;
+    // Peer private key.
+    bytes peer_key = 6;
+    // Allowed services that spawned process can use. (only used in V2)
+    repeated ConnInfoServices services = 7;
 }

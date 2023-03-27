@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-// This file preserves the messages used with thee deprecated elastic agent Checkin V1 RPC for reference.
+// This file preserves the messages used with the deprecated elastic agent Checkin() RPC for reference.
 syntax = "proto3";
 
 package proto;

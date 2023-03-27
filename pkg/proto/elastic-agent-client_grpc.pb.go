@@ -46,6 +46,8 @@ type ElasticAgentClient interface {
 	// A `StateObserved` must be streamed at least every 30 seconds or it will result in the
 	// application be automatically marked as FAILED, and after 60 seconds the Elastic Agent will
 	// force kill the entire process and restart it.
+	//
+	// Messages definitions are preserved in elastic-agent-client-deprecated.proto.
 	Checkin(ctx context.Context, opts ...grpc.CallOption) (ElasticAgent_CheckinClient, error)
 }
 
@@ -174,6 +176,8 @@ type ElasticAgentServer interface {
 	// A `StateObserved` must be streamed at least every 30 seconds or it will result in the
 	// application be automatically marked as FAILED, and after 60 seconds the Elastic Agent will
 	// force kill the entire process and restart it.
+	//
+	// Messages definitions are preserved in elastic-agent-client-deprecated.proto.
 	Checkin(ElasticAgent_CheckinServer) error
 	mustEmbedUnimplementedElasticAgentServer()
 }
