@@ -406,8 +406,11 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 	defer c.featuresMu.RUnlock()
 
 	msg := &proto.CheckinObserved{
-		Token:       c.token,
-		Units:       observed,
+		Token: c.token,
+		Units: observed,
+		Features: &proto.Features{
+			Fqdn: &proto.FQDNFeature{Enabled: true},
+		},
 		FeaturesIdx: c.featuresIdx,
 		VersionInfo: nil,
 	}
