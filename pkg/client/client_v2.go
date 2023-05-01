@@ -516,7 +516,6 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 		// otherwise it will not be notified until the next checkin timeout
 		c.unitChanged()
 	}
-
 }
 
 // findUnit finds an existing unit.
@@ -781,18 +780,29 @@ func (c *clientV2) tryPerformDiagnostics(actionResults chan *proto.ActionRespons
 }
 
 func (c *clientV2) registerDefaultDiagnostics() {
-	c.registerPprofDiagnostics("goroutine", "stack traces of all current goroutines")
-	c.registerPprofDiagnostics("heap", "a sampling of memory allocations of live objects")
-	c.registerPprofDiagnostics("allocs", "a sampling of all past memory allocations")
-	c.registerPprofDiagnostics("threadcreate", "stack traces that led to the creation of new OS threads")
-	c.registerPprofDiagnostics("block", "stack traces that led to blocking on synchronization primitives")
-	c.registerPprofDiagnostics("mutex", "stack traces of holders of contended mutexes")
+	c.registerPprofDiagnostics("goroutine", "stack traces of all current goroutines", 0)
+	c.registerPprofDiagnostics("heap", "a sampling of memory allocations of live objects", 0)
+	c.registerPprofDiagnostics("allocs", "a sampling of all past memory allocations", 0)
+	c.registerPprofDiagnostics("threadcreate", "stack traces that led to the creation of new OS threads", 0)
+	c.registerPprofDiagnostics("block", "stack traces that led to blocking on synchronization primitives", 0)
+	c.registerPprofDiagnostics("mutex", "stack traces of holders of contended mutexes", 0)
 }
 
-func (c *clientV2) registerPprofDiagnostics(name string, description string) {
-	c.RegisterDiagnosticHook(name, description, fmt.Sprintf("%s.txt", name), "plain/text", func() []byte {
+func (c *clientV2) registerPprofDiagnostics(name string, description string, debug int) {
+	var filename string
+	var contentType string
+	switch debug {
+	case 1:
+		filename = name + ".txt"
+		contentType = "plain/text"
+	default:
+		filename = name + ".pprof.gz"
+		contentType = "application/octet-stream"
+	}
+
+	c.RegisterDiagnosticHook(name, description, filename, contentType, func() []byte {
 		var w bytes.Buffer
-		err := pprof.Lookup(name).WriteTo(&w, 1)
+		err := pprof.Lookup(name).WriteTo(&w, debug)
 		if err != nil {
 			// error is returned as the content
 			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err))

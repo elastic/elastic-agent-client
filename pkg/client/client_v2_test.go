@@ -5,13 +5,17 @@
 package client
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/pprof/profile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -606,11 +610,24 @@ func TestClientV2_DiagnosticAction(t *testing.T) {
 	res, err := srv.PerformDiagnostic(unit.id, proto.UnitType(unit.unitType))
 	assert.NoError(t, err)
 
-	names := make([]string, 0, len(res))
+	expectedNames := []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex", "custom_component", "custom_unit"}
+	assert.Equal(t, len(expectedNames), len(res))
 	for _, d := range res {
-		names = append(names, d.Name)
+		assert.Contains(t, expectedNames, d.Name)
+		switch d.Name {
+		case "custom_unit":
+			assert.Equal(t, []byte("custom unit"), d.Content)
+		case "custom_component":
+			assert.Equal(t, []byte("custom component"), d.Content)
+		default:
+			gz, err := gzip.NewReader(bytes.NewBuffer(d.Content))
+			assert.NoError(t, err)
+			uncompressed, err := io.ReadAll(gz)
+			assert.NoError(t, err)
+			_, err = profile.ParseUncompressed(uncompressed)
+			assert.NoError(t, err)
+		}
 	}
-	assert.ElementsMatch(t, names, []string{"goroutine", "heap", "allocs", "threadcreate", "block", "mutex", "custom_component", "custom_unit"})
 }
 
 func TestTrigger_String(t *testing.T) {
