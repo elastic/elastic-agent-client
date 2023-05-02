@@ -1,0 +1,203 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License;
+// you may not use this file except in compliance with the Elastic License.
+
+// This file defines unimplemented gRPC services that are likely to be implemented in the future.
+syntax = "proto3";
+
+package proto;
+
+option cc_enable_arenas = true;
+option go_package = "pkg/proto;proto";
+import "google/protobuf/empty.proto";
+import "elastic-agent-client.proto";
+
+service ElasticAgentStore {
+    // Key-Value state storage is provided for each unit.
+    //
+    // Transactional store is provided to allow multiple key operations to occur before a commit to ensure consistent
+    // state when multiple keys make up the state of an units persistent state.
+    rpc BeginTx(StoreBeginTxRequest) returns (StoreBeginTxResponse);
+    rpc GetKey(StoreGetKeyRequest) returns (StoreGetKeyResponse);
+    rpc SetKey(StoreSetKeyRequest) returns (StoreSetKeyResponse);
+    rpc DeleteKey(StoreDeleteKeyRequest) returns (StoreDeleteKeyResponse);
+    rpc CommitTx(StoreCommitTxRequest) returns (StoreCommitTxResponse);
+    rpc DiscardTx(StoreDiscardTxRequest) returns (StoreDiscardTxResponse);
+}
+
+// Type of transaction to start.
+enum StoreTxType {
+    READ_ONLY = 0;
+    READ_WRITE = 1;
+}
+
+// Begins a new transaction.
+//
+// A started transaction must either have commit or discard called.
+message StoreBeginTxRequest {
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
+    string token = 1;
+    // ID of the unit.
+    string unit_id = 2;
+    // Type of the unit.
+    UnitType unit_type = 3;
+    // Type of transaction to start.
+    StoreTxType type = 4;
+}
+
+// Response for a started transaction.
+message StoreBeginTxResponse {
+    // Transaction ID.
+    string id = 1;
+}
+
+// Gets a key from the store.
+message StoreGetKeyRequest {
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
+    string token = 1;
+    // Transaction ID.
+    string tx_id = 2;
+    // Name of the key.
+    string name = 3;
+}
+
+// Response of the retrieved key.
+message StoreGetKeyResponse {
+    // Status result of the get.
+    enum Status {
+        // Action was successful.
+        FOUND = 0;
+        // Action has failed.
+        NOT_FOUND = 1;
+    }
+    Status status = 1;
+    // Value when `FOUND`.
+    bytes value = 2;
+}
+
+// Sets a key into the store.
+//
+// `tx_id` must be an ID of a transaction that was started with `READ_WRITE`.
+message StoreSetKeyRequest {
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
+    string token = 1;
+    // Transaction ID.
+    string tx_id = 2;
+    // Name of the key.
+    string name = 3;
+    // Value of the key.
+    bytes value = 4;
+    // TTL of the key (in milliseconds)
+    uint64 ttl = 5;
+}
+
+// Response from `SetKey`.
+message StoreSetKeyResponse {
+    // Empty at the moment, defined for possibility of adding future return values.
+}
+
+// Deletes a key in the store.
+//
+// `tx_id` must be an ID of a transaction that was started with `READ_WRITE`.
+//
+// Does not error in the case that a key does not exist.
+message StoreDeleteKeyRequest {
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
+    string token = 1;
+    // Transaction ID.
+    string tx_id = 2;
+    // Name of the key.
+    string name = 3;
+}
+
+// Response from `DeleteKey`.
+message StoreDeleteKeyResponse {
+    // Empty at the moment, defined for possibility of adding future return values.
+}
+
+// Commits the transaction in the store.
+//
+// Upon error the whole transaction is discarded so no need to call discard after error.
+message StoreCommitTxRequest {
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
+    string token = 1;
+    // Transaction ID.
+    string tx_id = 2;
+}
+
+// Response from `CommitTx`.
+message StoreCommitTxResponse {
+    // Empty at the moment, defined for possibility of adding future return values.
+}
+
+// Discards the transaction in the store.
+message StoreDiscardTxRequest {
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
+    string token = 1;
+    // Transaction ID.
+    string tx_id = 2;
+}
+
+// Response from `DiscardTx`.
+message StoreDiscardTxResponse {
+    // Empty at the moment, defined for possibility of adding future return values.
+}
+
+service ElasticAgentArtifact {
+    // Fetches an artifact from the artifact store.
+    //
+    // Response from this call can be chunked over multiple `ArtifactFetchResponse` for very large responses. A minimum
+    // of two responses will always be returned. The last response has eof set.
+    rpc Fetch(ArtifactFetchRequest) returns (stream ArtifactFetchResponse);
+}
+
+// Requests an artifact from the Elastic Agent.
+message ArtifactFetchRequest {
+    // Token that is used to uniquely identify the collection of inputs to the agent. When started this is provided
+    // in the `ConnInfo`.
+    string token = 1;
+    // ID of the artifact.
+    string id = 2;
+    // SHA256 of the artifact.
+    string sha256 = 3;
+}
+
+// Content of the artifact.
+message ArtifactFetchResponse {
+    oneof content_eof {
+        // Artifact content.
+        bytes content = 1;
+        // End-of-file.
+        google.protobuf.Empty eof = 2;
+    }
+}
+
+// Log service is only exposed to programs that are not started as sub-processes by Elastic Agent.
+//
+// This allows services that are not started as sub-processes to write to the same stdout that programs that are
+// started as subprocess. A program that is as a sub-process with stdout connected does not have the ability to use
+// this service.
+service ElasticAgentLog {
+    // Log messages to the Elastic Agent.
+    rpc Log(LogMessageRequest) returns (LogMessageResponse);
+}
+
+message LogMessage {
+    // ID of the unit.
+    string unit_id = 1;
+    // Type of the unit.
+    UnitType unit_type = 2;
+    // ECS log message body JSON encoded.
+    bytes message = 3;
+}
+
+message LogMessageRequest {
+    // Token that is used to uniquely identify the connection to the Elastic Agent.
+    string token = 1;
+    // Multiple message to report at the same time.
+    repeated LogMessage messages = 2;
+}
+
+message LogMessageResponse {
+    // Empty at the moment, defined for possibility of adding future return values.
+}

@@ -79,14 +79,17 @@ func (Update) Generate() error {
 		"--go_opt=paths=source_relative",
 		"--go-grpc_out=pkg/proto",
 		"--go-grpc_opt=paths=source_relative",
-		"elastic-agent-client.proto")
+		"elastic-agent-client.proto",
+		"elastic-agent-client-future.proto",
+		"elastic-agent-client-deprecated.proto",
+	)
 	if errGRPC != nil {
-		errGRPC = fmt.Errorf("failed to generate GRPC code: %w")
+		errGRPC = fmt.Errorf("failed to generate GRPC code: %w", errGRPC)
 	}
 
 	errGenerate := sh.RunV("go", "generate", "./...")
 	if errGenerate != nil {
-		errGenerate = fmt.Errorf("failed to run go generate: %w")
+		errGenerate = fmt.Errorf("failed to run go generate: %w", errGenerate)
 	}
 
 	switch {
