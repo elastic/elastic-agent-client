@@ -177,23 +177,25 @@ type clientV2 struct {
 	agentInfoMu sync.RWMutex
 	agentInfo   *AgentInfo
 
-	versionInfo     VersionInfo
-	versionInfoSent bool
+	versionInfo         VersionInfo
+	sendVersionInfoOnce sync.Once
 
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 	client proto.ElasticAgentClient
-	cfgMu  sync.RWMutex
-	obsMu  sync.RWMutex
 
-	kickSendObservedCh chan struct{}
-	errCh              chan error
-	changesCh          chan UnitChanged
-	unitsMu            sync.RWMutex
-	units              []*Unit
+	errCh     chan error
+	changesCh chan UnitChanged
 
-	featuresMu  sync.RWMutex
+	// stateChangeObservedCh is an internal channel that notifies checkinWriter
+	// that a unit state has changed. To trigger it, call unitsStateChanged.
+	stateChangeObservedCh chan struct{}
+
+	unitsMu sync.RWMutex
+	// Must hold unitsMu to access units or featuresIdx, since they
+	// must be synchronized with each other.
+	units       []*Unit
 	featuresIdx uint64
 
 	dmx       sync.RWMutex
@@ -210,15 +212,15 @@ type clientV2 struct {
 // NewV2 creates a client connection to Elastic Agent over the V2 control protocol.
 func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.DialOption) V2 {
 	c := &clientV2{
-		target:             target,
-		opts:               opts,
-		token:              token,
-		versionInfo:        versionInfo,
-		kickSendObservedCh: make(chan struct{}, 1),
-		errCh:              make(chan error),
-		changesCh:          make(chan UnitChanged),
-		diagHooks:          make(map[string]diagHook),
-		minCheckTimeout:    CheckinMinimumTimeout,
+		target:                target,
+		opts:                  opts,
+		token:                 token,
+		versionInfo:           versionInfo,
+		stateChangeObservedCh: make(chan struct{}, 1),
+		errCh:                 make(chan error),
+		changesCh:             make(chan UnitChanged),
+		diagHooks:             make(map[string]diagHook),
+		minCheckTimeout:       CheckinMinimumTimeout,
 	}
 	c.registerDefaultDiagnostics()
 	return c
@@ -300,130 +302,129 @@ func (c *clientV2) startCheckin() {
 
 	go func() {
 		defer c.wg.Done()
-		for {
-			select {
-			case <-c.ctx.Done():
-				// stopped
-				return
-			default:
-			}
-
+		for c.ctx.Err() == nil {
+			// If the initial RPC connection fails, checkinRoundTrip
+			// returns immediately, so we set a timer to avoid spinlocking
+			// on the error.
+			retryTimer := time.NewTimer(time.Second)
 			c.checkinRoundTrip()
+
+			// After the RPC client closes, wait until either the timer interval
+			// expires or the context is cancelled. Note that the timer waits
+			// one second since the checkinRoundTrip was last _called_, not
+			// since it returns; immediate retries are ok after an active
+			// connection shuts down.
+			select {
+			case <-retryTimer.C:
+			case <-c.ctx.Done():
+			}
 		}
 	}()
+}
+
+func (c *clientV2) checkinWriter(
+	checkinClient proto.ElasticAgent_CheckinV2Client,
+	done chan struct{},
+) {
+	t := time.NewTicker(c.minCheckTimeout)
+	defer t.Stop()
+
+	// Keep sending until the call returns an error
+	for c.sendObserved(checkinClient) == nil {
+
+		// Wait until the ticker goes off, or we're notified of an update.
+		select {
+		case <-c.stateChangeObservedCh:
+			// We're sending an off-cycle update, so reset the ticker timeout
+			t.Reset(c.minCheckTimeout)
+		case <-t.C:
+		case <-done:
+			return
+		}
+	}
 }
 
 func (c *clientV2) checkinRoundTrip() {
 	checkinCtx, checkinCancel := context.WithCancel(c.ctx)
 	defer checkinCancel()
 
+	// Return immediately if we can't establish an initial RPC connection.
 	checkinClient, err := c.client.CheckinV2(checkinCtx)
 	if err != nil {
 		c.errCh <- err
 		return
 	}
 
-	// ensure first checkin include version information
-	c.versionInfoSent = false
+	// wg tracks when the send and receive loops terminate.
+	var wg sync.WaitGroup
 
-	var checkinRead sync.WaitGroup
-	var checkinWrite sync.WaitGroup
-	done := make(chan bool)
+	// receiverDone is closed by the expected state loop when it
+	// terminates, so the observed state loop (checkinWriter) knows
+	// to return as well.
+	receiverDone := make(chan struct{})
 
 	// expected state check-ins
-	checkinRead.Add(1)
+	wg.Add(1)
 	go func() {
-		defer checkinRead.Done()
-		for {
-			expected, err := checkinClient.Recv()
-			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					c.errCh <- err
-				}
-				close(done)
-				return
-			}
-			c.sync(expected)
+		defer wg.Done()
+		defer close(receiverDone)
+		expected, err := checkinClient.Recv()
+		for ; err == nil; expected, err = checkinClient.Recv() {
+			c.applyExpected(expected)
+		}
+		if !errors.Is(err, io.EOF) {
+			c.errCh <- err
 		}
 	}()
 
 	// observed state check-ins
-	checkinWrite.Add(1)
+	wg.Add(1)
 	go func() {
-		defer checkinWrite.Done()
-
-		if err := c.sendObserved(checkinClient); err != nil {
-			if !errors.Is(err, io.EOF) {
-				c.errCh <- err
-			}
-			return
-		}
-
-		t := time.NewTicker(c.minCheckTimeout)
-		defer t.Stop()
-
-		for {
-			select {
-			case <-done:
-				return
-			case <-c.kickSendObservedCh:
-				if err := c.sendObserved(checkinClient); err != nil {
-					if !errors.Is(err, io.EOF) {
-						c.errCh <- err
-					}
-					return
-				}
-				t.Reset(c.minCheckTimeout)
-			case <-t.C:
-				if err := c.sendObserved(checkinClient); err != nil {
-					if !errors.Is(err, io.EOF) {
-						c.errCh <- err
-					}
-					return
-				}
-			}
-		}
+		defer wg.Done()
+		c.checkinWriter(checkinClient, receiverDone)
+		_ = checkinClient.CloseSend()
 	}()
 
-	// wait for write goroutine to quit then close the client
-	checkinWrite.Wait()
-	checkinClient.CloseSend()
-
-	// then wait for the read to quit
-	checkinRead.Wait()
+	// Wait for reader and writer to finish before returning.
+	wg.Wait()
 }
 
 // sendObserved sends the observed state of all the units.
+// If the send produces any error except io.EOF, sendObserved
+// forwards it to the client's error channel before returning.
 func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error {
 	c.unitsMu.RLock()
 	observed := make([]*proto.UnitObserved, 0, len(c.units))
 	for _, unit := range c.units {
 		observed = append(observed, unit.toObserved())
 	}
+	// Check featuresIdx within the same mutex block since we
+	// need observed and featuresIdx to be synchronized with each other.
+	featuresIdx := c.featuresIdx
 	c.unitsMu.RUnlock()
-
-	c.featuresMu.RLock()
-	defer c.featuresMu.RUnlock()
 
 	msg := &proto.CheckinObserved{
 		Token:       c.token,
 		Units:       observed,
-		FeaturesIdx: c.featuresIdx,
+		FeaturesIdx: featuresIdx,
 		VersionInfo: nil,
 	}
-	if !c.versionInfoSent {
-		c.versionInfoSent = true
+	c.sendVersionInfoOnce.Do(func() {
 		msg.VersionInfo = &proto.CheckinObservedVersionInfo{
 			Name:    c.versionInfo.Name,
 			Version: c.versionInfo.Version,
 			Meta:    c.versionInfo.Meta,
 		}
+	})
+	err := client.Send(msg)
+	if err != nil && !errors.Is(err, io.EOF) {
+		c.errCh <- err
 	}
-	return client.Send(msg)
+	return err
 }
 
-// sync syncs the expected state with the current state.
-func (c *clientV2) sync(expected *proto.CheckinExpected) {
+// applyExpected syncs the expected state with the current state.
+func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
 	if expected.AgentInfo != nil {
 		c.agentInfoMu.Lock()
 		c.agentInfo = &AgentInfo{
@@ -437,26 +438,42 @@ func (c *clientV2) sync(expected *proto.CheckinExpected) {
 	c.syncUnits(expected)
 }
 
-func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
-	c.unitsMu.Lock()
-	defer c.unitsMu.Unlock()
-	i := 0
-	removed := false
+// Remove from the client any units not in the given expected list,
+// returning a count of the units removed.
+// Caller must hold c.unitsMu.
+func (c *clientV2) removeUnexpectedUnits(expected *proto.CheckinExpected) int {
+	remainingCount := 0
+	removedCount := 0
+	// Coalesce c.units by moving all units that are still expected to
+	// the beginning of the array and truncating the rest.
 	for _, unit := range c.units {
 		if inExpected(unit, expected.Units) {
-			c.units[i] = unit
-			i++
+			c.units[remainingCount] = unit
+			remainingCount++
 		} else {
 			c.changesCh <- UnitChanged{
 				Type: UnitChangedRemoved,
 				Unit: unit,
 			}
-			removed = true
+			removedCount++
 		}
 	}
+	c.units = c.units[:remainingCount]
+	return removedCount
+}
 
-	// resize so units that no longer exist are removed from the slice
-	c.units = c.units[:i]
+func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
+	c.unitsMu.Lock()
+	defer c.unitsMu.Unlock()
+
+	if c.removeUnexpectedUnits(expected) > 0 {
+		// Most state changes are reported by the unit itself via
+		// Unit.UpdateState, which schedules a checkin update by calling
+		// unitsStateChanged(), but removals are handled immediately
+		// here so we also need to trigger the update ourselves.
+		c.unitsStateChanged()
+	}
+
 	for _, agentUnit := range expected.Units {
 		unit := c.findUnit(agentUnit.Id, UnitType(agentUnit.Type))
 		if unit == nil {
@@ -507,18 +524,12 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 	// Now that we've propagated feature flags' information to units, record
 	// the featuresIdx on the client so we can send it up as part of the observed
 	// state in the next checkin.
-	c.featuresMu.Lock()
-	defer c.featuresMu.Unlock()
+	// (It's safe to write to featuresIdx here since we hold c.unitsMu.)
 	c.featuresIdx = expected.FeaturesIdx
-
-	if removed {
-		// unit removed send updated observed change so agent is notified now
-		// otherwise it will not be notified until the next checkin timeout
-		c.unitChanged()
-	}
 }
 
-// findUnit finds an existing unit.
+// findUnit finds an existing unit. Caller must hold a read lock
+// on c.unitsMu.
 func (c *clientV2) findUnit(id string, unitType UnitType) *Unit {
 	for _, unit := range c.units {
 		if unit.id == id && unit.unitType == unitType {
@@ -528,10 +539,15 @@ func (c *clientV2) findUnit(id string, unitType UnitType) *Unit {
 	return nil
 }
 
-// unitChanged triggers the send goroutine to send a new observed state
-func (c *clientV2) unitChanged() {
-	if len(c.kickSendObservedCh) <= 0 {
-		c.kickSendObservedCh <- struct{}{}
+// unitsStateChanged notifies checkinWriter that there is new
+// state data to send.
+func (c *clientV2) unitsStateChanged() {
+	// Sending to kickSendObservedCh will trigger checkinWriter to
+	// send an update. If we can't send on the channel without blocking,
+	// then a request is already pending so we're done.
+	select {
+	case c.stateChangeObservedCh <- struct{}{}:
+	default:
 	}
 }
 
