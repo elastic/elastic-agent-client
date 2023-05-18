@@ -302,11 +302,11 @@ func (c *clientV2) startCheckin() {
 
 	go func() {
 		defer c.wg.Done()
+		// If the initial RPC connection fails, checkinRoundTrip
+		// returns immediately, so we set a timer to avoid spinlocking
+		// on the error.
+		retryTimer := time.NewTimer(1 * time.Second)
 		for c.ctx.Err() == nil {
-			// If the initial RPC connection fails, checkinRoundTrip
-			// returns immediately, so we set a timer to avoid spinlocking
-			// on the error.
-			retryTimer := time.NewTimer(time.Second)
 			c.checkinRoundTrip()
 
 			// After the RPC client closes, wait until either the timer interval
@@ -316,10 +316,56 @@ func (c *clientV2) startCheckin() {
 			// connection shuts down.
 			select {
 			case <-retryTimer.C:
+				retryTimer.Reset(1 * time.Second)
 			case <-c.ctx.Done():
 			}
 		}
 	}()
+}
+
+func (c *clientV2) checkinRoundTrip() {
+	checkinCtx, checkinCancel := context.WithCancel(c.ctx)
+	defer checkinCancel()
+
+	// Return immediately if we can't establish an initial RPC connection.
+	checkinClient, err := c.client.CheckinV2(checkinCtx)
+	if err != nil {
+		c.errCh <- err
+		return
+	}
+
+	// wg tracks when the reader and writer loops terminate.
+	var wg sync.WaitGroup
+
+	// readerDone is closed by the reader (expected state) loop when it
+	// terminates, so the writer (observed state) loop knows to return
+	// as well.
+	readerDone := make(chan struct{})
+
+	// expected state check-ins (reader)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(readerDone)
+		expected, err := checkinClient.Recv()
+		for ; err == nil; expected, err = checkinClient.Recv() {
+			c.applyExpected(expected)
+		}
+		if !errors.Is(err, io.EOF) {
+			c.errCh <- err
+		}
+	}()
+
+	// observed state check-ins (writer)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		c.checkinWriter(checkinClient, readerDone)
+		_ = checkinClient.CloseSend()
+	}()
+
+	// Wait for reader and writer to finish before returning.
+	wg.Wait()
 }
 
 func (c *clientV2) checkinWriter(
@@ -342,51 +388,6 @@ func (c *clientV2) checkinWriter(
 			return
 		}
 	}
-}
-
-func (c *clientV2) checkinRoundTrip() {
-	checkinCtx, checkinCancel := context.WithCancel(c.ctx)
-	defer checkinCancel()
-
-	// Return immediately if we can't establish an initial RPC connection.
-	checkinClient, err := c.client.CheckinV2(checkinCtx)
-	if err != nil {
-		c.errCh <- err
-		return
-	}
-
-	// wg tracks when the send and receive loops terminate.
-	var wg sync.WaitGroup
-
-	// receiverDone is closed by the expected state loop when it
-	// terminates, so the observed state loop (checkinWriter) knows
-	// to return as well.
-	receiverDone := make(chan struct{})
-
-	// expected state check-ins
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer close(receiverDone)
-		expected, err := checkinClient.Recv()
-		for ; err == nil; expected, err = checkinClient.Recv() {
-			c.applyExpected(expected)
-		}
-		if !errors.Is(err, io.EOF) {
-			c.errCh <- err
-		}
-	}()
-
-	// observed state check-ins
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.checkinWriter(checkinClient, receiverDone)
-		_ = checkinClient.CloseSend()
-	}()
-
-	// Wait for reader and writer to finish before returning.
-	wg.Wait()
 }
 
 // sendObserved sends the observed state of all the units.
@@ -567,15 +568,23 @@ func (c *clientV2) startActions() {
 	actionResults := make(chan *proto.ActionResponse, 100)
 	go func() {
 		defer c.wg.Done()
-		for {
-			select {
-			case <-c.ctx.Done():
-				// stopped
-				return
-			default:
-			}
-
+		// If the initial RPC connection fails, actionRoundTrip
+		// returns immediately, so we set a timer to avoid spinlocking
+		// on the error.
+		retryTimer := time.NewTimer(1 * time.Second)
+		for c.ctx.Err() == nil {
 			c.actionRoundTrip(actionResults)
+
+			// After the RPC client closes, wait until either the timer interval
+			// expires or the context is cancelled. Note that the timer waits
+			// one second since the checkinRoundTrip was last _called_, not
+			// since it returns; immediate retries are ok after an active
+			// connection shuts down.
+			select {
+			case <-retryTimer.C:
+				retryTimer.Reset(1 * time.Second)
+			case <-c.ctx.Done():
+			}
 		}
 	}()
 }
@@ -583,86 +592,94 @@ func (c *clientV2) startActions() {
 func (c *clientV2) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 	actionsCtx, actionsCancel := context.WithCancel(c.ctx)
 	defer actionsCancel()
+
+	// Return immediately if we can't establish an initial RPC connection.
 	actionsClient, err := c.client.Actions(actionsCtx)
 	if err != nil {
 		c.errCh <- err
 		return
 	}
 
-	var actionsRead sync.WaitGroup
-	var actionsWrite sync.WaitGroup
-	done := make(chan bool)
+	// wg tracks when the reader and writer loops terminate.
+	var wg sync.WaitGroup
+
+	// readerDone is closed by the reader loop when it terminates, so the
+	// writer loop knows to return as well.
+	readerDone := make(chan struct{})
 
 	// action requests
-	actionsRead.Add(1)
+	wg.Add(1)
 	go func() {
-		defer actionsRead.Done()
-		for {
-			action, err := actionsClient.Recv()
-			if err != nil {
-				if !errors.Is(err, io.EOF) {
-					c.errCh <- err
-				}
-				close(done)
-				return
-			}
-
-			switch action.Type {
-			case proto.ActionRequest_CUSTOM:
-				c.tryPerformAction(actionResults, action)
-			case proto.ActionRequest_DIAGNOSTICS:
-				c.tryPerformDiagnostics(actionResults, action)
-			default:
-				actionResults <- &proto.ActionResponse{
-					Token:  c.token,
-					Id:     action.Id,
-					Status: proto.ActionResponse_FAILED,
-					Result: ActionTypeUnknown,
-				}
-			}
-		}
+		defer wg.Done()
+		defer close(readerDone)
+		c.actionsReader(actionsClient, actionResults)
 	}()
 
 	// action responses
-	actionsWrite.Add(1)
+	wg.Add(1)
 	go func() {
-		defer actionsWrite.Done()
-
-		// initial connection of stream must send the token so
-		// the Elastic Agent knows this clients token.
-		err := actionsClient.Send(&proto.ActionResponse{
-			Token:  c.token,
-			Id:     ActionResponseInitID,
-			Status: proto.ActionResponse_SUCCESS,
-			Result: []byte("{}"),
-		})
-		if err != nil {
-			c.errCh <- err
-			return
-		}
-
-		for {
-			select {
-			case <-done:
-				return
-			case res := <-actionResults:
-				err := actionsClient.Send(res)
-				if err != nil {
-					// failed to send, add back to response to try again
-					actionResults <- res
-					c.errCh <- err
-					return
-				}
-			}
-		}
+		defer wg.Done()
+		defer actionsClient.CloseSend()
+		c.actionsWriter(actionsClient, actionResults, readerDone)
 	}()
 
-	// wait for write goroutine to quit then close the client
-	actionsWrite.Wait()
-	actionsClient.CloseSend()
+	// Wait for reader and writer to finish before returning.
+	wg.Wait()
+}
 
-	// then wait for the read to quit
-	actionsRead.Wait()
+func (c *clientV2) actionsReader(
+	actionsClient proto.ElasticAgent_ActionsClient,
+	actionResults chan *proto.ActionResponse,
+) {
+	action, err := actionsClient.Recv()
+	for ; err == nil; action, err = actionsClient.Recv() {
+		switch action.Type {
+		case proto.ActionRequest_CUSTOM:
+			c.tryPerformAction(actionResults, action)
+		case proto.ActionRequest_DIAGNOSTICS:
+			c.tryPerformDiagnostics(actionResults, action)
+		default:
+			actionResults <- &proto.ActionResponse{
+				Token:  c.token,
+				Id:     action.Id,
+				Status: proto.ActionResponse_FAILED,
+				Result: ActionTypeUnknown,
+			}
+		}
+	}
+	if !errors.Is(err, io.EOF) {
+		c.errCh <- err
+	}
+}
+
+func (c *clientV2) actionsWriter(
+	actionsClient proto.ElasticAgent_ActionsClient,
+	actionResults chan *proto.ActionResponse,
+	readerDone chan struct{},
+) {
+	// initial connection of stream must send the token so
+	// the Elastic Agent knows this clients token.
+	err := actionsClient.Send(&proto.ActionResponse{
+		Token:  c.token,
+		Id:     ActionResponseInitID,
+		Status: proto.ActionResponse_SUCCESS,
+		Result: []byte("{}"),
+	})
+	var actionResponse *proto.ActionResponse
+
+	for err == nil {
+		select {
+		case <-readerDone:
+			return
+		case actionResponse = <-actionResults:
+			err = actionsClient.Send(actionResponse)
+		}
+	}
+	c.errCh <- err
+	if actionResponse != nil {
+		// failed to send, add back to response queue to try again
+		actionResults <- actionResponse
+	}
 }
 
 func (c *clientV2) tryPerformAction(actionResults chan *proto.ActionResponse, action *proto.ActionRequest) {
