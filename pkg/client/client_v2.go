@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"runtime/pprof"
 	"strings"
 	"sync"
@@ -315,9 +314,7 @@ func (c *clientV2) checkinRoundTrip() {
 	defer checkinCancel()
 
 	// Return immediately if we can't establish an initial RPC connection.
-	checkinClient, err := c.client.CheckinV2(checkinCtx,
-		grpc_retry.WithMax(math.MaxUint),
-		grpc_retry.WithPerRetryTimeout(1*time.Second))
+	checkinClient, err := c.client.CheckinV2(checkinCtx, grpc_retry.WithPerRetryTimeout(1*time.Second))
 	if err != nil {
 		c.errCh <- err
 		return
@@ -568,9 +565,7 @@ func (c *clientV2) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 	defer actionsCancel()
 
 	// Return immediately if we can't establish an initial RPC connection.
-	actionsClient, err := c.client.Actions(actionsCtx,
-		grpc_retry.WithMax(math.MaxUint),
-		grpc_retry.WithPerRetryTimeout(1*time.Second))
+	actionsClient, err := c.client.Actions(actionsCtx, grpc_retry.WithPerRetryTimeout(1*time.Second))
 	if err != nil {
 		c.errCh <- err
 		return
