@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -33,6 +35,54 @@ func TestClientV2_DialError(t *testing.T) {
 	invalidClient := NewV2(fmt.Sprintf(":%d", srv.Port), "invalid_token", VersionInfo{})
 	assert.Error(t, invalidClient.Start(context.Background()))
 	defer invalidClient.Stop()
+}
+
+// Test that RPC errors on client startup delay before retrying instead
+// of producing a constant stream of errors.
+func TestRPCErrorRetryTimer(t *testing.T) {
+	// Create a TCP listener that rejects all incoming connections, to
+	// induce an RPC error when the client starts.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer listener.Close()
+	go rejectingListener(listener)
+
+	client := NewV2(listener.Addr().String(), mock.NewID(), VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	assert.NoError(t, client.Start(context.Background()))
+
+	// We expect one error each from checkinRoundTrip and actionRoundTrip.
+	// After those first RPC errors, the next ones shouldn't be sent for at least a
+	// second. We don't want to delay the tests that long for a non-failure
+	// case, so just do a short timeout here -- this is really just to make
+	// sure we don't fall back on the old behavior of sending rpc failures
+	// in a continuous stream.
+	rpcErrorCount := 0
+	timeoutChan := time.After(50 * time.Millisecond)
+testLoop:
+	for {
+		select {
+		case err := <-client.Errors():
+			if strings.Contains(err.Error(), "rpc error") {
+				rpcErrorCount++
+			}
+		case <-timeoutChan:
+			break testLoop
+		}
+	}
+
+	assert.Equal(t, 2, rpcErrorCount,
+		"expected 2 RPC errors, one from checkinRoundTrip and one from actionRoundTrip")
+}
+
+func rejectingListener(listener net.Listener) {
+	for {
+		conn, err := listener.Accept()
+		if err != nil && strings.Contains(err.Error(), "use of closed network connection") {
+			// End the loop when the listener is closed
+			return
+		}
+		conn.Close()
+	}
 }
 
 func TestClientV2_Checkin_Initial(t *testing.T) {
