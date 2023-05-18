@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	grpc_retry "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -302,23 +303,8 @@ func (c *clientV2) startCheckin() {
 
 	go func() {
 		defer c.wg.Done()
-		// If the initial RPC connection fails, checkinRoundTrip
-		// returns immediately, so we set a timer to avoid spinlocking
-		// on the error.
-		retryTimer := time.NewTimer(1 * time.Second)
 		for c.ctx.Err() == nil {
 			c.checkinRoundTrip()
-
-			// After the RPC client closes, wait until either the timer interval
-			// expires or the context is cancelled. Note that the timer waits
-			// one second since the checkinRoundTrip was last _called_, not
-			// since it returns; immediate retries are ok after an active
-			// connection shuts down.
-			select {
-			case <-retryTimer.C:
-				retryTimer.Reset(1 * time.Second)
-			case <-c.ctx.Done():
-			}
 		}
 	}()
 }
@@ -328,7 +314,7 @@ func (c *clientV2) checkinRoundTrip() {
 	defer checkinCancel()
 
 	// Return immediately if we can't establish an initial RPC connection.
-	checkinClient, err := c.client.CheckinV2(checkinCtx)
+	checkinClient, err := c.client.CheckinV2(checkinCtx, grpc_retry.WithPerRetryTimeout(1*time.Second))
 	if err != nil {
 		c.errCh <- err
 		return
@@ -568,23 +554,8 @@ func (c *clientV2) startActions() {
 	actionResults := make(chan *proto.ActionResponse, 100)
 	go func() {
 		defer c.wg.Done()
-		// If the initial RPC connection fails, actionRoundTrip
-		// returns immediately, so we set a timer to avoid spinlocking
-		// on the error.
-		retryTimer := time.NewTimer(1 * time.Second)
 		for c.ctx.Err() == nil {
 			c.actionRoundTrip(actionResults)
-
-			// After the RPC client closes, wait until either the timer interval
-			// expires or the context is cancelled. Note that the timer waits
-			// one second since the checkinRoundTrip was last _called_, not
-			// since it returns; immediate retries are ok after an active
-			// connection shuts down.
-			select {
-			case <-retryTimer.C:
-				retryTimer.Reset(1 * time.Second)
-			case <-c.ctx.Done():
-			}
 		}
 	}()
 }
@@ -594,7 +565,7 @@ func (c *clientV2) actionRoundTrip(actionResults chan *proto.ActionResponse) {
 	defer actionsCancel()
 
 	// Return immediately if we can't establish an initial RPC connection.
-	actionsClient, err := c.client.Actions(actionsCtx)
+	actionsClient, err := c.client.Actions(actionsCtx, grpc_retry.WithPerRetryTimeout(1*time.Second))
 	if err != nil {
 		c.errCh <- err
 		return
