@@ -177,8 +177,8 @@ type clientV2 struct {
 	agentInfoMu sync.RWMutex
 	agentInfo   *AgentInfo
 
-	versionInfo         VersionInfo
-	sendVersionInfoOnce sync.Once
+	versionInfo     VersionInfo
+	versionInfoSent bool
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -410,16 +410,18 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 		FeaturesIdx: featuresIdx,
 		VersionInfo: nil,
 	}
-	c.sendVersionInfoOnce.Do(func() {
+	if !c.versionInfoSent {
 		msg.VersionInfo = &proto.CheckinObservedVersionInfo{
 			Name:    c.versionInfo.Name,
 			Version: c.versionInfo.Version,
 			Meta:    c.versionInfo.Meta,
 		}
-	})
+	}
 	err := client.Send(msg)
 	if err != nil && !errors.Is(err, io.EOF) {
 		c.errCh <- err
+	} else {
+		c.versionInfoSent = true
 	}
 	return err
 }
@@ -543,7 +545,7 @@ func (c *clientV2) findUnit(id string, unitType UnitType) *Unit {
 // unitsStateChanged notifies checkinWriter that there is new
 // state data to send.
 func (c *clientV2) unitsStateChanged() {
-	// Sending to kickSendObservedCh will trigger checkinWriter to
+	// Sending to stateChangeObservedCh will trigger checkinWriter to
 	// send an update. If we can't send on the channel without blocking,
 	// then a request is already pending so we're done.
 	select {
