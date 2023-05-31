@@ -290,6 +290,20 @@ func (c *clientV2) RegisterDiagnosticHook(name string, description string, filen
 	}
 }
 
+// durationOf wraps a given function call and measures the time it consumed.
+func durationOf(callback func()) time.Duration {
+	before := time.Now()
+	callback()
+	return time.Since(before)
+}
+
+func nextExpBackoff(current time.Duration, max time.Duration) time.Duration {
+	if current*2 >= max {
+		return max
+	}
+	return current * 2
+}
+
 // startCheckin starts the go routines to send and receive check-ins
 //
 // This starts 3 go routines to manage the check-in bi-directional stream. The first
@@ -305,9 +319,18 @@ func (c *clientV2) startCheckin() {
 		// If the initial RPC connection fails, checkinRoundTrip
 		// returns immediately, so we set a timer to avoid spinlocking
 		// on the error.
-		retryTimer := time.NewTimer(1 * time.Second)
+		retryInterval := 1 * time.Second
+		retryTimer := time.NewTimer(retryInterval)
 		for c.ctx.Err() == nil {
-			c.checkinRoundTrip()
+			checkinDuration := durationOf(c.checkinRoundTrip)
+
+			if checkinDuration < time.Second {
+				// If the checkin round trip lasted less than a second, we're
+				// probably in an error loop -- apply exponential backoff up to 30s.
+				retryInterval = nextExpBackoff(retryInterval, 30*time.Second)
+			} else {
+				retryInterval = 1 * time.Second
+			}
 
 			// After the RPC client closes, wait until either the timer interval
 			// expires or the context is cancelled. Note that the timer waits
@@ -316,7 +339,7 @@ func (c *clientV2) startCheckin() {
 			// connection shuts down.
 			select {
 			case <-retryTimer.C:
-				retryTimer.Reset(1 * time.Second)
+				retryTimer.Reset(retryInterval)
 			case <-c.ctx.Done():
 			}
 		}
@@ -573,9 +596,20 @@ func (c *clientV2) startActions() {
 		// If the initial RPC connection fails, actionRoundTrip
 		// returns immediately, so we set a timer to avoid spinlocking
 		// on the error.
-		retryTimer := time.NewTimer(1 * time.Second)
+		retryInterval := 1 * time.Second
+		retryTimer := time.NewTimer(retryInterval)
 		for c.ctx.Err() == nil {
-			c.actionRoundTrip(actionResults)
+			actionDuration := durationOf(func() {
+				c.actionRoundTrip(actionResults)
+			})
+
+			if actionDuration < time.Second {
+				// If the action round trip lasted less than a second, we're
+				// probably in an error loop -- apply exponential backoff up to 30s.
+				retryInterval = nextExpBackoff(retryInterval, 30*time.Second)
+			} else {
+				retryInterval = 1 * time.Second
+			}
 
 			// After the RPC client closes, wait until either the timer interval
 			// expires or the context is cancelled. Note that the timer waits
@@ -584,7 +618,7 @@ func (c *clientV2) startActions() {
 			// connection shuts down.
 			select {
 			case <-retryTimer.C:
-				retryTimer.Reset(1 * time.Second)
+				retryTimer.Reset(retryInterval)
 			case <-c.ctx.Done():
 			}
 		}
