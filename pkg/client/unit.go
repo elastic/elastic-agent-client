@@ -207,7 +207,7 @@ func (u *Unit) UpdateState(state UnitState, message string, payload map[string]i
 		changed = true
 	}
 	if changed {
-		u.client.unitChanged()
+		u.client.unitsStateChanged()
 	}
 	return nil
 }
