@@ -10,7 +10,7 @@ require (
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.7.0
 	google.golang.org/grpc v1.46.0
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.29.1
 )
 
 require (
