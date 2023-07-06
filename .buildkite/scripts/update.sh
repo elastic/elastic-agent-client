@@ -6,7 +6,7 @@ source .buildkite/scripts/pre-install-command.sh
 apt-get update
 apt-get install unzip
 curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.19.4/protoc-3.19.4-linux-x86_64.zip
-unzip -ov protoc.zip -d /usr/local
+unzip -o protoc.zip -d /usr/local
 which protoc
 
 go env
