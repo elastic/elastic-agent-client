@@ -9,9 +9,6 @@ curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/do
 unzip -o protoc.zip -d /usr/local
 which protoc
 
-go env
-echo "$PATH"
-
 add_bin_path
 with_mage
 
