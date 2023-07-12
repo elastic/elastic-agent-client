@@ -6,25 +6,7 @@ steps:
   - label: "Update"
     key: update
     command:
-      - ".buildkite/scripts/update.sh"
-    agents:
-      image: "golang:${SETUP_GOLANG_VERSION}"
-      cpu: "8"
-      memory: "4G"
-
-  - label: "Lint"
-    key: lint
-    command:
-      - ".buildkite/scripts/lint.sh"
-    agents:
-      image: "golang:${SETUP_GOLANG_VERSION}"
-      cpu: "8"
-      memory: "4G"
-
-  - label: "Test"
-    key: test
-    command:
-      - ".buildkite/scripts/test.sh"
+      - ".buildkite/scripts/update-test.sh"
     agents:
       image: "golang:${SETUP_GOLANG_VERSION}"
       cpu: "8"
@@ -40,5 +22,5 @@ steps:
     agents:
       provider: "gcp" #junit plugin requires docker
     depends_on:
-      - step: "test"
+      - step: "update"
         allow_failure: true
