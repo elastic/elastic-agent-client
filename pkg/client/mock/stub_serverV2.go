@@ -57,7 +57,7 @@ type StubServerV2 struct {
 
 // Start the mock server
 func (s *StubServerV2) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", ":0")
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
 		return err
 	}
