@@ -271,6 +271,20 @@ func (u *Unit) RegisterDiagnosticHook(name string, description string, filename 
 	}
 }
 
+// RegisterOptionalDiagnosticHook is the same as RegisterDiagnosticHook, but it takes a paramTag value that corrisponds
+// the a parameter in the diagnostic request action. The diagnostic will only run if the action contains that tag in the Params field.
+func (u *Unit) RegisterOptionalDiagnosticHook(paramTag string, name string, description string, filename string, contentType string, hook DiagnosticHook) {
+	u.dmx.Lock()
+	defer u.dmx.Unlock()
+	u.diagHooks[name] = diagHook{
+		description:          description,
+		filename:             filename,
+		contentType:          contentType,
+		hook:                 hook,
+		optionalWithParamTag: paramTag,
+	}
+}
+
 // updateState updates the configuration for this unit, triggering the delegate
 // function if set.
 func (u *Unit) updateState(

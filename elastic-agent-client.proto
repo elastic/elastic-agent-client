@@ -261,6 +261,16 @@ message ActionRequest {
         // Defined diagnostics action.
         DIAGNOSTICS = 1;
     }
+    // The level that the action is operating on.
+    // Currently only used for diagnostics. 
+    enum Level {
+       // All diagnostics
+        ALL = 0;
+        // Component level action
+        COMPONENT = 1;
+        // Unit level action
+        UNIT = 2;
+    }
     // Unique ID of the action.
     string id = 1;
     // Name of the action (name is ignored for DIAGNOSTICS).
@@ -273,6 +283,9 @@ message ActionRequest {
     UnitType unit_type = 5;
     // Type of action to be performed (only used with V2).
     Type type = 6;
+    // Level marks the action as either operating on a component, or a unit.
+    // If level=component, then the consumer should ignore the unit_id and unit_type fields. 
+    Level level = 7;
 }
 
 message ActionDiagnosticUnitResult {
