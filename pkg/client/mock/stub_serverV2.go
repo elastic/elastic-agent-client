@@ -141,6 +141,7 @@ func (s *StubServerV2) Actions(server proto.ElasticAgent_ActionsServer) error {
 					Params:   act.Params,
 					UnitId:   act.UnitID,
 					UnitType: act.UnitType,
+					Level:    act.Level,
 				})
 				if err != nil {
 					panic(err)
@@ -231,12 +232,14 @@ func (s *StubServerV2) PerformAction(unitID string, unitType proto.UnitType, nam
 }
 
 // PerformDiagnostic is the implementation for the V2 mock server
-func (s *StubServerV2) PerformDiagnostic(unitID string, unitType proto.UnitType) ([]*proto.ActionDiagnosticUnitResult, error) {
+func (s *StubServerV2) PerformDiagnostic(unitID string, unitType proto.UnitType, level proto.ActionRequest_Level, params []byte) ([]*proto.ActionDiagnosticUnitResult, error) {
 	resCh := make(chan actionResultCh)
 	s.ActionsChan <- &PerformAction{
 		Type:     proto.ActionRequest_DIAGNOSTICS,
 		UnitID:   unitID,
 		UnitType: unitType,
+		Level:    level,
+		Params:   params,
 		DiagCallback: func(diag []*proto.ActionDiagnosticUnitResult, err error) {
 			resCh <- actionResultCh{
 				Diag: diag,

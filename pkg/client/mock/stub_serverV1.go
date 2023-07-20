@@ -18,7 +18,7 @@ import (
 // StubServerCheckin is used by the StubServer
 type StubServerCheckin func(*proto.StateObserved) *proto.StateExpected
 
-//StubServerAction is used by the StubServer
+// StubServerAction is used by the StubServer
 type StubServerAction func(*proto.ActionResponse) error
 
 // PerformAction is the stubbed action type for the mocked server
@@ -30,6 +30,7 @@ type PerformAction struct {
 	DiagCallback func([]*proto.ActionDiagnosticUnitResult, error)
 	UnitID       string
 	UnitType     proto.UnitType
+	Level        proto.ActionRequest_Level
 }
 
 type actionResultCh struct {
