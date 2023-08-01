@@ -185,6 +185,27 @@ message FQDNFeature {
     bool enabled = 1;
 }
 
+// Elastic APM TLS config
+message ElasticAPMTLS {
+    bool skip_verify = 1;
+    string server_cert = 2;
+    string server_ca = 3;
+}
+
+// Elastic APM configuration
+message ElasticAPM {
+    string environment = 1;
+    optional string APIKey = 2;
+    optional string SecretToken = 3;
+    repeated string hosts = 4;
+    ElasticAPMTLS tls = 5;
+}
+
+// APM configuration
+message APMConfig {
+    ElasticAPM elastic = 1;
+}
+
 // Component-level configuration.
 message Component {
     ComponentLimits limits = 1;
@@ -201,6 +222,8 @@ message ComponentLimits {
   // Should be ignored by non-Go components.
   // If set to `0` the client should use all the available CPUs.
   uint64 go_max_procs = 2;
+
+  optional APMConfig apm_config = 3;
 }
 
 // A set of units and their expected states and configuration.
