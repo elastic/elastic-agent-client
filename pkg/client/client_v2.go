@@ -58,6 +58,9 @@ const (
 	// TriggeredStateChange indicates when a unit state has ganged.
 	// This constant represents a single bit in a bitmask. @see Trigger.
 	TriggeredStateChange // state_change_triggered
+	// TriggeredAPMChange indicates that the APM configuration has changed
+	// This constant represents a single bit in a bitmask
+	TriggeredAPMChange // apm_config_change_triggered
 )
 
 func (t Trigger) String() string {
@@ -84,6 +87,10 @@ func (t Trigger) String() string {
 		triggers = append(triggers, "state_change_triggered")
 	}
 
+	if current&TriggeredAPMChange == TriggeredAPMChange {
+		current &= ^TriggeredAPMChange
+		triggers = append(triggers, "apm_config_change_triggered")
+	}
 	if current != 0 {
 		return fmt.Sprintf("invalid trigger value: %d", t)
 	}
@@ -552,6 +559,9 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 		}
 	}
 
+	// Technically we should wait until the APM config is also applied, but the syncUnits is called after this and
+	// we have a single index for the whole component
+
 	c.componentConfig = expected.Component
 	c.componentIdx = expected.ComponentIdx
 }
@@ -568,6 +578,15 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 		c.unitsStateChanged()
 	}
 
+	var apmConfig *proto.APMConfig
+	func() {
+		c.componentMu.RLock()
+		defer c.componentMu.RUnlock()
+		if c.componentConfig != nil {
+			apmConfig = c.componentConfig.ApmConfig
+		}
+	}()
+
 	for _, agentUnit := range expected.Units {
 		unit := c.findUnit(agentUnit.Id, UnitType(agentUnit.Type))
 		if unit == nil {
@@ -580,6 +599,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				agentUnit.Config,
 				agentUnit.ConfigStateIdx,
 				expected.Features,
+				apmConfig,
 				c)
 			c.units = append(c.units, unit)
 
@@ -592,6 +612,10 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				changed.Triggers = TriggeredFeatureChange
 			}
 
+			if apmConfig != nil {
+				changed.Triggers |= TriggeredAPMChange
+			}
+
 			c.changesCh <- changed
 		} else {
 			// existing unit
@@ -601,7 +625,9 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				expected.FeaturesIdx,
 				expected.Features,
 				agentUnit.Config,
-				agentUnit.ConfigStateIdx)
+				agentUnit.ConfigStateIdx,
+				apmConfig,
+			)
 
 			changed := UnitChanged{
 				Triggers: triggers,

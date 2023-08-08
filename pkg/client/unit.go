@@ -127,6 +127,8 @@ type Unit struct {
 	features    *proto.Features
 	featuresIdx uint64 // do I really need it?
 
+	apm *proto.APMConfig
+
 	stateMu      sync.RWMutex
 	state        UnitState
 	stateMsg     string
@@ -153,22 +155,24 @@ func (u *Unit) Type() UnitType {
 
 // Expected contains the expected state, log level, features and config for a unit.
 type Expected struct {
-	Config   *proto.UnitExpectedConfig
-	Features *proto.Features
-	LogLevel UnitLogLevel
-	State    UnitState
+	Config    *proto.UnitExpectedConfig
+	Features  *proto.Features
+	LogLevel  UnitLogLevel
+	State     UnitState
+	APMConfig *proto.APMConfig
 }
 
-// Expected returns the expected state, log level, features and config for the unit.
+// Expected returns the expected state, log level, features, apm and config for the unit.
 func (u *Unit) Expected() Expected {
 	u.expectedStateMu.RLock()
 	defer u.expectedStateMu.RUnlock()
 
 	return Expected{
-		Config:   u.config,
-		Features: u.features,
-		LogLevel: u.logLevel,
-		State:    u.expectedState,
+		Config:    u.config,
+		Features:  u.features,
+		LogLevel:  u.logLevel,
+		State:     u.expectedState,
+		APMConfig: u.apm,
 	}
 }
 
@@ -293,7 +297,8 @@ func (u *Unit) updateState(
 	expFeaturesIdx uint64,
 	expFeatures *proto.Features,
 	cfg *proto.UnitExpectedConfig,
-	cfgIdx uint64) Trigger {
+	cfgIdx uint64,
+	expAPM *proto.APMConfig) Trigger {
 
 	var triggers Trigger
 
@@ -326,6 +331,10 @@ func (u *Unit) updateState(
 		}
 	}
 
+	if ((u.apm == nil || expAPM == nil) && u.apm != expAPM) || !gproto.Equal(u.apm, expAPM) {
+		u.apm = expAPM
+		triggers |= TriggeredAPMChange
+	}
 	return triggers
 }
 
@@ -355,7 +364,9 @@ func newUnit(
 	cfg *proto.UnitExpectedConfig,
 	cfgIdx uint64,
 	features *proto.Features,
-	client *clientV2) *Unit {
+	apmConfig *proto.APMConfig,
+	client *clientV2,
+) *Unit {
 
 	unit := Unit{
 		id:            id,
@@ -370,6 +381,7 @@ func newUnit(
 		client:        client,
 		actions:       make(map[string]Action),
 		diagHooks:     make(map[string]diagHook),
+		apm:           apmConfig,
 	}
 
 	return &unit
