@@ -117,7 +117,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 					},
 					Component: &proto.Component{
 						Limits: &proto.ComponentLimits{
-							MaxProcs: 0,
+							GoMaxProcs: 0,
 						},
 					},
 					Units: []*proto.UnitExpected{
@@ -277,7 +277,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 						FeaturesIdx: 1,
 						Component: &proto.Component{
 							Limits: &proto.ComponentLimits{
-								MaxProcs: 0,
+								GoMaxProcs: 0,
 							},
 						},
 						ComponentIdx: 1,
@@ -311,7 +311,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 						FeaturesIdx: 1,
 						Component: &proto.Component{
 							Limits: &proto.ComponentLimits{
-								MaxProcs: 0,
+								GoMaxProcs: 0,
 							},
 						},
 						ComponentIdx: 1,
@@ -341,7 +341,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 						FeaturesIdx: 1,
 						Component: &proto.Component{
 							Limits: &proto.ComponentLimits{
-								MaxProcs: 0,
+								GoMaxProcs: 0,
 							},
 						},
 						ComponentIdx: 1,
@@ -875,8 +875,8 @@ func TestClientV2_Checkin_Component(t *testing.T) {
 	checkinCounter := 0
 	componentsIdx := rand.Uint64()
 
-	maxProcs := uint64(999) // unlikely to match the actual core count
-	require.NotEqual(t, maxProcs, runtime.GOMAXPROCS(0), "the actual GOMAXPROCS should not equal to the test value")
+	goMaxProcs := uint64(999) // unlikely to match the actual core count
+	require.NotEqual(t, goMaxProcs, runtime.GOMAXPROCS(0), "the actual GOMAXPROCS should not equal to the test value")
 
 	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
@@ -896,7 +896,7 @@ func TestClientV2_Checkin_Component(t *testing.T) {
 						ComponentIdx: componentsIdx,
 						Component: &proto.Component{
 							Limits: &proto.ComponentLimits{
-								MaxProcs: maxProcs,
+								GoMaxProcs: goMaxProcs,
 							},
 						},
 						Units: []*proto.UnitExpected{},
@@ -965,7 +965,7 @@ func TestClientV2_Checkin_Component(t *testing.T) {
 
 	require.Empty(t, errs)
 
-	require.Equal(t, int(maxProcs), runtime.GOMAXPROCS(0), "GOMAXPROCS should be set by the component config")
+	require.Equal(t, int(goMaxProcs), runtime.GOMAXPROCS(0), "GOMAXPROCS should be set by the component config")
 }
 
 func setupClientForDiagnostics(ctx context.Context, t *testing.T) (*Unit, V2, mock.StubServerV2) {

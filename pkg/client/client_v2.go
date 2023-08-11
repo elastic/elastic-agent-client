@@ -532,8 +532,8 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 	c.componentMu.Lock()
 	defer c.componentMu.Unlock()
 
-	if expected.Component.Limits.MaxProcs > 0 {
-		_ = runtime.GOMAXPROCS(int(expected.Component.Limits.MaxProcs))
+	if expected.Component.Limits.GoMaxProcs > 0 {
+		_ = runtime.GOMAXPROCS(int(expected.Component.Limits.GoMaxProcs))
 	}
 	c.componentIdx = expected.ComponentIdx
 }

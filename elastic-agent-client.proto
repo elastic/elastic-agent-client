@@ -196,11 +196,11 @@ message ComponentLimits {
   // are included here even if other concrete fields are defined for this message.
   google.protobuf.Struct source = 1;
 
-  // The maximum number of CPUs that can be used simultaneously by the component.
-  // For Go programs, it's GOMAXPROCS, see https://pkg.go.dev/runtime#GOMAXPROCS.
-  // Other languages should set their equivalent to Go's GOMAXPROCS.
+  // GoMaxProcs limits the number of operating system threads that can execute user-level Go code simultaneously.
+  // Translates into GOMAXPROCS Go runtime setting for the component implemented in Go.
+	// Should be ignored by non-Go components.
   // If set to `0` the client should use all the available CPUs.
-  uint64 max_procs = 2;
+  uint64 go_max_procs = 2;
 }
 
 // A set of units and their expected states and configuration.
