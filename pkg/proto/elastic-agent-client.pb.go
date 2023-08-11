@@ -1193,12 +1193,12 @@ type CheckinExpected struct {
 	// Features are the expected feature flags configurations.
 	// Added on Elastic Agent v8.7.1.
 	Features *Features `protobuf:"bytes,3,opt,name=features,proto3" json:"features,omitempty"`
-	// Index of the either current features configuration or new the configuration provided.
+	// Index of the most recently applied feature flags configuration
 	FeaturesIdx uint64 `protobuf:"varint,4,opt,name=features_idx,json=featuresIdx,proto3" json:"features_idx,omitempty"`
 	// Component is the expected component configuration.
 	// Added on Elastic Agent v8.10.0.
 	Component *Component `protobuf:"bytes,5,opt,name=component,proto3" json:"component,omitempty"`
-	// Index of the either current component configuration or new the configuration provided.
+	// Index of the most recently applied component configuration
 	ComponentIdx uint64 `protobuf:"varint,6,opt,name=component_idx,json=componentIdx,proto3" json:"component_idx,omitempty"`
 }
 
@@ -1462,9 +1462,9 @@ type CheckinObserved struct {
 	// Features are the expected feature flags configurations.
 	// Added on Elastic Agent v8.7.1.
 	Features *Features `protobuf:"bytes,4,opt,name=features,proto3" json:"features,omitempty"`
-	// Index of the either current features configuration or new the configuration provided.
+	// Index of the most recently applied feature flags configuration
 	FeaturesIdx uint64 `protobuf:"varint,5,opt,name=features_idx,json=featuresIdx,proto3" json:"features_idx,omitempty"`
-	// Index of the either current component configuration or new the configuration provided.
+	// Index of the most recently applied component configuration
 	// Added on Elastic Agent v8.10.0.
 	ComponentIdx uint64 `protobuf:"varint,6,opt,name=component_idx,json=componentIdx,proto3" json:"component_idx,omitempty"`
 }

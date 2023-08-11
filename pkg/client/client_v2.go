@@ -204,8 +204,10 @@ type clientV2 struct {
 	units       []*Unit
 	featuresIdx uint64
 
-	componentMu  sync.RWMutex
-	componentIdx uint64
+	componentMu sync.RWMutex
+	// Must hold `componentMu` for changing component fields below
+	componentIdx    uint64
+	componentConfig *proto.Component
 
 	dmx       sync.RWMutex
 	diagHooks map[string]diagHook
@@ -529,12 +531,28 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 	if expected.Component == nil {
 		return
 	}
+
 	c.componentMu.Lock()
 	defer c.componentMu.Unlock()
 
-	if expected.Component.Limits.GoMaxProcs > 0 {
-		_ = runtime.GOMAXPROCS(int(expected.Component.Limits.GoMaxProcs))
+	// applying the component limits
+	if expected.Component.Limits != nil {
+		var prevGoMaxProcs int
+		if c.componentConfig != nil && c.componentConfig.Limits != nil {
+			prevGoMaxProcs = int(c.componentConfig.Limits.GoMaxProcs)
+		}
+		newGoMaxProcs := int(expected.Component.Limits.GoMaxProcs)
+		// calling `runtime.GOMAXPROCS` is expensive, so we call it only when the value really changed
+		if newGoMaxProcs != prevGoMaxProcs {
+			if newGoMaxProcs == 0 {
+				_ = runtime.GOMAXPROCS(runtime.NumCPU())
+			} else {
+				_ = runtime.GOMAXPROCS(newGoMaxProcs)
+			}
+		}
 	}
+
+	c.componentConfig = expected.Component
 	c.componentIdx = expected.ComponentIdx
 }
 
