@@ -528,27 +528,27 @@ func (c *clientV2) removeUnexpectedUnits(expected *proto.CheckinExpected) int {
 // because a user of the client will have to read from this channel,
 // otherwise the client would stay blocked.
 func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
-	if expected.Component == nil {
-		return
-	}
-
 	c.componentMu.Lock()
 	defer c.componentMu.Unlock()
 
 	// applying the component limits
-	if expected.Component.Limits != nil {
-		var prevGoMaxProcs int
-		if c.componentConfig != nil && c.componentConfig.Limits != nil {
-			prevGoMaxProcs = int(c.componentConfig.Limits.GoMaxProcs)
-		}
-		newGoMaxProcs := int(expected.Component.Limits.GoMaxProcs)
-		// calling `runtime.GOMAXPROCS` is expensive, so we call it only when the value really changed
-		if newGoMaxProcs != prevGoMaxProcs {
-			if newGoMaxProcs == 0 {
-				_ = runtime.GOMAXPROCS(runtime.NumCPU())
-			} else {
-				_ = runtime.GOMAXPROCS(newGoMaxProcs)
-			}
+	var (
+		prevGoMaxProcs int
+		newGoMaxProcs  int
+	)
+	if c.componentConfig != nil && c.componentConfig.Limits != nil {
+		prevGoMaxProcs = int(c.componentConfig.Limits.GoMaxProcs)
+	}
+	if expected.Component != nil && expected.Component.Limits != nil {
+		newGoMaxProcs = int(expected.Component.Limits.GoMaxProcs)
+	}
+
+	// calling `runtime.GOMAXPROCS` is expensive, so we call it only when the value really changed
+	if newGoMaxProcs != prevGoMaxProcs {
+		if newGoMaxProcs == 0 {
+			_ = runtime.GOMAXPROCS(runtime.NumCPU())
+		} else {
+			_ = runtime.GOMAXPROCS(newGoMaxProcs)
 		}
 	}
 
