@@ -17,7 +17,7 @@ The entrypoint for implementing a control protocol client in Go is to create an 
 
 ## Design
 The design of the control protocol follows from the Elastic Agent [architecture](https://github.com/elastic/elastic-agent/blob/main/docs/architecture.md) which
-defines the component and unit terminology used in the protocol. The connection sequence and typical messaging flow is as follows:
+defines the component and unit terminology used in the protocol. The connection sequence is as follows:
 
 1. The agent determines that it should start a new component. Today the majority of components run as subprocesses of the agent. In this case the agent
 will launch the process and pass the information needed to connect to the agent's gRPC server on Stdin. The `ConnInfo` message type describes the information
