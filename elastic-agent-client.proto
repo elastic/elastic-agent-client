@@ -359,7 +359,7 @@ enum ConnInfoServices {
     Log = 4;
 }
 
-// Connection information sent to the application on startup so it knows how to connected back to the Elastic Agent.
+// Connection information sent to the application on startup so it knows how to connect back to the Elastic Agent.
 //
 // This is normally sent through stdin and should never be sent across a network un-encrypted.
 message ConnInfo {

@@ -23,7 +23,27 @@ defines the component and unit terminology used in the protocol. The connection 
 will launch the process and pass the information needed to connect to the agent's gRPC server on Stdin. The `ConnInfo` message type describes the information
 that will be passed to each process at start up:
 
-https://github.com/elastic/elastic-agent-client/blob/3551199ffd826a0c4535f5890902a10fa329f301/elastic-agent-client.proto#L362-L381
+```protobuf
+// Connection information sent to the application on startup so it knows how to connect back to the Elastic Agent.
+//
+// This is normally sent through stdin and should never be sent across a network un-encrypted.
+message ConnInfo {
+    // GRPC connection address.
+    string addr = 1;
+    // Server name to use when connecting over TLS.
+    string server_name = 2;
+    // Token that the application should send as the unique identifier when connecting over the GRPC.
+    string token = 3;
+    // CA certificate.
+    bytes ca_cert = 4;
+    // Peer certificate.
+    bytes peer_cert = 5;
+    // Peer private key.
+    bytes peer_key = 6;
+    // Allowed services that spawned process can use. (only used in V2)
+    repeated ConnInfoServices services = 7;
+}
+```
 
 The [client.NewV2FromReader()](https://github.com/cmacknz/elastic-agent-client/blob/3551199ffd826a0c4535f5890902a10fa329f301/pkg/client/reader.go#L66) is a
 convenience method for directly initializing a client from Stdin at startup.
