@@ -13,6 +13,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -113,6 +114,11 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 					},
 					Features: &proto.Features{
 						Fqdn: &proto.FQDNFeature{Enabled: wantFQDN},
+					},
+					Component: &proto.Component{
+						Limits: &proto.ComponentLimits{
+							MaxProcs: 0,
+						},
 					},
 					Units: []*proto.UnitExpected{
 						{
@@ -269,6 +275,12 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 					return &proto.CheckinExpected{
 						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: false}},
 						FeaturesIdx: 1,
+						Component: &proto.Component{
+							Limits: &proto.ComponentLimits{
+								MaxProcs: 0,
+							},
+						},
+						ComponentIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -297,6 +309,12 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 					return &proto.CheckinExpected{
 						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
 						FeaturesIdx: 1,
+						Component: &proto.Component{
+							Limits: &proto.ComponentLimits{
+								MaxProcs: 0,
+							},
+						},
+						ComponentIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -321,6 +339,12 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 					return &proto.CheckinExpected{
 						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
 						FeaturesIdx: 1,
+						Component: &proto.Component{
+							Limits: &proto.ComponentLimits{
+								MaxProcs: 0,
+							},
+						},
+						ComponentIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -842,6 +866,106 @@ func TestClientV2_Checkin_FeatureFlags(t *testing.T) {
 	}))
 
 	require.Empty(t, errs)
+}
+
+func TestClientV2_Checkin_Component(t *testing.T) {
+	var m sync.Mutex
+	token := mock.NewID()
+	connected := false
+	checkinCounter := 0
+	componentsIdx := rand.Uint64()
+
+	maxProcs := uint64(999) // unlikely to match the actual core count
+	require.NotEqual(t, maxProcs, runtime.GOMAXPROCS(0), "the actual GOMAXPROCS should not equal to the test value")
+
+	srv := mock.StubServerV2{
+		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+			m.Lock()
+			defer m.Unlock()
+
+			if observed.Token == token {
+				connected = true
+
+				switch checkinCounter {
+				case 0:
+					// first checkin
+					require.Equal(t, uint64(0), observed.ComponentIdx)
+
+					checkinCounter++
+					return &proto.CheckinExpected{
+						ComponentIdx: componentsIdx,
+						Component: &proto.Component{
+							Limits: &proto.ComponentLimits{
+								MaxProcs: maxProcs,
+							},
+						},
+						Units: []*proto.UnitExpected{},
+					}
+
+				case 1:
+					// second checkin
+					require.Equal(t, componentsIdx, observed.ComponentIdx)
+					checkinCounter++
+				}
+			}
+			// disconnect
+			return nil
+		},
+		ActionImpl: func(response *proto.ActionResponse) error {
+			// actions not tested here
+			return nil
+		},
+		ActionsChan: make(chan *mock.PerformAction, 100),
+	}
+	require.NoError(t, srv.Start())
+	defer srv.Stop()
+
+	var errsMu sync.Mutex
+	var errs []error
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	serverAddr := fmt.Sprintf(":%d", srv.Port)
+	client := NewV2(serverAddr, token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials())).(*clientV2)
+	storeErrors(ctx, client, &errs, &errsMu)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-client.UnitChanges(): // otherwise the client can block forever
+				// we don't need to react to units since we test the component-level change
+			}
+		}
+	}()
+
+	require.NoError(t, client.Start(ctx))
+	defer client.Stop()
+
+	require.NoError(t, waitFor(func() error {
+		m.Lock()
+		defer m.Unlock()
+
+		if !connected {
+			return fmt.Errorf("server never received valid token")
+		}
+
+		expectedCheckinCounter := 2
+		if checkinCounter < expectedCheckinCounter {
+			return fmt.Errorf(
+				"server did not receive expected number of checkins = %d; actual checkins received = %d",
+				expectedCheckinCounter,
+				checkinCounter,
+			)
+		}
+
+		return nil
+	}))
+
+	require.Empty(t, errs)
+
+	require.Equal(t, int(maxProcs), runtime.GOMAXPROCS(0), "GOMAXPROCS should be set by the component config")
 }
 
 func setupClientForDiagnostics(ctx context.Context, t *testing.T) (*Unit, V2, mock.StubServerV2) {

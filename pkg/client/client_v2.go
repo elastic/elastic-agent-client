@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"runtime/pprof"
 	"strings"
 	"sync"
@@ -202,6 +203,9 @@ type clientV2 struct {
 	// must be synchronized with each other.
 	units       []*Unit
 	featuresIdx uint64
+
+	componentMu  sync.RWMutex
+	componentIdx uint64
 
 	dmx       sync.RWMutex
 	diagHooks map[string]diagHook
@@ -449,11 +453,16 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 	featuresIdx := c.featuresIdx
 	c.unitsMu.RUnlock()
 
+	c.componentMu.RLock()
+	componentIdx := c.componentIdx
+	c.componentMu.RUnlock()
+
 	msg := &proto.CheckinObserved{
-		Token:       c.token,
-		Units:       observed,
-		FeaturesIdx: featuresIdx,
-		VersionInfo: nil,
+		Token:        c.token,
+		Units:        observed,
+		FeaturesIdx:  featuresIdx,
+		ComponentIdx: componentIdx,
+		VersionInfo:  nil,
 	}
 	if !c.versionInfoSent {
 		msg.VersionInfo = &proto.CheckinObservedVersionInfo{
@@ -483,6 +492,7 @@ func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
 		c.agentInfoMu.Unlock()
 	}
 
+	c.syncComponent(expected)
 	c.syncUnits(expected)
 }
 
@@ -508,6 +518,24 @@ func (c *clientV2) removeUnexpectedUnits(expected *proto.CheckinExpected) int {
 	}
 	c.units = c.units[:remainingCount]
 	return removedCount
+}
+
+// for now the component configuration is applied to the whole process globally
+// when there is a need of propagating changes we should implement an update channel
+// similar to `UnitChanges() <-chan UnitChanged`, however, this would be a breaking change
+// because a user of the client will have to read from this channel,
+// otherwise the client would stay blocked.
+func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
+	if expected.Component == nil {
+		return
+	}
+	c.componentMu.Lock()
+	defer c.componentMu.Unlock()
+
+	if expected.Component.Limits.MaxProcs > 0 {
+		_ = runtime.GOMAXPROCS(int(expected.Component.Limits.MaxProcs))
+	}
+	c.componentIdx = expected.ComponentIdx
 }
 
 func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
