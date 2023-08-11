@@ -28,4 +28,6 @@ The protocol today consists of two streaming RPCs:
 
 ## Developing
 
-TODO Add steps to regen the protocol here
+The development process is driven by [Mage](https://magefile.org/). Run `mage -l` to see the list of targets.
+
+When editing the the .proto files first run `mage update:all` to run protoc followed by `mage check:all` to run the checks and tests.
