@@ -15,12 +15,15 @@ import "elastic-agent-client-deprecated.proto";
 service ElasticAgent {
     // Called by the client to provide the Elastic Agent the state of the application over the V2 protocol.
     //
+    // Implements a reconciliation loop where a component periodically tells the agent what its current
+    // observed configuration is, and the agent replies with the configuration it is expected to be running.
+    //
     // A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the
     // set of units automatically marked as FAILED, and after 60 seconds the Elastic Agent will
     // force kill the entire process and restart it.
     rpc CheckinV2(stream CheckinObserved) returns (stream CheckinExpected);
 
-    // Called by the client on connection to the GRPC allowing the Elastic Agent to stream action
+    // Called by the client after receiving connection info to allow the Elastic Agent to stream action
     // requests to the application and the application stream back responses to those requests.
     //
     // Request and response is swapped here because the Elastic Agent sends the requests in a stream
