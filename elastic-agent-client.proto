@@ -185,6 +185,24 @@ message FQDNFeature {
     bool enabled = 1;
 }
 
+// Component-level configuration.
+message Component {
+    ComponentLimits limits = 1;
+}
+
+// Limits to configure for the currently running component.
+message ComponentLimits {
+  // Source is the original source of the limits. All values from the limits
+  // are included here even if other concrete fields are defined for this message.
+  google.protobuf.Struct source = 1;
+
+  // GoMaxProcs limits the number of operating system threads that can execute user-level Go code simultaneously.
+  // Translates into GOMAXPROCS Go runtime setting for the component implemented in Go.
+  // Should be ignored by non-Go components.
+  // If set to `0` the client should use all the available CPUs.
+  uint64 go_max_procs = 2;
+}
+
 // A set of units and their expected states and configuration.
 message CheckinExpected {
     // Units is the expected units the component should be running.
@@ -195,8 +213,14 @@ message CheckinExpected {
     // Features are the expected feature flags configurations.
     // Added on Elastic Agent v8.7.1.
     Features features = 3;
-    // Index of the either current features configuration or new the configuration provided.
+    // Index of the most recently applied feature flags configuration
     uint64 features_idx = 4;
+
+    // Component is the expected component configuration.
+    // Added on Elastic Agent v8.10.0.
+    Component component = 5;
+    // Index of the most recently applied component configuration
+    uint64 component_idx = 6;
 }
 
 // Observed status for a unit.
@@ -247,8 +271,12 @@ message CheckinObserved {
     // Features are the expected feature flags configurations.
     // Added on Elastic Agent v8.7.1.
     Features features = 4;
-    // Index of the either current features configuration or new the configuration provided.
+    // Index of the most recently applied feature flags configuration
     uint64 features_idx = 5;
+
+    // Index of the most recently applied component configuration
+    // Added on Elastic Agent v8.10.0.
+    uint64 component_idx = 6;
 }
 
 // A action request is streamed from the Elastic Agent to the application so an action can be performed

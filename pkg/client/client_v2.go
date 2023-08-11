@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"runtime/pprof"
 	"strings"
 	"sync"
@@ -202,6 +203,11 @@ type clientV2 struct {
 	// must be synchronized with each other.
 	units       []*Unit
 	featuresIdx uint64
+
+	componentMu sync.RWMutex
+	// Must hold `componentMu` for changing component fields below
+	componentIdx    uint64
+	componentConfig *proto.Component
 
 	dmx       sync.RWMutex
 	diagHooks map[string]diagHook
@@ -449,11 +455,16 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 	featuresIdx := c.featuresIdx
 	c.unitsMu.RUnlock()
 
+	c.componentMu.RLock()
+	componentIdx := c.componentIdx
+	c.componentMu.RUnlock()
+
 	msg := &proto.CheckinObserved{
-		Token:       c.token,
-		Units:       observed,
-		FeaturesIdx: featuresIdx,
-		VersionInfo: nil,
+		Token:        c.token,
+		Units:        observed,
+		FeaturesIdx:  featuresIdx,
+		ComponentIdx: componentIdx,
+		VersionInfo:  nil,
 	}
 	if !c.versionInfoSent {
 		msg.VersionInfo = &proto.CheckinObservedVersionInfo{
@@ -483,6 +494,7 @@ func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
 		c.agentInfoMu.Unlock()
 	}
 
+	c.syncComponent(expected)
 	c.syncUnits(expected)
 }
 
@@ -508,6 +520,40 @@ func (c *clientV2) removeUnexpectedUnits(expected *proto.CheckinExpected) int {
 	}
 	c.units = c.units[:remainingCount]
 	return removedCount
+}
+
+// for now the component configuration is applied to the whole process globally
+// when there is a need of propagating changes we should implement an update channel
+// similar to `UnitChanges() <-chan UnitChanged`, however, this would be a breaking change
+// because a user of the client will have to read from this channel,
+// otherwise the client would stay blocked.
+func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
+	c.componentMu.Lock()
+	defer c.componentMu.Unlock()
+
+	// applying the component limits
+	var (
+		prevGoMaxProcs int
+		newGoMaxProcs  int
+	)
+	if c.componentConfig != nil && c.componentConfig.Limits != nil {
+		prevGoMaxProcs = int(c.componentConfig.Limits.GoMaxProcs)
+	}
+	if expected.Component != nil && expected.Component.Limits != nil {
+		newGoMaxProcs = int(expected.Component.Limits.GoMaxProcs)
+	}
+
+	// calling `runtime.GOMAXPROCS` is expensive, so we call it only when the value really changed
+	if newGoMaxProcs != prevGoMaxProcs {
+		if newGoMaxProcs == 0 {
+			_ = runtime.GOMAXPROCS(runtime.NumCPU())
+		} else {
+			_ = runtime.GOMAXPROCS(newGoMaxProcs)
+		}
+	}
+
+	c.componentConfig = expected.Component
+	c.componentIdx = expected.ComponentIdx
 }
 
 func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {

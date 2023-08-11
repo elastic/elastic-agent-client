@@ -13,6 +13,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -113,6 +114,11 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 					},
 					Features: &proto.Features{
 						Fqdn: &proto.FQDNFeature{Enabled: wantFQDN},
+					},
+					Component: &proto.Component{
+						Limits: &proto.ComponentLimits{
+							GoMaxProcs: 0,
+						},
 					},
 					Units: []*proto.UnitExpected{
 						{
@@ -269,6 +275,12 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 					return &proto.CheckinExpected{
 						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: false}},
 						FeaturesIdx: 1,
+						Component: &proto.Component{
+							Limits: &proto.ComponentLimits{
+								GoMaxProcs: 0,
+							},
+						},
+						ComponentIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -297,6 +309,12 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 					return &proto.CheckinExpected{
 						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
 						FeaturesIdx: 1,
+						Component: &proto.Component{
+							Limits: &proto.ComponentLimits{
+								GoMaxProcs: 0,
+							},
+						},
+						ComponentIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -321,6 +339,12 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 					return &proto.CheckinExpected{
 						Features:    &proto.Features{Fqdn: &proto.FQDNFeature{Enabled: wantFQDN}},
 						FeaturesIdx: 1,
+						Component: &proto.Component{
+							Limits: &proto.ComponentLimits{
+								GoMaxProcs: 0,
+							},
+						},
+						ComponentIdx: 1,
 						Units: []*proto.UnitExpected{
 							{
 								Id:             unitOne.id,
@@ -798,6 +822,7 @@ func TestClientV2_Checkin_FeatureFlags(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials())).(*clientV2)
+	client.minCheckTimeout = 100 * time.Millisecond // otherwise the test will run for too long
 	storeErrors(ctx, client, &errs, &errsMu)
 
 	// receive the units
@@ -842,6 +867,200 @@ func TestClientV2_Checkin_FeatureFlags(t *testing.T) {
 	}))
 
 	require.Empty(t, errs)
+}
+
+type componentConfigServerValidation struct {
+	componentIdx uint64
+	goMaxProcs   int
+}
+
+func TestClientV2_Checkin_Component(t *testing.T) {
+	var m sync.Mutex
+	token := mock.NewID()
+	connected := false
+	checkinCounter := 0
+	initialComponentsIdx := rand.Uint64()
+	componentsIdx := initialComponentsIdx
+
+	initialGoMaxProcs := runtime.GOMAXPROCS(0)
+	expGoMaxProcs := 999 // unlikely to match the actual core count
+	require.NotEqual(t, expGoMaxProcs, initialGoMaxProcs, "the actual GOMAXPROCS should not equal to the test value")
+
+	// every validation takes place before the checkin response from the server
+	serverValidations := []struct {
+		name             string
+		actual, expected componentConfigServerValidation
+	}{
+		{
+			name: "returns no component config, sets initial idx",
+			expected: componentConfigServerValidation{
+				componentIdx: 0,
+				goMaxProcs:   initialGoMaxProcs,
+			},
+		},
+		{
+			name: "returns a component config but no limits defined",
+			expected: componentConfigServerValidation{
+				componentIdx: initialComponentsIdx,
+				goMaxProcs:   initialGoMaxProcs,
+			},
+		},
+		{
+			name: "returns GOMAXPROCS set",
+			expected: componentConfigServerValidation{
+				componentIdx: initialComponentsIdx + 1,
+				goMaxProcs:   initialGoMaxProcs,
+			},
+		},
+		{
+			name: "checks GOMAXPROCS is set",
+			expected: componentConfigServerValidation{
+				componentIdx: initialComponentsIdx + 2,
+				goMaxProcs:   expGoMaxProcs,
+			},
+		},
+		{
+			name: "unsets GOMAXPROCS",
+			expected: componentConfigServerValidation{
+				// no increment in this, previous step didn't change the config
+				componentIdx: initialComponentsIdx + 2,
+				goMaxProcs:   expGoMaxProcs,
+			},
+		},
+		{
+			name: "checks GOMAXPROCS is reset",
+			expected: componentConfigServerValidation{
+				componentIdx: initialComponentsIdx + 3,
+				goMaxProcs:   initialGoMaxProcs,
+			},
+		},
+	}
+
+	srv := mock.StubServerV2{
+		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+			m.Lock()
+			defer m.Unlock()
+
+			if observed.Token == token {
+				connected = true
+				if checkinCounter > len(serverValidations) {
+					return nil
+				}
+				serverValidations[checkinCounter].actual = componentConfigServerValidation{
+					componentIdx: observed.ComponentIdx,
+					goMaxProcs:   runtime.GOMAXPROCS(0),
+				}
+
+				switch checkinCounter {
+				case 0:
+					checkinCounter++
+					return &proto.CheckinExpected{
+						ComponentIdx: componentsIdx,
+						Units:        []*proto.UnitExpected{},
+					}
+
+				case 1:
+					checkinCounter++
+					componentsIdx++
+
+					return &proto.CheckinExpected{
+						ComponentIdx: componentsIdx,
+						Component:    &proto.Component{},
+						Units:        []*proto.UnitExpected{},
+					}
+
+				case 2:
+					checkinCounter++
+					componentsIdx++
+
+					return &proto.CheckinExpected{
+						ComponentIdx: componentsIdx,
+						Component: &proto.Component{
+							Limits: &proto.ComponentLimits{
+								GoMaxProcs: uint64(expGoMaxProcs),
+							},
+						},
+						Units: []*proto.UnitExpected{},
+					}
+
+				case 3:
+					checkinCounter++
+
+				case 4:
+					checkinCounter++
+					componentsIdx++
+
+					return &proto.CheckinExpected{
+						ComponentIdx: componentsIdx,
+						Units:        []*proto.UnitExpected{},
+					}
+
+				case 5:
+					checkinCounter++
+				}
+			}
+			// disconnect
+			return nil
+		},
+		ActionImpl: func(response *proto.ActionResponse) error {
+			// actions not tested here
+			return nil
+		},
+		ActionsChan: make(chan *mock.PerformAction, 100),
+	}
+	require.NoError(t, srv.Start())
+	defer srv.Stop()
+
+	var errsMu sync.Mutex
+	var errs []error
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	serverAddr := fmt.Sprintf(":%d", srv.Port)
+	client := NewV2(serverAddr, token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials())).(*clientV2)
+	client.minCheckTimeout = 100 * time.Millisecond // otherwise the test will run for too long
+	storeErrors(ctx, client, &errs, &errsMu)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-client.UnitChanges(): // otherwise the client can block forever
+				// we don't need to react to units since we test the component-level change
+			}
+		}
+	}()
+
+	require.NoError(t, client.Start(ctx))
+	defer client.Stop()
+
+	require.NoError(t, waitFor(func() error {
+		m.Lock()
+		defer m.Unlock()
+
+		if !connected {
+			return fmt.Errorf("server never received valid token")
+		}
+		expectedCheckinCounter := len(serverValidations)
+		if checkinCounter < expectedCheckinCounter {
+			return fmt.Errorf(
+				"server did not receive expected number of checkins = %d; actual checkins received = %d",
+				expectedCheckinCounter,
+				checkinCounter,
+			)
+		}
+
+		return nil
+	}))
+
+	require.Empty(t, errs)
+
+	for _, sv := range serverValidations {
+		t.Run(sv.name, func(t *testing.T) {
+			require.Equal(t, sv.expected, sv.actual)
+		})
+	}
 }
 
 func setupClientForDiagnostics(ctx context.Context, t *testing.T) (*Unit, V2, mock.StubServerV2) {
