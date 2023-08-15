@@ -141,10 +141,12 @@ message UnitExpected {
     UnitType type = 2;
     // Expected state of the unit. Will always be one of HEALTHY or STOPPED.
     State state = 3;
-    // Index of the either current configuration or new configuration provided.
+    // Index or revision of the expected configuration. When the expected configuration changes the
+    // agent will increment this number and the UnitExpectedConfig field will be populated.
     uint64 config_state_idx = 4;
-    // Resulting configuration. (If the application already has the current `config_state_idx` this
-    // will be empty.)
+    // Current expected configuration. Omitted if the client reports it has applied the current
+    // configuration to avoid wasting CPU by constantly copying the configuration between the agent
+    // and the client.
     UnitExpectedConfig config = 5;
     // Log level of the unit.
     UnitLogLevel log_level = 6;
@@ -201,16 +203,24 @@ message CheckinExpected {
     // Agent info is provided only on first CheckinExpected response to the component.
     CheckinAgentInfo agent_info = 2;
 
-    // Features are the expected feature flags configurations.
-    // Added on Elastic Agent v8.7.1.
+    // Features are the expected feature flags configurations. Can apply to either components or
+    // individual units depending on the flag and its implementation. Omitted if the client reports
+    // it has applied the current configuration to avoid wasting CPU by constantly copying the
+    // configuration between the agent and the client. Added in Elastic Agent v8.7.1.
     Features features = 3;
-    // Index of the most recently applied feature flags configuration
+
+    // Index or revision of the expected feature flags configuration. When the expected
+    // configuration changes the agent will increment this number and the Features field will be
+    // populated.
     uint64 features_idx = 4;
 
-    // Component is the expected component configuration.
-    // Added on Elastic Agent v8.10.0.
+    // Component is the expected component configuration. Contains configuration expected to apply
+    // globally to the entire component process. Omitted if the client reports it has applied the
+    // current configuration to avoid wasting CPU by constantly copying the configuration between
+    // the agent and the client. Added in Elastic Agent v8.10.0.
     Component component = 5;
-    // Index of the most recently applied component configuration
+    // Index or revision of the expected component configuration. When the expected configuration
+    // changes the agent will increment this number and the Component field will be populated.
     uint64 component_idx = 6;
 }
 
@@ -225,7 +235,8 @@ message UnitObserved {
     string id = 1;
     // Unit type.
     UnitType type = 2;
-    // Current index of the applied configuration.
+    // Index or revision of the currently applied configuration. Only the index is reported back to the agent
+    // to avoid wasting CPU regularly copying the entire configuration between the agent and the client.
     uint64 config_state_idx = 3;
     // Current state of the unit.
     State state = 4;
@@ -259,14 +270,14 @@ message CheckinObserved {
     // one of the values have changed.
     optional CheckinObservedVersionInfo version_info = 3;
 
-    // Features are the expected feature flags configurations.
-    // Added on Elastic Agent v8.7.1.
-    Features features = 4;
-    // Index of the most recently applied feature flags configuration
+    // Index or revision of the currently feature flags configuration. Only the index is reported
+    // back to the agent to avoid wasting CPU regularly copying the entire configuration between the
+    // agent and the client.
     uint64 features_idx = 5;
 
-    // Index of the most recently applied component configuration
-    // Added on Elastic Agent v8.10.0.
+    // Index or revision of the currently component configuration. Only the index is reported back
+    // to the agent to avoid wasting CPU regularly copying the entire configuration between the
+    // agent and the client.
     uint64 component_idx = 6;
 }
 
@@ -275,9 +286,11 @@ message CheckinObserved {
 message ActionRequest {
     // Type of action being performed.
     enum Type {
-        // Custom action (registered by the unit)
+        // Custom action (registered by the unit). Examples include endpoint response actions and OSQuery results.
         CUSTOM = 0;
-        // Defined diagnostics action.
+        // Diagnostics collection action. Implemented by components and units when they which to
+        // include custom information in diagnostics archives. If unimplemented, a ActionResponse
+        // with the FAILED status is required.
         DIAGNOSTICS = 1;
     }
     // The level that the action is operating on.
@@ -329,7 +342,7 @@ message ActionResponse {
     enum Status {
         // Action was successful.
         SUCCESS = 0;
-        // Action has failed.
+        // Action has failed or is unimplemented.
         FAILED = 1;
     }
     // Token that is used to uniquely identify the application to agent. When agent started this
@@ -341,7 +354,7 @@ message ActionResponse {
     Status status = 3;
     // JSON encoded result for the action (empty when diagnostic action response).
     bytes result = 4;
-    // Specific result for diagnostics action. (only used in V2)
+    // Specific result for the diagnostics action.
     repeated ActionDiagnosticUnitResult diagnostic = 5;
 }
 

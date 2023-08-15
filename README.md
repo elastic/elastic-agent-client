@@ -51,6 +51,10 @@ convenience method for directly initializing a client from Stdin at startup.
 2. Clients are expected to immediately establish the `CheckinV2` and `Actions` streaming RPC to allow them to receive their expected configuration and any
 actions that are required. The operation of these two RPCs is described in more detail directly in the [elatic-agent-client.proto](https://github.com/elastic/elastic-agent-client/blob/main/elastic-agent-client.proto) file.
 
+## Example Exchange
+
+TODO: Add an example message exchange between a component and the elastic agent.
+
 ## Developing
 
 The development process is driven by [Mage](https://magefile.org/). Run `mage -l` to see the list of targets.
