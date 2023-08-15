@@ -1189,7 +1189,10 @@ type CheckinExpected struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Units is the expected units the component should be running.
+	// Units is the expected units the component should be running. Note that units can be added or
+	// removed from this list any time as the agent policy is edited. Units that should be removed
+	// will first have their expected state set to STOPPED, and then will be removed from this list
+	// once their observed state has also been repoted as STOPPED to allow for graceful shutdown.
 	Units []*UnitExpected `protobuf:"bytes,1,rep,name=units,proto3" json:"units,omitempty"`
 	// Agent info is provided only on first CheckinExpected response to the component.
 	AgentInfo *CheckinAgentInfo `protobuf:"bytes,2,opt,name=agent_info,json=agentInfo,proto3" json:"agent_info,omitempty"`
