@@ -17,8 +17,12 @@ service ElasticAgent {
     // Implements a reconciliation loop where a component periodically tells the agent what its current
     // observed configuration is, and the agent replies with the configuration it is expected to be running.
     //
-    // A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the
-    // set of units automatically marked as FAILED, and after 60 seconds the Elastic Agent will
+    // Each included configuration block is accompanied by an index or revision number so that the
+    // observed messages do not need to waste CPU copying the entire applied configuration back to
+    // the agent on each checkin. Configurations in large deployments can be 1MB or more.
+    //
+    // A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the set
+    // of units automatically marked as FAILED. After several missed checkins the Elastic Agent will
     // force kill the entire process and restart it.
     rpc CheckinV2(stream CheckinObserved) returns (stream CheckinExpected);
 
@@ -145,8 +149,7 @@ message UnitExpected {
     // agent will increment this number and the UnitExpectedConfig field will be populated.
     uint64 config_state_idx = 4;
     // Current expected configuration. Omitted if the client reports it has applied the current
-    // configuration to avoid wasting CPU by constantly copying the configuration between the agent
-    // and the client.
+    // configuration.
     UnitExpectedConfig config = 5;
     // Log level of the unit.
     UnitLogLevel log_level = 6;
@@ -205,8 +208,7 @@ message CheckinExpected {
 
     // Features are the expected feature flags configurations. Can apply to either components or
     // individual units depending on the flag and its implementation. Omitted if the client reports
-    // it has applied the current configuration to avoid wasting CPU by constantly copying the
-    // configuration between the agent and the client. Added in Elastic Agent v8.7.1.
+    // it has applied the current configuration. Added in Elastic Agent v8.7.1.
     Features features = 3;
 
     // Index or revision of the expected feature flags configuration. When the expected
@@ -216,8 +218,7 @@ message CheckinExpected {
 
     // Component is the expected component configuration. Contains configuration expected to apply
     // globally to the entire component process. Omitted if the client reports it has applied the
-    // current configuration to avoid wasting CPU by constantly copying the configuration between
-    // the agent and the client. Added in Elastic Agent v8.10.0.
+    // current configuration. Added in Elastic Agent v8.10.0.
     Component component = 5;
     // Index or revision of the expected component configuration. When the expected configuration
     // changes the agent will increment this number and the Component field will be populated.
@@ -235,8 +236,7 @@ message UnitObserved {
     string id = 1;
     // Unit type.
     UnitType type = 2;
-    // Index or revision of the currently applied configuration. Only the index is reported back to the agent
-    // to avoid wasting CPU regularly copying the entire configuration between the agent and the client.
+    // Index or revision of the currently applied configuration.
     uint64 config_state_idx = 3;
     // Current state of the unit.
     State state = 4;
@@ -270,14 +270,10 @@ message CheckinObserved {
     // one of the values have changed.
     optional CheckinObservedVersionInfo version_info = 3;
 
-    // Index or revision of the currently feature flags configuration. Only the index is reported
-    // back to the agent to avoid wasting CPU regularly copying the entire configuration between the
-    // agent and the client.
+    // Index or revision of the currently feature flags configuration.
     uint64 features_idx = 5;
 
-    // Index or revision of the currently component configuration. Only the index is reported back
-    // to the agent to avoid wasting CPU regularly copying the entire configuration between the
-    // agent and the client.
+    // Index or revision of the currently component configuration.
     uint64 component_idx = 6;
 }
 

@@ -818,8 +818,7 @@ type UnitExpected struct {
 	// agent will increment this number and the UnitExpectedConfig field will be populated.
 	ConfigStateIdx uint64 `protobuf:"varint,4,opt,name=config_state_idx,json=configStateIdx,proto3" json:"config_state_idx,omitempty"`
 	// Current expected configuration. Omitted if the client reports it has applied the current
-	// configuration to avoid wasting CPU by constantly copying the configuration between the agent
-	// and the client.
+	// configuration.
 	Config *UnitExpectedConfig `protobuf:"bytes,5,opt,name=config,proto3" json:"config,omitempty"`
 	// Log level of the unit.
 	LogLevel UnitLogLevel `protobuf:"varint,6,opt,name=log_level,json=logLevel,proto3,enum=proto.UnitLogLevel" json:"log_level,omitempty"`
@@ -1196,8 +1195,7 @@ type CheckinExpected struct {
 	AgentInfo *CheckinAgentInfo `protobuf:"bytes,2,opt,name=agent_info,json=agentInfo,proto3" json:"agent_info,omitempty"`
 	// Features are the expected feature flags configurations. Can apply to either components or
 	// individual units depending on the flag and its implementation. Omitted if the client reports
-	// it has applied the current configuration to avoid wasting CPU by constantly copying the
-	// configuration between the agent and the client. Added in Elastic Agent v8.7.1.
+	// it has applied the current configuration. Added in Elastic Agent v8.7.1.
 	Features *Features `protobuf:"bytes,3,opt,name=features,proto3" json:"features,omitempty"`
 	// Index or revision of the expected feature flags configuration. When the expected
 	// configuration changes the agent will increment this number and the Features field will be
@@ -1205,8 +1203,7 @@ type CheckinExpected struct {
 	FeaturesIdx uint64 `protobuf:"varint,4,opt,name=features_idx,json=featuresIdx,proto3" json:"features_idx,omitempty"`
 	// Component is the expected component configuration. Contains configuration expected to apply
 	// globally to the entire component process. Omitted if the client reports it has applied the
-	// current configuration to avoid wasting CPU by constantly copying the configuration between
-	// the agent and the client. Added in Elastic Agent v8.10.0.
+	// current configuration. Added in Elastic Agent v8.10.0.
 	Component *Component `protobuf:"bytes,5,opt,name=component,proto3" json:"component,omitempty"`
 	// Index or revision of the expected component configuration. When the expected configuration
 	// changes the agent will increment this number and the Component field will be populated.
@@ -1302,8 +1299,7 @@ type UnitObserved struct {
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// Unit type.
 	Type UnitType `protobuf:"varint,2,opt,name=type,proto3,enum=proto.UnitType" json:"type,omitempty"`
-	// Index or revision of the currently applied configuration. Only the index is reported back to the agent
-	// to avoid wasting CPU regularly copying the entire configuration between the agent and the client.
+	// Index or revision of the currently applied configuration.
 	ConfigStateIdx uint64 `protobuf:"varint,3,opt,name=config_state_idx,json=configStateIdx,proto3" json:"config_state_idx,omitempty"`
 	// Current state of the unit.
 	State State `protobuf:"varint,4,opt,name=state,proto3,enum=proto.State" json:"state,omitempty"`
@@ -1471,13 +1467,9 @@ type CheckinObserved struct {
 	// Version information about the running program. Should always be included on first checkin, and not again unless
 	// one of the values have changed.
 	VersionInfo *CheckinObservedVersionInfo `protobuf:"bytes,3,opt,name=version_info,json=versionInfo,proto3,oneof" json:"version_info,omitempty"`
-	// Index or revision of the currently feature flags configuration. Only the index is reported
-	// back to the agent to avoid wasting CPU regularly copying the entire configuration between the
-	// agent and the client.
+	// Index or revision of the currently feature flags configuration.
 	FeaturesIdx uint64 `protobuf:"varint,5,opt,name=features_idx,json=featuresIdx,proto3" json:"features_idx,omitempty"`
-	// Index or revision of the currently component configuration. Only the index is reported back
-	// to the agent to avoid wasting CPU regularly copying the entire configuration between the
-	// agent and the client.
+	// Index or revision of the currently component configuration.
 	ComponentIdx uint64 `protobuf:"varint,6,opt,name=component_idx,json=componentIdx,proto3" json:"component_idx,omitempty"`
 }
 

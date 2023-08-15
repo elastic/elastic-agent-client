@@ -31,8 +31,12 @@ type ElasticAgentClient interface {
 	// Implements a reconciliation loop where a component periodically tells the agent what its current
 	// observed configuration is, and the agent replies with the configuration it is expected to be running.
 	//
-	// A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the
-	// set of units automatically marked as FAILED, and after 60 seconds the Elastic Agent will
+	// Each included configuration block is accompanied by an index or revision number so that the
+	// observed messages do not need to waste CPU copying the entire applied configuration back to
+	// the agent on each checkin. Configurations in large deployments can be 1MB or more.
+	//
+	// A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the set
+	// of units automatically marked as FAILED. After several missed checkins the Elastic Agent will
 	// force kill the entire process and restart it.
 	CheckinV2(ctx context.Context, opts ...grpc.CallOption) (ElasticAgent_CheckinV2Client, error)
 	// Called by the client after receiving connection info to allow the Elastic Agent to stream action
@@ -123,8 +127,12 @@ type ElasticAgentServer interface {
 	// Implements a reconciliation loop where a component periodically tells the agent what its current
 	// observed configuration is, and the agent replies with the configuration it is expected to be running.
 	//
-	// A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the
-	// set of units automatically marked as FAILED, and after 60 seconds the Elastic Agent will
+	// Each included configuration block is accompanied by an index or revision number so that the
+	// observed messages do not need to waste CPU copying the entire applied configuration back to
+	// the agent on each checkin. Configurations in large deployments can be 1MB or more.
+	//
+	// A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the set
+	// of units automatically marked as FAILED. After several missed checkins the Elastic Agent will
 	// force kill the entire process and restart it.
 	CheckinV2(ElasticAgent_CheckinV2Server) error
 	// Called by the client after receiving connection info to allow the Elastic Agent to stream action
