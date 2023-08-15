@@ -406,8 +406,8 @@ the [zap](https://github.com/uber-go/zap) logger.
 ```go
     // When logging either the agent or client side of the exchange both an observed and expected response
     // are likely be available at the same time.
- 	var expected *proto.CheckinExpected,
- 	var observed *proto.CheckinObserved,
+    var expected *proto.CheckinExpected,
+    var observed *proto.CheckinObserved,
 
     obsJSON, _ := protojson.Marshal(observed)
     expJSON, _ := protojson.Marshal(expected)
