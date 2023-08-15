@@ -273,6 +273,10 @@ message CheckinObserved {
     // one of the values have changed.
     optional CheckinObservedVersionInfo version_info = 3;
 
+    // Deprecated: sending the feature flag configuration from client back to agent is unnecessary.
+    reserved "features";
+    reserved 4;
+
     // Index or revision of the currently feature flags configuration.
     uint64 features_idx = 5;
 
