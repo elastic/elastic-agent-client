@@ -90,12 +90,11 @@ func TestUnitUpdateAPMConfig(t *testing.T) {
 		apm:           nil,
 	}
 
-	apiKey := "apikey"
 	notEmptyAPMCfg := &proto.APMConfig{
 		Elastic: &proto.ElasticAPM{
 			Environment: "test",
-			APIKey:      &apiKey,
-			SecretToken: nil,
+			ApiKey:      "apikey",
+			SecretToken: "",
 			Hosts:       []string{"host1", "host2"},
 			Tls: &proto.ElasticAPMTLS{
 				SkipVerify: false,

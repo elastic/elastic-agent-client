@@ -880,7 +880,7 @@ type unitChangesAccumulator struct {
 	unitChanges []UnitChanged
 }
 
-func (uca *unitChangesAccumulator) Start(t *testing.T, ctx context.Context, c <-chan UnitChanged) {
+func (uca *unitChangesAccumulator) Start(ctx context.Context, t *testing.T, c <-chan UnitChanged) {
 	go func() {
 		for {
 			select {
@@ -923,13 +923,11 @@ func TestClientV2_Checkin_APMConfig(t *testing.T) {
 	connected := false
 	checkinCounter := 0
 
-	apiKey := "someAPIKey"
-
 	apmConfig := &proto.APMConfig{
 		Elastic: &proto.ElasticAPM{
 			Environment: "test-client",
-			APIKey:      &apiKey,
-			SecretToken: nil,
+			ApiKey:      "someAPIKey",
+			SecretToken: "",
 			Hosts:       []string{"host1", "host2"},
 			Tls:         nil,
 		},
@@ -993,7 +991,7 @@ func TestClientV2_Checkin_APMConfig(t *testing.T) {
 	storeErrors(ctx, client, &errs, &errsMu)
 
 	var uca unitChangesAccumulator
-	uca.Start(t, ctx, client.UnitChanges())
+	uca.Start(ctx, t, client.UnitChanges())
 
 	require.NoError(t, client.Start(ctx))
 	defer client.Stop()
