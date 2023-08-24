@@ -194,11 +194,12 @@ message ElasticAPMTLS {
 
 // Elastic APM configuration
 message ElasticAPM {
-    string environment = 1;
-    optional string APIKey = 2;
-    optional string SecretToken = 3;
-    repeated string hosts = 4;
-    ElasticAPMTLS tls = 5;
+    ElasticAPMTLS tls = 1;
+    string environment = 2;
+    string api_key = 3;
+    string secret_token = 4;
+    repeated string hosts = 5;
+    string global_labels = 6;
 }
 
 // APM configuration
