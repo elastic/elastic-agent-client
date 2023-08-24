@@ -997,6 +997,8 @@ func TestClientV2_Checkin_APMConfig(t *testing.T) {
 	defer client.Stop()
 
 	require.Eventuallyf(t, func() bool {
+		m.Lock()
+		defer m.Unlock()
 		return checkinCounter >= 2
 	}, time.Second, 100*time.Millisecond, "server did not receive expected number of checkins = %d; actual checkins received = %d", 2, checkinCounter)
 
