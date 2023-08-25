@@ -108,12 +108,6 @@ func TestUnitUpdateAPMConfig(t *testing.T) {
 		name         string
 		initialState Unit
 		update       struct {
-			//unitState   UnitState
-			//UnitLogLvl  UnitLogLevel
-			//featuresIdx uint64
-			//features    *proto.Features
-			//unitConfig  *proto.UnitExpectedConfig
-			//cfgIdx      uint64
 			apmConfig *proto.APMConfig
 		}
 		triggeredFlags Trigger
