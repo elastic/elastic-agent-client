@@ -331,7 +331,7 @@ func (u *Unit) updateState(
 		}
 	}
 
-	if !gproto.Equal(u.apm, expAPM {
+	if !gproto.Equal(u.apm, expAPM) {
 		u.apm = expAPM
 		triggers |= TriggeredAPMChange
 	}
