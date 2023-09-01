@@ -561,7 +561,6 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 
 	// Technically we should wait until the APM config is also applied, but the syncUnits is called after this and
 	// we have a single index for the whole component
-
 	c.componentConfig = expected.Component
 	c.componentIdx = expected.ComponentIdx
 }
