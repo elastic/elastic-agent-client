@@ -881,7 +881,6 @@ type ArtifactFetchResponse struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to ContentEof:
-	//
 	//	*ArtifactFetchResponse_Content
 	//	*ArtifactFetchResponse_Eof
 	ContentEof isArtifactFetchResponse_ContentEof `protobuf_oneof:"content_eof"`

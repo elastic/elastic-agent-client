@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	gproto "google.golang.org/protobuf/proto"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -259,8 +260,8 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	var m sync.Mutex
 	token := mock.NewID()
 	connected := false
-	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil)
-	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil)
+	unitOne := newUnit(mock.NewID(), UnitTypeOutput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil, nil)
+	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil, nil)
 	wantFQDN := true
 	srv := mock.StubServerV2{
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
@@ -747,6 +748,11 @@ func TestTrigger_String(t *testing.T) {
 			Want:    "feature_change_triggered, state_change_triggered",
 		},
 		{
+			Name:    "two changes: feature_change_triggered, apm_config_change_triggered",
+			Trigger: TriggeredFeatureChange | TriggeredAPMChange,
+			Want:    "feature_change_triggered, apm_config_change_triggered",
+		},
+		{
 			Name:    "invalid trigger value",
 			Trigger: 1618,
 			Want:    "invalid trigger value: 1618",
@@ -764,7 +770,7 @@ func TestTrigger_String(t *testing.T) {
 func TestClientV2_Checkin_FeatureFlags(t *testing.T) {
 	var m sync.Mutex
 	token := mock.NewID()
-	unit := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil)
+	unit := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil, nil)
 	connected := false
 	checkinCounter := 0
 	featuresIdx := rand.Uint64()
@@ -867,6 +873,149 @@ func TestClientV2_Checkin_FeatureFlags(t *testing.T) {
 	}))
 
 	require.Empty(t, errs)
+}
+
+type unitChangesAccumulator struct {
+	mx          sync.Mutex
+	unitChanges []UnitChanged
+}
+
+func (uca *unitChangesAccumulator) Start(ctx context.Context, t *testing.T, c <-chan UnitChanged) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case uc := <-c:
+				func() {
+					t.Logf("received unit change %v", uc)
+					switch uc.Type {
+					case UnitChangedAdded:
+						err := uc.Unit.UpdateState(UnitStateHealthy, "Healthy", map[string]interface{}{
+							"custom": "payload",
+						})
+						require.NoError(t, err)
+					}
+
+					uca.mx.Lock()
+					defer uca.mx.Unlock()
+
+					uca.unitChanges = append(uca.unitChanges, uc)
+				}()
+			}
+		}
+	}()
+}
+
+func (uca *unitChangesAccumulator) GetAccumulatedChanges() []UnitChanged {
+	uca.mx.Lock()
+	defer uca.mx.Unlock()
+
+	ret := make([]UnitChanged, len(uca.unitChanges))
+	copy(ret, uca.unitChanges)
+	return ret
+}
+
+func TestClientV2_Checkin_APMConfig(t *testing.T) {
+	var m sync.Mutex
+	token := mock.NewID()
+	unit := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil, nil)
+	connected := false
+	checkinCounter := 0
+
+	apmConfig := &proto.APMConfig{
+		Elastic: &proto.ElasticAPM{
+			Environment: "test-client",
+			ApiKey:      "someAPIKey",
+			SecretToken: "",
+			Hosts:       []string{"host1", "host2"},
+			Tls:         nil,
+		},
+	}
+
+	srv := mock.StubServerV2{
+		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+			m.Lock()
+			defer m.Unlock()
+
+			if observed.Token == token {
+				connected = true
+
+				switch checkinCounter {
+				case 0:
+					// first checkin
+					checkinCounter++
+					return &proto.CheckinExpected{
+						FeaturesIdx: 0,
+						Component: &proto.Component{
+							ApmConfig: apmConfig,
+						},
+						ComponentIdx: 1,
+						Units: []*proto.UnitExpected{
+							{
+								Id:             unit.id,
+								Type:           proto.UnitType_INPUT,
+								State:          proto.State_HEALTHY,
+								LogLevel:       proto.UnitLogLevel_INFO,
+								ConfigStateIdx: 1,
+								Config: &proto.UnitExpectedConfig{
+									Id: "config_unit",
+								},
+							},
+						},
+					}
+
+				case 1:
+					// second checkin
+					assert.Equal(t, uint64(1), observed.ComponentIdx)
+					checkinCounter++
+				}
+			}
+			// disconnect
+			return nil
+		},
+		ActionImpl: func(response *proto.ActionResponse) error {
+			// actions not tested here
+			return nil
+		},
+		ActionsChan: make(chan *mock.PerformAction, 100),
+	}
+	require.NoError(t, srv.Start())
+	defer srv.Stop()
+
+	var errsMu sync.Mutex
+	var errs []error
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials())).(*clientV2)
+	storeErrors(ctx, client, &errs, &errsMu)
+
+	var uca unitChangesAccumulator
+	uca.Start(ctx, t, client.UnitChanges())
+
+	require.NoError(t, client.Start(ctx))
+	defer client.Stop()
+
+	require.Eventually(t, func() bool {
+		m.Lock()
+		defer m.Unlock()
+		return checkinCounter >= 2
+	}, time.Second, 100*time.Millisecond, "server did not receive expected number of checkins")
+
+	require.Empty(t, errs)
+	assert.True(t, connected)
+	changes := uca.GetAccumulatedChanges()
+	assert.NotEmpty(t, changes)
+	for _, c := range changes {
+		assert.Truef(
+			t,
+			gproto.Equal(apmConfig, c.Unit.apm),
+			"unit id %s has wrong apm config: expected: %v, actual: %v",
+			c.Unit.ID(),
+			apmConfig,
+			c.Unit.apm,
+		)
+	}
 }
 
 type componentConfigServerValidation struct {

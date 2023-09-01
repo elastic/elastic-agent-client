@@ -185,9 +185,32 @@ message FQDNFeature {
     bool enabled = 1;
 }
 
+// Elastic APM TLS config
+message ElasticAPMTLS {
+    bool skip_verify = 1;
+    string server_cert = 2;
+    string server_ca = 3;
+}
+
+// Elastic APM configuration
+message ElasticAPM {
+    ElasticAPMTLS tls = 1;
+    string environment = 2;
+    string api_key = 3;
+    string secret_token = 4;
+    repeated string hosts = 5;
+    string global_labels = 6;
+}
+
+// APM configuration
+message APMConfig {
+    ElasticAPM elastic = 1;
+}
+
 // Component-level configuration.
 message Component {
     ComponentLimits limits = 1;
+    optional APMConfig apm_config = 2;
 }
 
 // Limits to configure for the currently running component.
