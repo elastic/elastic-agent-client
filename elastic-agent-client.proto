@@ -12,14 +12,18 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 service ElasticAgent {
-    // Called by the client to provide the Elastic Agent the state of the application over the V2 protocol.
+    // Called by the client to provide the Elastic Agent the state of the application over the V2
+    // protocol.
     //
-    // Implements a reconciliation loop where a component periodically tells the agent what its current
-    // observed configuration is, and the agent replies with the configuration it is expected to be running.
+    // Implements a reconciliation loop where a component periodically tells the agent what its
+    // current observed configuration is, and the agent replies with the configuration it is
+    // expected to be running.
     //
-    // Each configuration block included in the expected message is accompanied by an index or revision number. Corresponding 
-    // observed messages do not need to waste CPU copying the entire applied configuration back to
-    // the agent on each checkin; instead, they can simply echo back the index or revision number from the expected message upon successful reconciliation. Configurations in large deployments can be 1MB or more.
+    // Each configuration block included in the expected message is accompanied by an index or
+    // revision number. Corresponding observed messages do not need to waste CPU copying the entire
+    // applied configuration back to the agent on each checkin; instead, they can simply echo back
+    // the index or revision number from the expected message upon successful reconciliation.
+    // Configurations in large deployments can be 1MB or more.
     //
     // A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the set
     // of units automatically marked as FAILED. After several missed checkins the Elastic Agent will
