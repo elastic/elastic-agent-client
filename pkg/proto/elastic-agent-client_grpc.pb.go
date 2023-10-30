@@ -26,18 +26,33 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ElasticAgentClient interface {
-	// Called by the client to provide the Elastic Agent the state of the application over the V2 protocol.
+	// Called by the client to provide the Elastic Agent the state of the application over the V2
+	// protocol.
 	//
-	// Implements a reconciliation loop where a component periodically tells the agent what its current
-	// observed configuration is, and the agent replies with the configuration it is expected to be running.
+	// Implements a reconciliation loop where a component periodically tells the agent what its
+	// current observed configuration is, and the agent replies with the configuration it is
+	// expected to be running.
 	//
-	// Each included configuration block is accompanied by an index or revision number so that the
-	// observed messages do not need to waste CPU copying the entire applied configuration back to
-	// the agent on each checkin. Configurations in large deployments can be 1MB or more.
+	// Each configuration block included in the expected message is accompanied by an index or
+	// revision number. Corresponding observed messages do not need to waste CPU copying the entire
+	// applied configuration back to the agent on each checkin; instead, they can simply echo back
+	// the index or revision number from the expected message upon successful reconciliation.
+	// Configurations in large deployments can be 1MB or more.
 	//
 	// A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the set
 	// of units automatically marked as FAILED. After several missed checkins the Elastic Agent will
 	// force kill the entire process and restart it.
+	//
+	// The V2 protocol is designed to operate knowing as little as possible about the units and
+	// components it communicates with. Each unit or component can accept arbitrary user
+	// configuration from the agent policy which is encoded in a `google.protobuf.Struct source`
+	// field. The agent does not fully parse or inspect the contents of the source field and
+	// passes it through to components unmodified.
+	//
+	// Use of the source field allows the input configurations to evolve without needing to modify
+	// the control protocol itself. In some cases commonly used or important fields are extracted as
+	// a dedicated message type, but these definitions do not comletely define the contents of the
+	// source field which is free to contain additional fields.
 	CheckinV2(ctx context.Context, opts ...grpc.CallOption) (ElasticAgent_CheckinV2Client, error)
 	// Called by the client after receiving connection info to allow the Elastic Agent to stream action
 	// requests to the application and the application stream back responses to those requests.
@@ -122,18 +137,33 @@ func (x *elasticAgentActionsClient) Recv() (*ActionRequest, error) {
 // All implementations must embed UnimplementedElasticAgentServer
 // for forward compatibility
 type ElasticAgentServer interface {
-	// Called by the client to provide the Elastic Agent the state of the application over the V2 protocol.
+	// Called by the client to provide the Elastic Agent the state of the application over the V2
+	// protocol.
 	//
-	// Implements a reconciliation loop where a component periodically tells the agent what its current
-	// observed configuration is, and the agent replies with the configuration it is expected to be running.
+	// Implements a reconciliation loop where a component periodically tells the agent what its
+	// current observed configuration is, and the agent replies with the configuration it is
+	// expected to be running.
 	//
-	// Each included configuration block is accompanied by an index or revision number so that the
-	// observed messages do not need to waste CPU copying the entire applied configuration back to
-	// the agent on each checkin. Configurations in large deployments can be 1MB or more.
+	// Each configuration block included in the expected message is accompanied by an index or
+	// revision number. Corresponding observed messages do not need to waste CPU copying the entire
+	// applied configuration back to the agent on each checkin; instead, they can simply echo back
+	// the index or revision number from the expected message upon successful reconciliation.
+	// Configurations in large deployments can be 1MB or more.
 	//
 	// A `CheckinObserved` must be streamed at least every 30 seconds or it will result in the set
 	// of units automatically marked as FAILED. After several missed checkins the Elastic Agent will
 	// force kill the entire process and restart it.
+	//
+	// The V2 protocol is designed to operate knowing as little as possible about the units and
+	// components it communicates with. Each unit or component can accept arbitrary user
+	// configuration from the agent policy which is encoded in a `google.protobuf.Struct source`
+	// field. The agent does not fully parse or inspect the contents of the source field and
+	// passes it through to components unmodified.
+	//
+	// Use of the source field allows the input configurations to evolve without needing to modify
+	// the control protocol itself. In some cases commonly used or important fields are extracted as
+	// a dedicated message type, but these definitions do not comletely define the contents of the
+	// source field which is free to contain additional fields.
 	CheckinV2(ElasticAgent_CheckinV2Server) error
 	// Called by the client after receiving connection info to allow the Elastic Agent to stream action
 	// requests to the application and the application stream back responses to those requests.

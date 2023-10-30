@@ -271,8 +271,8 @@ type ActionRequest_Type int32
 const (
 	// Custom action (registered by the unit). Examples include endpoint response actions and OSQuery results.
 	ActionRequest_CUSTOM ActionRequest_Type = 0
-	// Diagnostics collection action. Implemented by components and units when they which to
-	// include custom information in diagnostics archives. If unimplemented, a ActionResponse
+	// Diagnostics collection action. Implemented by components and units when they wish to
+	// include custom information in diagnostics archives. If unimplemented, an ActionResponse
 	// with the FAILED status is required.
 	ActionRequest_DIAGNOSTICS ActionRequest_Type = 1
 )
@@ -425,8 +425,8 @@ type Package struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Source is the original source of the message. All values from the message are included here
-	// even if other concrete fields are defined for this message.
+	// Source is the original configuration of this Package in the agent policy. Only standard
+	// fields are defined as explicit types, additional can be parsed from source.
 	Source *structpb.Struct `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
 	// Name of the package.
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
@@ -493,8 +493,8 @@ type Meta struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Source is the original source of the message. All values from the message are included here
-	// even if other concrete fields are defined for this message.
+	// Source is the original configuration of this Meta object in the agent policy. Only standard
+	// fields are defined as explicit types, additional can be parsed from source.
 	Source *structpb.Struct `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
 	// Package metadata.
 	Package *Package `protobuf:"bytes,2,opt,name=package,proto3" json:"package,omitempty"`
@@ -552,8 +552,8 @@ type DataStream struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Source is the original source of the message. All values from the message are included here
-	// even if other concrete fields are defined for this message.
+	// Source is the original configuration of this DataStream object in the agent policy. Only
+	// standard fields are defined as explicit types, additional can be parsed from source.
 	Source *structpb.Struct `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
 	// Dataset for the stream.
 	Dataset string `protobuf:"bytes,2,opt,name=dataset,proto3" json:"dataset,omitempty"`
@@ -629,8 +629,11 @@ type Stream struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Source is the original source of the message. All values from the message are included here
-	// even if other concrete fields are defined for this message.
+	// Source is the original configuration of this Stream object in the agent policy. Only standard
+	// fields are defined as explicit types, additional can be parsed from source.
+	//
+	// This source field will almost always contain arbitrary unit configuration fields beyond those
+	// explicitly defined in this message type.
 	Source     *structpb.Struct `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
 	Id         string           `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
 	DataStream *DataStream      `protobuf:"bytes,3,opt,name=data_stream,json=dataStream,proto3" json:"data_stream,omitempty"`
@@ -695,8 +698,11 @@ type UnitExpectedConfig struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Source is the original source of the message. All values from the configuration are included here
-	// even if other concrete fields are defined for this message.
+	// Source is the original configuration of this unit configuration object in the agent policy.
+	// Only standard fields are defined as explicit types, additional can be parsed from source.
+	//
+	// This source field will almost always contain arbitrary unit configuration fields beyond those
+	// explicitly defined in this message type.
 	Source *structpb.Struct `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
 	// Unique ID for the Unit.
 	Id string `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
