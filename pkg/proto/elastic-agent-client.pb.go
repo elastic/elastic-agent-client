@@ -313,7 +313,7 @@ func (x ActionRequest_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ActionRequest_Type.Descriptor instead.
 func (ActionRequest_Type) EnumDescriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{15, 0}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{18, 0}
 }
 
 // The level that the action is operating on.
@@ -367,7 +367,7 @@ func (x ActionRequest_Level) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ActionRequest_Level.Descriptor instead.
 func (ActionRequest_Level) EnumDescriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{15, 1}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{18, 1}
 }
 
 // Status result of the action.
@@ -416,7 +416,7 @@ func (x ActionResponse_Status) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ActionResponse_Status.Descriptor instead.
 func (ActionResponse_Status) EnumDescriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{17, 0}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{20, 0}
 }
 
 // Package metadata provided in the meta field of a unit.
@@ -1073,19 +1073,220 @@ func (x *FQDNFeature) GetEnabled() bool {
 	return false
 }
 
+// Elastic APM TLS config
+type ElasticAPMTLS struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SkipVerify bool   `protobuf:"varint,1,opt,name=skip_verify,json=skipVerify,proto3" json:"skip_verify,omitempty"`
+	ServerCert string `protobuf:"bytes,2,opt,name=server_cert,json=serverCert,proto3" json:"server_cert,omitempty"`
+	ServerCa   string `protobuf:"bytes,3,opt,name=server_ca,json=serverCa,proto3" json:"server_ca,omitempty"`
+}
+
+func (x *ElasticAPMTLS) Reset() {
+	*x = ElasticAPMTLS{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_elastic_agent_client_proto_msgTypes[9]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ElasticAPMTLS) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ElasticAPMTLS) ProtoMessage() {}
+
+func (x *ElasticAPMTLS) ProtoReflect() protoreflect.Message {
+	mi := &file_elastic_agent_client_proto_msgTypes[9]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ElasticAPMTLS.ProtoReflect.Descriptor instead.
+func (*ElasticAPMTLS) Descriptor() ([]byte, []int) {
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ElasticAPMTLS) GetSkipVerify() bool {
+	if x != nil {
+		return x.SkipVerify
+	}
+	return false
+}
+
+func (x *ElasticAPMTLS) GetServerCert() string {
+	if x != nil {
+		return x.ServerCert
+	}
+	return ""
+}
+
+func (x *ElasticAPMTLS) GetServerCa() string {
+	if x != nil {
+		return x.ServerCa
+	}
+	return ""
+}
+
+// Elastic APM configuration
+type ElasticAPM struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Tls          *ElasticAPMTLS `protobuf:"bytes,1,opt,name=tls,proto3" json:"tls,omitempty"`
+	Environment  string         `protobuf:"bytes,2,opt,name=environment,proto3" json:"environment,omitempty"`
+	ApiKey       string         `protobuf:"bytes,3,opt,name=api_key,json=apiKey,proto3" json:"api_key,omitempty"`
+	SecretToken  string         `protobuf:"bytes,4,opt,name=secret_token,json=secretToken,proto3" json:"secret_token,omitempty"`
+	Hosts        []string       `protobuf:"bytes,5,rep,name=hosts,proto3" json:"hosts,omitempty"`
+	GlobalLabels string         `protobuf:"bytes,6,opt,name=global_labels,json=globalLabels,proto3" json:"global_labels,omitempty"`
+}
+
+func (x *ElasticAPM) Reset() {
+	*x = ElasticAPM{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_elastic_agent_client_proto_msgTypes[10]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *ElasticAPM) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ElasticAPM) ProtoMessage() {}
+
+func (x *ElasticAPM) ProtoReflect() protoreflect.Message {
+	mi := &file_elastic_agent_client_proto_msgTypes[10]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ElasticAPM.ProtoReflect.Descriptor instead.
+func (*ElasticAPM) Descriptor() ([]byte, []int) {
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ElasticAPM) GetTls() *ElasticAPMTLS {
+	if x != nil {
+		return x.Tls
+	}
+	return nil
+}
+
+func (x *ElasticAPM) GetEnvironment() string {
+	if x != nil {
+		return x.Environment
+	}
+	return ""
+}
+
+func (x *ElasticAPM) GetApiKey() string {
+	if x != nil {
+		return x.ApiKey
+	}
+	return ""
+}
+
+func (x *ElasticAPM) GetSecretToken() string {
+	if x != nil {
+		return x.SecretToken
+	}
+	return ""
+}
+
+func (x *ElasticAPM) GetHosts() []string {
+	if x != nil {
+		return x.Hosts
+	}
+	return nil
+}
+
+func (x *ElasticAPM) GetGlobalLabels() string {
+	if x != nil {
+		return x.GlobalLabels
+	}
+	return ""
+}
+
+// APM configuration
+type APMConfig struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Elastic *ElasticAPM `protobuf:"bytes,1,opt,name=elastic,proto3" json:"elastic,omitempty"`
+}
+
+func (x *APMConfig) Reset() {
+	*x = APMConfig{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_elastic_agent_client_proto_msgTypes[11]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *APMConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*APMConfig) ProtoMessage() {}
+
+func (x *APMConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_elastic_agent_client_proto_msgTypes[11]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use APMConfig.ProtoReflect.Descriptor instead.
+func (*APMConfig) Descriptor() ([]byte, []int) {
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *APMConfig) GetElastic() *ElasticAPM {
+	if x != nil {
+		return x.Elastic
+	}
+	return nil
+}
+
 // Component-level configuration.
 type Component struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Limits *ComponentLimits `protobuf:"bytes,1,opt,name=limits,proto3" json:"limits,omitempty"`
+	Limits    *ComponentLimits `protobuf:"bytes,1,opt,name=limits,proto3" json:"limits,omitempty"`
+	ApmConfig *APMConfig       `protobuf:"bytes,2,opt,name=apm_config,json=apmConfig,proto3,oneof" json:"apm_config,omitempty"`
 }
 
 func (x *Component) Reset() {
 	*x = Component{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_elastic_agent_client_proto_msgTypes[9]
+		mi := &file_elastic_agent_client_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1098,7 +1299,7 @@ func (x *Component) String() string {
 func (*Component) ProtoMessage() {}
 
 func (x *Component) ProtoReflect() protoreflect.Message {
-	mi := &file_elastic_agent_client_proto_msgTypes[9]
+	mi := &file_elastic_agent_client_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1111,12 +1312,19 @@ func (x *Component) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Component.ProtoReflect.Descriptor instead.
 func (*Component) Descriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{9}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Component) GetLimits() *ComponentLimits {
 	if x != nil {
 		return x.Limits
+	}
+	return nil
+}
+
+func (x *Component) GetApmConfig() *APMConfig {
+	if x != nil {
+		return x.ApmConfig
 	}
 	return nil
 }
@@ -1140,7 +1348,7 @@ type ComponentLimits struct {
 func (x *ComponentLimits) Reset() {
 	*x = ComponentLimits{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_elastic_agent_client_proto_msgTypes[10]
+		mi := &file_elastic_agent_client_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1153,7 +1361,7 @@ func (x *ComponentLimits) String() string {
 func (*ComponentLimits) ProtoMessage() {}
 
 func (x *ComponentLimits) ProtoReflect() protoreflect.Message {
-	mi := &file_elastic_agent_client_proto_msgTypes[10]
+	mi := &file_elastic_agent_client_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1166,7 +1374,7 @@ func (x *ComponentLimits) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ComponentLimits.ProtoReflect.Descriptor instead.
 func (*ComponentLimits) Descriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{10}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ComponentLimits) GetSource() *structpb.Struct {
@@ -1216,7 +1424,7 @@ type CheckinExpected struct {
 func (x *CheckinExpected) Reset() {
 	*x = CheckinExpected{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_elastic_agent_client_proto_msgTypes[11]
+		mi := &file_elastic_agent_client_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1229,7 +1437,7 @@ func (x *CheckinExpected) String() string {
 func (*CheckinExpected) ProtoMessage() {}
 
 func (x *CheckinExpected) ProtoReflect() protoreflect.Message {
-	mi := &file_elastic_agent_client_proto_msgTypes[11]
+	mi := &file_elastic_agent_client_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1242,7 +1450,7 @@ func (x *CheckinExpected) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckinExpected.ProtoReflect.Descriptor instead.
 func (*CheckinExpected) Descriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{11}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CheckinExpected) GetUnits() []*UnitExpected {
@@ -1316,7 +1524,7 @@ type UnitObserved struct {
 func (x *UnitObserved) Reset() {
 	*x = UnitObserved{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_elastic_agent_client_proto_msgTypes[12]
+		mi := &file_elastic_agent_client_proto_msgTypes[15]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1329,7 +1537,7 @@ func (x *UnitObserved) String() string {
 func (*UnitObserved) ProtoMessage() {}
 
 func (x *UnitObserved) ProtoReflect() protoreflect.Message {
-	mi := &file_elastic_agent_client_proto_msgTypes[12]
+	mi := &file_elastic_agent_client_proto_msgTypes[15]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1342,7 +1550,7 @@ func (x *UnitObserved) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnitObserved.ProtoReflect.Descriptor instead.
 func (*UnitObserved) Descriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{12}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UnitObserved) GetId() string {
@@ -1404,7 +1612,7 @@ type CheckinObservedVersionInfo struct {
 func (x *CheckinObservedVersionInfo) Reset() {
 	*x = CheckinObservedVersionInfo{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_elastic_agent_client_proto_msgTypes[13]
+		mi := &file_elastic_agent_client_proto_msgTypes[16]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1417,7 +1625,7 @@ func (x *CheckinObservedVersionInfo) String() string {
 func (*CheckinObservedVersionInfo) ProtoMessage() {}
 
 func (x *CheckinObservedVersionInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_elastic_agent_client_proto_msgTypes[13]
+	mi := &file_elastic_agent_client_proto_msgTypes[16]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1430,7 +1638,7 @@ func (x *CheckinObservedVersionInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckinObservedVersionInfo.ProtoReflect.Descriptor instead.
 func (*CheckinObservedVersionInfo) Descriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{13}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CheckinObservedVersionInfo) GetName() string {
@@ -1479,7 +1687,7 @@ type CheckinObserved struct {
 func (x *CheckinObserved) Reset() {
 	*x = CheckinObserved{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_elastic_agent_client_proto_msgTypes[14]
+		mi := &file_elastic_agent_client_proto_msgTypes[17]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1492,7 +1700,7 @@ func (x *CheckinObserved) String() string {
 func (*CheckinObserved) ProtoMessage() {}
 
 func (x *CheckinObserved) ProtoReflect() protoreflect.Message {
-	mi := &file_elastic_agent_client_proto_msgTypes[14]
+	mi := &file_elastic_agent_client_proto_msgTypes[17]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1505,7 +1713,7 @@ func (x *CheckinObserved) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckinObserved.ProtoReflect.Descriptor instead.
 func (*CheckinObserved) Descriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{14}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CheckinObserved) GetToken() string {
@@ -1570,7 +1778,7 @@ type ActionRequest struct {
 func (x *ActionRequest) Reset() {
 	*x = ActionRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_elastic_agent_client_proto_msgTypes[15]
+		mi := &file_elastic_agent_client_proto_msgTypes[18]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1583,7 +1791,7 @@ func (x *ActionRequest) String() string {
 func (*ActionRequest) ProtoMessage() {}
 
 func (x *ActionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_elastic_agent_client_proto_msgTypes[15]
+	mi := &file_elastic_agent_client_proto_msgTypes[18]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1596,7 +1804,7 @@ func (x *ActionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionRequest.ProtoReflect.Descriptor instead.
 func (*ActionRequest) Descriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{15}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ActionRequest) GetId() string {
@@ -1670,7 +1878,7 @@ type ActionDiagnosticUnitResult struct {
 func (x *ActionDiagnosticUnitResult) Reset() {
 	*x = ActionDiagnosticUnitResult{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_elastic_agent_client_proto_msgTypes[16]
+		mi := &file_elastic_agent_client_proto_msgTypes[19]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1683,7 +1891,7 @@ func (x *ActionDiagnosticUnitResult) String() string {
 func (*ActionDiagnosticUnitResult) ProtoMessage() {}
 
 func (x *ActionDiagnosticUnitResult) ProtoReflect() protoreflect.Message {
-	mi := &file_elastic_agent_client_proto_msgTypes[16]
+	mi := &file_elastic_agent_client_proto_msgTypes[19]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1696,7 +1904,7 @@ func (x *ActionDiagnosticUnitResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionDiagnosticUnitResult.ProtoReflect.Descriptor instead.
 func (*ActionDiagnosticUnitResult) Descriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{16}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ActionDiagnosticUnitResult) GetName() string {
@@ -1764,7 +1972,7 @@ type ActionResponse struct {
 func (x *ActionResponse) Reset() {
 	*x = ActionResponse{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_elastic_agent_client_proto_msgTypes[17]
+		mi := &file_elastic_agent_client_proto_msgTypes[20]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1777,7 +1985,7 @@ func (x *ActionResponse) String() string {
 func (*ActionResponse) ProtoMessage() {}
 
 func (x *ActionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_elastic_agent_client_proto_msgTypes[17]
+	mi := &file_elastic_agent_client_proto_msgTypes[20]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1790,7 +1998,7 @@ func (x *ActionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActionResponse.ProtoReflect.Descriptor instead.
 func (*ActionResponse) Descriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{17}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ActionResponse) GetToken() string {
@@ -1855,7 +2063,7 @@ type ConnInfo struct {
 func (x *ConnInfo) Reset() {
 	*x = ConnInfo{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_elastic_agent_client_proto_msgTypes[18]
+		mi := &file_elastic_agent_client_proto_msgTypes[21]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1868,7 +2076,7 @@ func (x *ConnInfo) String() string {
 func (*ConnInfo) ProtoMessage() {}
 
 func (x *ConnInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_elastic_agent_client_proto_msgTypes[18]
+	mi := &file_elastic_agent_client_proto_msgTypes[21]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1881,7 +2089,7 @@ func (x *ConnInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnInfo.ProtoReflect.Descriptor instead.
 func (*ConnInfo) Descriptor() ([]byte, []int) {
-	return file_elastic_agent_client_proto_rawDescGZIP(), []int{18}
+	return file_elastic_agent_client_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ConnInfo) GetAddr() string {
@@ -2019,11 +2227,39 @@ var file_elastic_agent_client_proto_rawDesc = []byte{
 	0x65, 0x61, 0x74, 0x75, 0x72, 0x65, 0x52, 0x04, 0x66, 0x71, 0x64, 0x6e, 0x22, 0x27, 0x0a, 0x0b,
 	0x46, 0x51, 0x44, 0x4e, 0x46, 0x65, 0x61, 0x74, 0x75, 0x72, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x65,
 	0x6e, 0x61, 0x62, 0x6c, 0x65, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x65, 0x6e,
-	0x61, 0x62, 0x6c, 0x65, 0x64, 0x22, 0x3b, 0x0a, 0x09, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x6e, 0x65,
-	0x6e, 0x74, 0x12, 0x2e, 0x0a, 0x06, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x73, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x0b, 0x32, 0x16, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x43, 0x6f, 0x6d, 0x70, 0x6f,
-	0x6e, 0x65, 0x6e, 0x74, 0x4c, 0x69, 0x6d, 0x69, 0x74, 0x73, 0x52, 0x06, 0x6c, 0x69, 0x6d, 0x69,
-	0x74, 0x73, 0x22, 0x64, 0x0a, 0x0f, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x6e, 0x65, 0x6e, 0x74, 0x4c,
+	0x61, 0x62, 0x6c, 0x65, 0x64, 0x22, 0x6e, 0x0a, 0x0d, 0x45, 0x6c, 0x61, 0x73, 0x74, 0x69, 0x63,
+	0x41, 0x50, 0x4d, 0x54, 0x4c, 0x53, 0x12, 0x1f, 0x0a, 0x0b, 0x73, 0x6b, 0x69, 0x70, 0x5f, 0x76,
+	0x65, 0x72, 0x69, 0x66, 0x79, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x0a, 0x73, 0x6b, 0x69,
+	0x70, 0x56, 0x65, 0x72, 0x69, 0x66, 0x79, 0x12, 0x1f, 0x0a, 0x0b, 0x73, 0x65, 0x72, 0x76, 0x65,
+	0x72, 0x5f, 0x63, 0x65, 0x72, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0a, 0x73, 0x65,
+	0x72, 0x76, 0x65, 0x72, 0x43, 0x65, 0x72, 0x74, 0x12, 0x1b, 0x0a, 0x09, 0x73, 0x65, 0x72, 0x76,
+	0x65, 0x72, 0x5f, 0x63, 0x61, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x73, 0x65, 0x72,
+	0x76, 0x65, 0x72, 0x43, 0x61, 0x22, 0xcd, 0x01, 0x0a, 0x0a, 0x45, 0x6c, 0x61, 0x73, 0x74, 0x69,
+	0x63, 0x41, 0x50, 0x4d, 0x12, 0x26, 0x0a, 0x03, 0x74, 0x6c, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x14, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x45, 0x6c, 0x61, 0x73, 0x74, 0x69,
+	0x63, 0x41, 0x50, 0x4d, 0x54, 0x4c, 0x53, 0x52, 0x03, 0x74, 0x6c, 0x73, 0x12, 0x20, 0x0a, 0x0b,
+	0x65, 0x6e, 0x76, 0x69, 0x72, 0x6f, 0x6e, 0x6d, 0x65, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x0b, 0x65, 0x6e, 0x76, 0x69, 0x72, 0x6f, 0x6e, 0x6d, 0x65, 0x6e, 0x74, 0x12, 0x17,
+	0x0a, 0x07, 0x61, 0x70, 0x69, 0x5f, 0x6b, 0x65, 0x79, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x06, 0x61, 0x70, 0x69, 0x4b, 0x65, 0x79, 0x12, 0x21, 0x0a, 0x0c, 0x73, 0x65, 0x63, 0x72, 0x65,
+	0x74, 0x5f, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x73,
+	0x65, 0x63, 0x72, 0x65, 0x74, 0x54, 0x6f, 0x6b, 0x65, 0x6e, 0x12, 0x14, 0x0a, 0x05, 0x68, 0x6f,
+	0x73, 0x74, 0x73, 0x18, 0x05, 0x20, 0x03, 0x28, 0x09, 0x52, 0x05, 0x68, 0x6f, 0x73, 0x74, 0x73,
+	0x12, 0x23, 0x0a, 0x0d, 0x67, 0x6c, 0x6f, 0x62, 0x61, 0x6c, 0x5f, 0x6c, 0x61, 0x62, 0x65, 0x6c,
+	0x73, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x67, 0x6c, 0x6f, 0x62, 0x61, 0x6c, 0x4c,
+	0x61, 0x62, 0x65, 0x6c, 0x73, 0x22, 0x38, 0x0a, 0x09, 0x41, 0x50, 0x4d, 0x43, 0x6f, 0x6e, 0x66,
+	0x69, 0x67, 0x12, 0x2b, 0x0a, 0x07, 0x65, 0x6c, 0x61, 0x73, 0x74, 0x69, 0x63, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x11, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x45, 0x6c, 0x61, 0x73,
+	0x74, 0x69, 0x63, 0x41, 0x50, 0x4d, 0x52, 0x07, 0x65, 0x6c, 0x61, 0x73, 0x74, 0x69, 0x63, 0x22,
+	0x80, 0x01, 0x0a, 0x09, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x6e, 0x65, 0x6e, 0x74, 0x12, 0x2e, 0x0a,
+	0x06, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x73, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e,
+	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x6e, 0x65, 0x6e, 0x74, 0x4c,
+	0x69, 0x6d, 0x69, 0x74, 0x73, 0x52, 0x06, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x73, 0x12, 0x34, 0x0a,
+	0x0a, 0x61, 0x70, 0x6d, 0x5f, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x10, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x41, 0x50, 0x4d, 0x43, 0x6f, 0x6e,
+	0x66, 0x69, 0x67, 0x48, 0x00, 0x52, 0x09, 0x61, 0x70, 0x6d, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x67,
+	0x88, 0x01, 0x01, 0x42, 0x0d, 0x0a, 0x0b, 0x5f, 0x61, 0x70, 0x6d, 0x5f, 0x63, 0x6f, 0x6e, 0x66,
+	0x69, 0x67, 0x22, 0x64, 0x0a, 0x0f, 0x43, 0x6f, 0x6d, 0x70, 0x6f, 0x6e, 0x65, 0x6e, 0x74, 0x4c,
 	0x69, 0x6d, 0x69, 0x74, 0x73, 0x12, 0x2f, 0x0a, 0x06, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x18,
 	0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x17, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70,
 	0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x52, 0x06,
@@ -2198,7 +2434,7 @@ func file_elastic_agent_client_proto_rawDescGZIP() []byte {
 }
 
 var file_elastic_agent_client_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_elastic_agent_client_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_elastic_agent_client_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_elastic_agent_client_proto_goTypes = []interface{}{
 	(State)(0),                         // 0: proto.State
 	(UnitType)(0),                      // 1: proto.UnitType
@@ -2216,28 +2452,31 @@ var file_elastic_agent_client_proto_goTypes = []interface{}{
 	(*CheckinAgentInfo)(nil),           // 13: proto.CheckinAgentInfo
 	(*Features)(nil),                   // 14: proto.Features
 	(*FQDNFeature)(nil),                // 15: proto.FQDNFeature
-	(*Component)(nil),                  // 16: proto.Component
-	(*ComponentLimits)(nil),            // 17: proto.ComponentLimits
-	(*CheckinExpected)(nil),            // 18: proto.CheckinExpected
-	(*UnitObserved)(nil),               // 19: proto.UnitObserved
-	(*CheckinObservedVersionInfo)(nil), // 20: proto.CheckinObservedVersionInfo
-	(*CheckinObserved)(nil),            // 21: proto.CheckinObserved
-	(*ActionRequest)(nil),              // 22: proto.ActionRequest
-	(*ActionDiagnosticUnitResult)(nil), // 23: proto.ActionDiagnosticUnitResult
-	(*ActionResponse)(nil),             // 24: proto.ActionResponse
-	(*ConnInfo)(nil),                   // 25: proto.ConnInfo
-	nil,                                // 26: proto.CheckinObservedVersionInfo.MetaEntry
-	(*structpb.Struct)(nil),            // 27: google.protobuf.Struct
-	(*timestamppb.Timestamp)(nil),      // 28: google.protobuf.Timestamp
+	(*ElasticAPMTLS)(nil),              // 16: proto.ElasticAPMTLS
+	(*ElasticAPM)(nil),                 // 17: proto.ElasticAPM
+	(*APMConfig)(nil),                  // 18: proto.APMConfig
+	(*Component)(nil),                  // 19: proto.Component
+	(*ComponentLimits)(nil),            // 20: proto.ComponentLimits
+	(*CheckinExpected)(nil),            // 21: proto.CheckinExpected
+	(*UnitObserved)(nil),               // 22: proto.UnitObserved
+	(*CheckinObservedVersionInfo)(nil), // 23: proto.CheckinObservedVersionInfo
+	(*CheckinObserved)(nil),            // 24: proto.CheckinObserved
+	(*ActionRequest)(nil),              // 25: proto.ActionRequest
+	(*ActionDiagnosticUnitResult)(nil), // 26: proto.ActionDiagnosticUnitResult
+	(*ActionResponse)(nil),             // 27: proto.ActionResponse
+	(*ConnInfo)(nil),                   // 28: proto.ConnInfo
+	nil,                                // 29: proto.CheckinObservedVersionInfo.MetaEntry
+	(*structpb.Struct)(nil),            // 30: google.protobuf.Struct
+	(*timestamppb.Timestamp)(nil),      // 31: google.protobuf.Timestamp
 }
 var file_elastic_agent_client_proto_depIdxs = []int32{
-	27, // 0: proto.Package.source:type_name -> google.protobuf.Struct
-	27, // 1: proto.Meta.source:type_name -> google.protobuf.Struct
+	30, // 0: proto.Package.source:type_name -> google.protobuf.Struct
+	30, // 1: proto.Meta.source:type_name -> google.protobuf.Struct
 	7,  // 2: proto.Meta.package:type_name -> proto.Package
-	27, // 3: proto.DataStream.source:type_name -> google.protobuf.Struct
-	27, // 4: proto.Stream.source:type_name -> google.protobuf.Struct
+	30, // 3: proto.DataStream.source:type_name -> google.protobuf.Struct
+	30, // 4: proto.Stream.source:type_name -> google.protobuf.Struct
 	9,  // 5: proto.Stream.data_stream:type_name -> proto.DataStream
-	27, // 6: proto.UnitExpectedConfig.source:type_name -> google.protobuf.Struct
+	30, // 6: proto.UnitExpectedConfig.source:type_name -> google.protobuf.Struct
 	8,  // 7: proto.UnitExpectedConfig.meta:type_name -> proto.Meta
 	9,  // 8: proto.UnitExpectedConfig.data_stream:type_name -> proto.DataStream
 	10, // 9: proto.UnitExpectedConfig.streams:type_name -> proto.Stream
@@ -2245,36 +2484,39 @@ var file_elastic_agent_client_proto_depIdxs = []int32{
 	0,  // 11: proto.UnitExpected.state:type_name -> proto.State
 	11, // 12: proto.UnitExpected.config:type_name -> proto.UnitExpectedConfig
 	2,  // 13: proto.UnitExpected.log_level:type_name -> proto.UnitLogLevel
-	27, // 14: proto.Features.source:type_name -> google.protobuf.Struct
+	30, // 14: proto.Features.source:type_name -> google.protobuf.Struct
 	15, // 15: proto.Features.fqdn:type_name -> proto.FQDNFeature
-	17, // 16: proto.Component.limits:type_name -> proto.ComponentLimits
-	27, // 17: proto.ComponentLimits.source:type_name -> google.protobuf.Struct
-	12, // 18: proto.CheckinExpected.units:type_name -> proto.UnitExpected
-	13, // 19: proto.CheckinExpected.agent_info:type_name -> proto.CheckinAgentInfo
-	14, // 20: proto.CheckinExpected.features:type_name -> proto.Features
-	16, // 21: proto.CheckinExpected.component:type_name -> proto.Component
-	1,  // 22: proto.UnitObserved.type:type_name -> proto.UnitType
-	0,  // 23: proto.UnitObserved.state:type_name -> proto.State
-	27, // 24: proto.UnitObserved.payload:type_name -> google.protobuf.Struct
-	26, // 25: proto.CheckinObservedVersionInfo.meta:type_name -> proto.CheckinObservedVersionInfo.MetaEntry
-	19, // 26: proto.CheckinObserved.units:type_name -> proto.UnitObserved
-	20, // 27: proto.CheckinObserved.version_info:type_name -> proto.CheckinObservedVersionInfo
-	1,  // 28: proto.ActionRequest.unit_type:type_name -> proto.UnitType
-	4,  // 29: proto.ActionRequest.type:type_name -> proto.ActionRequest.Type
-	5,  // 30: proto.ActionRequest.level:type_name -> proto.ActionRequest.Level
-	28, // 31: proto.ActionDiagnosticUnitResult.generated:type_name -> google.protobuf.Timestamp
-	6,  // 32: proto.ActionResponse.status:type_name -> proto.ActionResponse.Status
-	23, // 33: proto.ActionResponse.diagnostic:type_name -> proto.ActionDiagnosticUnitResult
-	3,  // 34: proto.ConnInfo.services:type_name -> proto.ConnInfoServices
-	21, // 35: proto.ElasticAgent.CheckinV2:input_type -> proto.CheckinObserved
-	24, // 36: proto.ElasticAgent.Actions:input_type -> proto.ActionResponse
-	18, // 37: proto.ElasticAgent.CheckinV2:output_type -> proto.CheckinExpected
-	22, // 38: proto.ElasticAgent.Actions:output_type -> proto.ActionRequest
-	37, // [37:39] is the sub-list for method output_type
-	35, // [35:37] is the sub-list for method input_type
-	35, // [35:35] is the sub-list for extension type_name
-	35, // [35:35] is the sub-list for extension extendee
-	0,  // [0:35] is the sub-list for field type_name
+	16, // 16: proto.ElasticAPM.tls:type_name -> proto.ElasticAPMTLS
+	17, // 17: proto.APMConfig.elastic:type_name -> proto.ElasticAPM
+	20, // 18: proto.Component.limits:type_name -> proto.ComponentLimits
+	18, // 19: proto.Component.apm_config:type_name -> proto.APMConfig
+	30, // 20: proto.ComponentLimits.source:type_name -> google.protobuf.Struct
+	12, // 21: proto.CheckinExpected.units:type_name -> proto.UnitExpected
+	13, // 22: proto.CheckinExpected.agent_info:type_name -> proto.CheckinAgentInfo
+	14, // 23: proto.CheckinExpected.features:type_name -> proto.Features
+	19, // 24: proto.CheckinExpected.component:type_name -> proto.Component
+	1,  // 25: proto.UnitObserved.type:type_name -> proto.UnitType
+	0,  // 26: proto.UnitObserved.state:type_name -> proto.State
+	30, // 27: proto.UnitObserved.payload:type_name -> google.protobuf.Struct
+	29, // 28: proto.CheckinObservedVersionInfo.meta:type_name -> proto.CheckinObservedVersionInfo.MetaEntry
+	22, // 29: proto.CheckinObserved.units:type_name -> proto.UnitObserved
+	23, // 30: proto.CheckinObserved.version_info:type_name -> proto.CheckinObservedVersionInfo
+	1,  // 31: proto.ActionRequest.unit_type:type_name -> proto.UnitType
+	4,  // 32: proto.ActionRequest.type:type_name -> proto.ActionRequest.Type
+	5,  // 33: proto.ActionRequest.level:type_name -> proto.ActionRequest.Level
+	31, // 34: proto.ActionDiagnosticUnitResult.generated:type_name -> google.protobuf.Timestamp
+	6,  // 35: proto.ActionResponse.status:type_name -> proto.ActionResponse.Status
+	26, // 36: proto.ActionResponse.diagnostic:type_name -> proto.ActionDiagnosticUnitResult
+	3,  // 37: proto.ConnInfo.services:type_name -> proto.ConnInfoServices
+	24, // 38: proto.ElasticAgent.CheckinV2:input_type -> proto.CheckinObserved
+	27, // 39: proto.ElasticAgent.Actions:input_type -> proto.ActionResponse
+	21, // 40: proto.ElasticAgent.CheckinV2:output_type -> proto.CheckinExpected
+	25, // 41: proto.ElasticAgent.Actions:output_type -> proto.ActionRequest
+	40, // [40:42] is the sub-list for method output_type
+	38, // [38:40] is the sub-list for method input_type
+	38, // [38:38] is the sub-list for extension type_name
+	38, // [38:38] is the sub-list for extension extendee
+	0,  // [0:38] is the sub-list for field type_name
 }
 
 func init() { file_elastic_agent_client_proto_init() }
@@ -2392,7 +2634,7 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 		file_elastic_agent_client_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Component); i {
+			switch v := v.(*ElasticAPMTLS); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2404,7 +2646,7 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 		file_elastic_agent_client_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ComponentLimits); i {
+			switch v := v.(*ElasticAPM); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2416,7 +2658,7 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 		file_elastic_agent_client_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CheckinExpected); i {
+			switch v := v.(*APMConfig); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2428,7 +2670,7 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 		file_elastic_agent_client_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*UnitObserved); i {
+			switch v := v.(*Component); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2440,7 +2682,7 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 		file_elastic_agent_client_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CheckinObservedVersionInfo); i {
+			switch v := v.(*ComponentLimits); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2452,7 +2694,7 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 		file_elastic_agent_client_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CheckinObserved); i {
+			switch v := v.(*CheckinExpected); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2464,7 +2706,7 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 		file_elastic_agent_client_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ActionRequest); i {
+			switch v := v.(*UnitObserved); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2476,7 +2718,7 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 		file_elastic_agent_client_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ActionDiagnosticUnitResult); i {
+			switch v := v.(*CheckinObservedVersionInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2488,7 +2730,7 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 		file_elastic_agent_client_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ActionResponse); i {
+			switch v := v.(*CheckinObserved); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2500,6 +2742,42 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 		file_elastic_agent_client_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ActionRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_elastic_agent_client_proto_msgTypes[19].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ActionDiagnosticUnitResult); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_elastic_agent_client_proto_msgTypes[20].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*ActionResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_elastic_agent_client_proto_msgTypes[21].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ConnInfo); i {
 			case 0:
 				return &v.state
@@ -2512,14 +2790,15 @@ func file_elastic_agent_client_proto_init() {
 			}
 		}
 	}
-	file_elastic_agent_client_proto_msgTypes[14].OneofWrappers = []interface{}{}
+	file_elastic_agent_client_proto_msgTypes[12].OneofWrappers = []interface{}{}
+	file_elastic_agent_client_proto_msgTypes[17].OneofWrappers = []interface{}{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_elastic_agent_client_proto_rawDesc,
 			NumEnums:      7,
-			NumMessages:   20,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
