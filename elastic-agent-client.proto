@@ -314,8 +314,8 @@ message ActionRequest {
     enum Type {
         // Custom action (registered by the unit). Examples include endpoint response actions and OSQuery results.
         CUSTOM = 0;
-        // Diagnostics collection action. Implemented by components and units when they which to
-        // include custom information in diagnostics archives. If unimplemented, a ActionResponse
+        // Diagnostics collection action. Implemented by components and units when they wish to
+        // include custom information in diagnostics archives. If unimplemented, an ActionResponse
         // with the FAILED status is required.
         DIAGNOSTICS = 1;
     }
