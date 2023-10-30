@@ -61,6 +61,16 @@ type ElasticAgentClient interface {
 	// to the connected process. The order of response from the process does not matter, it is acceptable
 	// for the response order to be different then the request order.
 	Actions(ctx context.Context, opts ...grpc.CallOption) (ElasticAgent_ActionsClient, error)
+	// DEPRECATED: DO NOT USE
+	//
+	// Called by the client to provide the Elastic Agent the state of the application.
+	//
+	// A `StateObserved` must be streamed at least every 30 seconds or it will result in the
+	// application be automatically marked as FAILED, and after 60 seconds the Elastic Agent will
+	// force kill the entire process and restart it.
+	//
+	// Messages definitions are preserved in elastic-agent-client-deprecated.proto.
+	Checkin(ctx context.Context, opts ...grpc.CallOption) (ElasticAgent_CheckinClient, error)
 }
 
 type elasticAgentClient struct {
@@ -133,6 +143,37 @@ func (x *elasticAgentActionsClient) Recv() (*ActionRequest, error) {
 	return m, nil
 }
 
+func (c *elasticAgentClient) Checkin(ctx context.Context, opts ...grpc.CallOption) (ElasticAgent_CheckinClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ElasticAgent_ServiceDesc.Streams[2], "/proto.ElasticAgent/Checkin", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &elasticAgentCheckinClient{stream}
+	return x, nil
+}
+
+type ElasticAgent_CheckinClient interface {
+	Send(*StateObserved) error
+	Recv() (*StateExpected, error)
+	grpc.ClientStream
+}
+
+type elasticAgentCheckinClient struct {
+	grpc.ClientStream
+}
+
+func (x *elasticAgentCheckinClient) Send(m *StateObserved) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *elasticAgentCheckinClient) Recv() (*StateExpected, error) {
+	m := new(StateExpected)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // ElasticAgentServer is the server API for ElasticAgent service.
 // All implementations must embed UnimplementedElasticAgentServer
 // for forward compatibility
@@ -172,6 +213,16 @@ type ElasticAgentServer interface {
 	// to the connected process. The order of response from the process does not matter, it is acceptable
 	// for the response order to be different then the request order.
 	Actions(ElasticAgent_ActionsServer) error
+	// DEPRECATED: DO NOT USE
+	//
+	// Called by the client to provide the Elastic Agent the state of the application.
+	//
+	// A `StateObserved` must be streamed at least every 30 seconds or it will result in the
+	// application be automatically marked as FAILED, and after 60 seconds the Elastic Agent will
+	// force kill the entire process and restart it.
+	//
+	// Messages definitions are preserved in elastic-agent-client-deprecated.proto.
+	Checkin(ElasticAgent_CheckinServer) error
 	mustEmbedUnimplementedElasticAgentServer()
 }
 
@@ -184,6 +235,9 @@ func (UnimplementedElasticAgentServer) CheckinV2(ElasticAgent_CheckinV2Server) e
 }
 func (UnimplementedElasticAgentServer) Actions(ElasticAgent_ActionsServer) error {
 	return status.Errorf(codes.Unimplemented, "method Actions not implemented")
+}
+func (UnimplementedElasticAgentServer) Checkin(ElasticAgent_CheckinServer) error {
+	return status.Errorf(codes.Unimplemented, "method Checkin not implemented")
 }
 func (UnimplementedElasticAgentServer) mustEmbedUnimplementedElasticAgentServer() {}
 
@@ -250,6 +304,32 @@ func (x *elasticAgentActionsServer) Recv() (*ActionResponse, error) {
 	return m, nil
 }
 
+func _ElasticAgent_Checkin_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ElasticAgentServer).Checkin(&elasticAgentCheckinServer{stream})
+}
+
+type ElasticAgent_CheckinServer interface {
+	Send(*StateExpected) error
+	Recv() (*StateObserved, error)
+	grpc.ServerStream
+}
+
+type elasticAgentCheckinServer struct {
+	grpc.ServerStream
+}
+
+func (x *elasticAgentCheckinServer) Send(m *StateExpected) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *elasticAgentCheckinServer) Recv() (*StateObserved, error) {
+	m := new(StateObserved)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // ElasticAgent_ServiceDesc is the grpc.ServiceDesc for ElasticAgent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -267,6 +347,12 @@ var ElasticAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "Actions",
 			Handler:       _ElasticAgent_Actions_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "Checkin",
+			Handler:       _ElasticAgent_Checkin_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

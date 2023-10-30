@@ -10,6 +10,7 @@ option cc_enable_arenas = true;
 option go_package = "pkg/proto;proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
+import "elastic-agent-client-deprecated.proto";
 
 service ElasticAgent {
     // Called by the client to provide the Elastic Agent the state of the application over the V2
@@ -48,6 +49,17 @@ service ElasticAgent {
     // to the connected process. The order of response from the process does not matter, it is acceptable
     // for the response order to be different then the request order.
     rpc Actions(stream ActionResponse) returns (stream ActionRequest);
+
+    // DEPRECATED: DO NOT USE
+    //
+    // Called by the client to provide the Elastic Agent the state of the application.
+    //
+    // A `StateObserved` must be streamed at least every 30 seconds or it will result in the
+    // application be automatically marked as FAILED, and after 60 seconds the Elastic Agent will
+    // force kill the entire process and restart it.
+    //
+    // Messages definitions are preserved in elastic-agent-client-deprecated.proto.
+    rpc Checkin(stream StateObserved) returns (stream StateExpected);
 }
 
 // State codes for the current state.
