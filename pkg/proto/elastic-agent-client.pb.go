@@ -426,7 +426,7 @@ type Package struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Source is the original configuration of this Package in the agent policy. Only standard
-	// fields are defined as explicit types, additional can be parsed from source.
+	// fields are defined as explicit types, additional fields can be parsed from source.
 	Source *structpb.Struct `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
 	// Name of the package.
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
@@ -494,7 +494,7 @@ type Meta struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Source is the original configuration of this Meta object in the agent policy. Only standard
-	// fields are defined as explicit types, additional can be parsed from source.
+	// fields are defined as explicit types, additional fields can be parsed from source.
 	Source *structpb.Struct `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
 	// Package metadata.
 	Package *Package `protobuf:"bytes,2,opt,name=package,proto3" json:"package,omitempty"`
@@ -553,7 +553,7 @@ type DataStream struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Source is the original configuration of this DataStream object in the agent policy. Only
-	// standard fields are defined as explicit types, additional can be parsed from source.
+	// standard fields are defined as explicit types, additional fields can be parsed from source.
 	Source *structpb.Struct `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
 	// Dataset for the stream.
 	Dataset string `protobuf:"bytes,2,opt,name=dataset,proto3" json:"dataset,omitempty"`
@@ -630,7 +630,7 @@ type Stream struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Source is the original configuration of this Stream object in the agent policy. Only standard
-	// fields are defined as explicit types, additional can be parsed from source.
+	// fields are defined as explicit types, additional fields can be parsed from source.
 	//
 	// This source field will almost always contain arbitrary unit configuration fields beyond those
 	// explicitly defined in this message type.
@@ -699,7 +699,7 @@ type UnitExpectedConfig struct {
 	unknownFields protoimpl.UnknownFields
 
 	// Source is the original configuration of this unit configuration object in the agent policy.
-	// Only standard fields are defined as explicit types, additional can be parsed from source.
+	// Only standard fields are defined as explicit types, additional fields can be parsed from source.
 	//
 	// This source field will almost always contain arbitrary unit configuration fields beyond those
 	// explicitly defined in this message type.

@@ -104,7 +104,7 @@ enum UnitLogLevel {
 // Package metadata provided in the meta field of a unit.
 message Package {
     // Source is the original configuration of this Package in the agent policy. Only standard
-    // fields are defined as explicit types, additional can be parsed from source.
+    // fields are defined as explicit types, additional fields can be parsed from source.
     google.protobuf.Struct source = 1;
     // Name of the package.
     string name = 2;
@@ -115,7 +115,7 @@ message Package {
 // Metadata provided in the meta field of a unit.
 message Meta {
     // Source is the original configuration of this Meta object in the agent policy. Only standard
-    // fields are defined as explicit types, additional can be parsed from source.
+    // fields are defined as explicit types, additional fields can be parsed from source.
     google.protobuf.Struct source = 1;
     // Package metadata.
     Package package = 2;
@@ -124,7 +124,7 @@ message Meta {
 // Data stream defined in either top-level unit or in multiple streams in the unit.
 message DataStream {
     // Source is the original configuration of this DataStream object in the agent policy. Only
-    // standard fields are defined as explicit types, additional can be parsed from source.
+    // standard fields are defined as explicit types, additional fields can be parsed from source.
     google.protobuf.Struct source = 1;
     // Dataset for the stream.
     string dataset = 2;
@@ -137,7 +137,7 @@ message DataStream {
 // Stream defined in a configuration.
 message Stream {
     // Source is the original configuration of this Stream object in the agent policy. Only standard
-    // fields are defined as explicit types, additional can be parsed from source.
+    // fields are defined as explicit types, additional fields can be parsed from source.
     //
     // This source field will almost always contain arbitrary unit configuration fields beyond those
     // explicitly defined in this message type.
@@ -149,7 +149,7 @@ message Stream {
 // A units expected configuration.
 message UnitExpectedConfig {
     // Source is the original configuration of this unit configuration object in the agent policy.
-    // Only standard fields are defined as explicit types, additional can be parsed from source.
+    // Only standard fields are defined as explicit types, additional fields can be parsed from source.
     //
     // This source field will almost always contain arbitrary unit configuration fields beyond those
     // explicitly defined in this message type.
