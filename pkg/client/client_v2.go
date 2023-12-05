@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	protobuf "google.golang.org/protobuf/proto"
 	"io"
 	"runtime"
 	"runtime/pprof"
@@ -23,6 +24,9 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 )
+
+// DefaultMaxMessageSize is the maximum message size that is allowed to be sent.
+const DefaultMaxMessageSize = 1024 * 1024 * 4 // copied from the gRPC default
 
 type (
 	// UnitChangedType defines types for when units are adjusted.
@@ -181,10 +185,49 @@ type V2 interface {
 	RegisterOptionalDiagnosticHook(paramTag string, name string, description string, filename string, contentType string, hook DiagnosticHook)
 }
 
+// v2options hold the client options.
+type v2options struct {
+	maxMessageSize  int
+	chunkingAllowed bool
+	dialOptions     []grpc.DialOption
+}
+
+// DialOptions returns the dial options for the GRPC connection.
+func (o *v2options) DialOptions() []grpc.DialOption {
+	opts := make([]grpc.DialOption, 0, len(o.dialOptions)+1)
+	opts = append(opts, o.dialOptions...)
+	opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(o.maxMessageSize), grpc.MaxCallSendMsgSize(o.maxMessageSize)))
+	return opts
+}
+
+// V2ClientOption is an option that can be used when creating the client.
+type V2ClientOption func(*v2options)
+
+// WithMaxMessageSize sets the maximum message size.
+func WithMaxMessageSize(size int) V2ClientOption {
+	return func(o *v2options) {
+		o.maxMessageSize = size
+	}
+}
+
+// WithChunking sets if the client can use chunking with the server.
+func WithChunking(enabled bool) V2ClientOption {
+	return func(o *v2options) {
+		o.chunkingAllowed = enabled
+	}
+}
+
+// WithGRPCDialOptions allows the setting of GRPC dial options.
+func WithGRPCDialOptions(opts ...grpc.DialOption) V2ClientOption {
+	return func(o *v2options) {
+		o.dialOptions = append(o.dialOptions, opts...)
+	}
+}
+
 // clientV2 manages the state and communication to the Elastic Agent over the V2 control protocol.
 type clientV2 struct {
 	target string
-	opts   []grpc.DialOption
+	opts   v2options
 	token  string
 
 	agentInfoMu sync.RWMutex
@@ -228,10 +271,16 @@ type clientV2 struct {
 }
 
 // NewV2 creates a client connection to Elastic Agent over the V2 control protocol.
-func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.DialOption) V2 {
+func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2ClientOption) V2 {
+	var options v2options
+	options.maxMessageSize = DefaultMaxMessageSize
+	for _, o := range opts {
+		o(&options)
+	}
+
 	c := &clientV2{
 		target:                target,
-		opts:                  opts,
+		opts:                  options,
 		token:                 token,
 		versionInfo:           versionInfo,
 		stateChangeObservedCh: make(chan struct{}, 1),
@@ -247,7 +296,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.Di
 // Start starts the connection to Elastic Agent.
 func (c *clientV2) Start(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	conn, err := grpc.DialContext(ctx, c.target, c.opts...)
+	conn, err := grpc.DialContext(ctx, c.target, c.opts.DialOptions()...)
 	if err != nil {
 		return err
 	}
@@ -405,8 +454,8 @@ func (c *clientV2) checkinRoundTrip() {
 	go func() {
 		defer wg.Done()
 		defer close(readerDone)
-		expected, err := checkinClient.Recv()
-		for ; err == nil; expected, err = checkinClient.Recv() {
+		expected, err := recvExpectedChunked(checkinClient, c.opts.chunkingAllowed)
+		for ; err == nil; expected, err = recvExpectedChunked(checkinClient, c.opts.chunkingAllowed) {
 			c.applyExpected(expected)
 		}
 		if !errors.Is(err, io.EOF) {
@@ -432,6 +481,9 @@ func (c *clientV2) checkinWriter(
 ) {
 	t := time.NewTicker(c.minCheckTimeout)
 	defer t.Stop()
+
+	// Always resent the version information on restart of the loop.
+	c.versionInfoSent = false
 
 	// Keep sending until the call returns an error
 	for c.sendObserved(checkinClient) == nil {
@@ -479,8 +531,13 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 			Version: c.versionInfo.Version,
 			Meta:    c.versionInfo.Meta,
 		}
+		// supports information is sent when version information is set,
+		// this ensures that its always sent once per connected loop
+		if c.opts.chunkingAllowed {
+			msg.Supports = []proto.ConnectionSupports{proto.ConnectionSupports_CheckinChunking}
+		}
 	}
-	err := client.Send(msg)
+	err := sendObservedChunked(client, msg, c.opts.chunkingAllowed, c.opts.maxMessageSize)
 	if err != nil && !errors.Is(err, io.EOF) {
 		c.errCh <- err
 	} else {
@@ -1026,4 +1083,120 @@ func inExpected(unit *Unit, expected []*proto.UnitExpected) bool {
 		}
 	}
 	return false
+}
+
+func recvExpectedChunked(client proto.ElasticAgent_CheckinV2Client, chunk bool) (*proto.CheckinExpected, error) {
+	if chunk {
+		var initialMsg *proto.CheckinExpected
+		for {
+			msg, err := client.Recv()
+			if err != nil {
+				return nil, err
+			}
+			if msg.UnitsTimestamp == nil {
+				// all included in a single message
+				return msg, nil
+			}
+			if initialMsg == nil {
+				// first message in batch
+				initialMsg = msg
+			} else if initialMsg.UnitsTimestamp.AsTime() != msg.UnitsTimestamp.AsTime() {
+				// only used if the new timestamp is newer
+				if initialMsg.UnitsTimestamp.AsTime().After(msg.UnitsTimestamp.AsTime()) {
+					// not newer so we ignore the message
+					continue
+				}
+				// different batch; restart
+				initialMsg = msg
+			}
+			if len(msg.Units) == 0 {
+				// ending match message
+				return initialMsg, nil
+			}
+			initialMsg.Units = append(initialMsg.Units, msg.Units...)
+		}
+	}
+	return client.Recv()
+}
+
+func sendObservedChunked(client proto.ElasticAgent_CheckinV2Client, msg *proto.CheckinObserved, chunk bool, maxSize int) error {
+	if !chunk {
+		// chunking is disabled
+		return client.Send(msg)
+	}
+	s := protobuf.Size(msg)
+	if s <= maxSize {
+		// fits so no chunking needed
+		return client.Send(msg)
+	}
+	// doesn't fit; chunk the message
+	// this is done by dividing the units into two; keep dividing each chunk into two until it fits
+	// a timestamp is needed to ensure all chunks have a timestamp
+	msgs, err := observedChunked(msg, maxSize, 2)
+	if err != nil {
+		return err
+	}
+	for _, msg := range msgs {
+		if err := client.Send(msg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func observedChunked(msg *proto.CheckinObserved, maxSize int, divider int) ([]*proto.CheckinObserved, error) {
+	timestamp := time.Now()
+	chunkSize := len(msg.Units) / divider
+	if chunkSize < 0 {
+		return nil, fmt.Errorf("unable to chunk proto.CheckinObserved a single unit is greater than the max %d size", maxSize)
+	}
+	msgs := make([]*proto.CheckinObserved, 0, divider+1)
+	for i := 0; i < divider; i++ {
+		if i == 0 {
+			// first message all fields are set; except units is made smaller
+			m := shallowCopyCheckinObserved(msg)
+			m.Units = make([]*proto.UnitObserved, chunkSize)
+			copy(m.Units, msg.Units[0:chunkSize])
+			msg.UnitsTimestamp = timestamppb.New(timestamp)
+			if protobuf.Size(m) > maxSize {
+				// too large increase divider
+				return observedChunked(msg, maxSize, divider*2)
+			}
+			msgs = append(msgs, m)
+			continue
+		}
+		if i == divider-1 {
+			// last message; chunk size needs to take into account rounding division where the last chunk
+			// might need to include an extra unit
+			chunkSize = chunkSize + len(msg.Units) - (chunkSize * divider)
+		}
+		m := &proto.CheckinObserved{}
+		m.Token = msg.Token
+		m.Units = make([]*proto.UnitObserved, chunkSize)
+		copy(m.Units, msg.Units[i*chunkSize:(i*chunkSize)+chunkSize])
+		m.UnitsTimestamp = timestamppb.New(timestamp)
+		if protobuf.Size(m) > maxSize {
+			// too large increase divider
+			return observedChunked(msg, maxSize, divider*2)
+		}
+		msgs = append(msgs, m)
+	}
+	msgs = append(msgs, &proto.CheckinObserved{
+		Token:          msg.Token,
+		Units:          []*proto.UnitObserved{},
+		UnitsTimestamp: timestamppb.New(timestamp),
+	})
+	return msgs, nil
+}
+
+func shallowCopyCheckinObserved(msg *proto.CheckinObserved) *proto.CheckinObserved {
+	return &proto.CheckinObserved{
+		Token:          msg.Token,
+		Units:          msg.Units,
+		VersionInfo:    msg.VersionInfo,
+		FeaturesIdx:    msg.FeaturesIdx,
+		ComponentIdx:   msg.ComponentIdx,
+		UnitsTimestamp: msg.UnitsTimestamp,
+		Supports:       msg.Supports,
+	}
 }
