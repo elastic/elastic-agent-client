@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	protobuf "google.golang.org/protobuf/proto"
 	"io"
 	"runtime"
 	"runtime/pprof"
@@ -1124,15 +1123,7 @@ func sendObservedChunked(client proto.ElasticAgent_CheckinV2Client, msg *proto.C
 		// chunking is disabled
 		return client.Send(msg)
 	}
-	s := protobuf.Size(msg)
-	if s <= maxSize {
-		// fits so no chunking needed
-		return client.Send(msg)
-	}
-	// doesn't fit; chunk the message
-	// this is done by dividing the units into two; keep dividing each chunk into two until it fits
-	// a timestamp is needed to ensure all chunks have a timestamp
-	msgs, err := observedChunked(msg, maxSize, 2)
+	msgs, err := utils.ChunkedObserved(msg, maxSize)
 	if err != nil {
 		return err
 	}
@@ -1142,61 +1133,4 @@ func sendObservedChunked(client proto.ElasticAgent_CheckinV2Client, msg *proto.C
 		}
 	}
 	return nil
-}
-
-func observedChunked(msg *proto.CheckinObserved, maxSize int, divider int) ([]*proto.CheckinObserved, error) {
-	timestamp := time.Now()
-	chunkSize := len(msg.Units) / divider
-	if chunkSize < 0 {
-		return nil, fmt.Errorf("unable to chunk proto.CheckinObserved a single unit is greater than the max %d size", maxSize)
-	}
-	msgs := make([]*proto.CheckinObserved, 0, divider+1)
-	for i := 0; i < divider; i++ {
-		if i == 0 {
-			// first message all fields are set; except units is made smaller
-			m := shallowCopyCheckinObserved(msg)
-			m.Units = make([]*proto.UnitObserved, chunkSize)
-			copy(m.Units, msg.Units[0:chunkSize])
-			msg.UnitsTimestamp = timestamppb.New(timestamp)
-			if protobuf.Size(m) > maxSize {
-				// too large increase divider
-				return observedChunked(msg, maxSize, divider*2)
-			}
-			msgs = append(msgs, m)
-			continue
-		}
-		if i == divider-1 {
-			// last message; chunk size needs to take into account rounding division where the last chunk
-			// might need to include an extra unit
-			chunkSize = chunkSize + len(msg.Units) - (chunkSize * divider)
-		}
-		m := &proto.CheckinObserved{}
-		m.Token = msg.Token
-		m.Units = make([]*proto.UnitObserved, chunkSize)
-		copy(m.Units, msg.Units[i*chunkSize:(i*chunkSize)+chunkSize])
-		m.UnitsTimestamp = timestamppb.New(timestamp)
-		if protobuf.Size(m) > maxSize {
-			// too large increase divider
-			return observedChunked(msg, maxSize, divider*2)
-		}
-		msgs = append(msgs, m)
-	}
-	msgs = append(msgs, &proto.CheckinObserved{
-		Token:          msg.Token,
-		Units:          []*proto.UnitObserved{},
-		UnitsTimestamp: timestamppb.New(timestamp),
-	})
-	return msgs, nil
-}
-
-func shallowCopyCheckinObserved(msg *proto.CheckinObserved) *proto.CheckinObserved {
-	return &proto.CheckinObserved{
-		Token:          msg.Token,
-		Units:          msg.Units,
-		VersionInfo:    msg.VersionInfo,
-		FeaturesIdx:    msg.FeaturesIdx,
-		ComponentIdx:   msg.ComponentIdx,
-		UnitsTimestamp: msg.UnitsTimestamp,
-		Supports:       msg.Supports,
-	}
 }
