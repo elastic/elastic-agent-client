@@ -378,7 +378,10 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials()))).(*clientV2)
+	client := NewV2(
+		fmt.Sprintf(":%d", srv.Port), token, VersionInfo{},
+		WithChunking(true), WithMaxMessageSize(150),
+		WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials()))).(*clientV2)
 	storeErrors(ctx, client, &errs, &errsMu)
 
 	// receive the units

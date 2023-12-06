@@ -5,6 +5,7 @@
 package utils
 
 import (
+	"golang.org/x/exp/slices"
 	"strings"
 	"testing"
 	"time"
@@ -217,6 +218,19 @@ func TestChunkedObserved(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				diff := cmp.Diff(scenario.Expected, observed, protocmp.Transform())
+				require.Empty(t, diff)
+
+				// re-assemble and it should now match the original
+				assembled, err := RecvChunkedObserved(&fakeCheckinObservedReceiver{msgs: observed})
+				require.NoError(t, err)
+
+				// to compare we need to remove the units timestamp and ensure the units are in the same order
+				// completely acceptable that they get re-ordered in the chunking process
+				assembled.UnitsTimestamp = nil
+				slices.SortStableFunc(assembled.Units, sortObservedUnits)
+				slices.SortStableFunc(scenario.Original.Units, sortObservedUnits)
+
+				diff = cmp.Diff(scenario.Original, assembled, protocmp.Transform())
 				assert.Empty(t, diff)
 			}
 		})
@@ -418,6 +432,19 @@ func TestChunkedExpected(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				diff := cmp.Diff(scenario.Expected, observed, protocmp.Transform())
+				require.Empty(t, diff)
+
+				// re-assemble and it should now match the original
+				assembled, err := RecvChunkedExpected(&fakeCheckinExpectedReceiver{msgs: observed})
+				require.NoError(t, err)
+
+				// to compare we need to remove the units timestamp and ensure the units are in the same order
+				// completely acceptable that they get re-ordered in the chunking process
+				assembled.UnitsTimestamp = nil
+				slices.SortStableFunc(assembled.Units, sortExpectedUnits)
+				slices.SortStableFunc(scenario.Original.Units, sortExpectedUnits)
+
+				diff = cmp.Diff(scenario.Original, assembled, protocmp.Transform())
 				assert.Empty(t, diff)
 			}
 		})
@@ -430,4 +457,32 @@ func mustStruct(v map[string]interface{}) *structpb.Struct {
 		panic(err)
 	}
 	return s
+}
+
+func sortObservedUnits(a *proto.UnitObserved, b *proto.UnitObserved) int {
+	return strings.Compare(a.Id, b.Id)
+}
+
+func sortExpectedUnits(a *proto.UnitExpected, b *proto.UnitExpected) int {
+	return strings.Compare(a.Id, b.Id)
+}
+
+type fakeCheckinObservedReceiver struct {
+	msgs []*proto.CheckinObserved
+}
+
+func (f *fakeCheckinObservedReceiver) Recv() (*proto.CheckinObserved, error) {
+	var msg *proto.CheckinObserved
+	msg, f.msgs = f.msgs[0], f.msgs[1:]
+	return msg, nil
+}
+
+type fakeCheckinExpectedReceiver struct {
+	msgs []*proto.CheckinExpected
+}
+
+func (f *fakeCheckinExpectedReceiver) Recv() (*proto.CheckinExpected, error) {
+	var msg *proto.CheckinExpected
+	msg, f.msgs = f.msgs[0], f.msgs[1:]
+	return msg, nil
 }

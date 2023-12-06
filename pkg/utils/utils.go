@@ -95,8 +95,7 @@ func ChunkedObserved(msg *proto.CheckinObserved, maxSize int, opts ...ChunkOptio
 	}
 
 	// keep adding units until it doesn't fit
-	nextUnit := 1
-	for s < maxSize && nextUnit < len(bySize) {
+	for nextUnit := 1; s < maxSize && nextUnit < len(bySize); nextUnit++ {
 		us := bySize[nextUnit]
 		if s+us.size < maxSize {
 			// unit fits add it
@@ -122,6 +121,45 @@ func ChunkedObserved(msg *proto.CheckinObserved, maxSize int, opts ...ChunkOptio
 	m.Units = make([]*proto.UnitObserved, 0)
 	msgs = append(msgs, m)
 	return msgs, nil
+}
+
+// CheckinObservedReceiver provides a Recv interface to receive proto.CheckinObserved messages.
+type CheckinObservedReceiver interface {
+	Recv() (*proto.CheckinObserved, error)
+}
+
+// RecvChunkedObserved handles the receiving of chunked proto.CheckinObserved.
+func RecvChunkedObserved(recv CheckinObservedReceiver) (*proto.CheckinObserved, error) {
+	var first *proto.CheckinObserved
+	for {
+		msg, err := recv.Recv()
+		if err != nil {
+			return nil, err
+		}
+		if msg.UnitsTimestamp == nil {
+			// all included in a single message
+			return msg, nil
+		}
+		if first == nil {
+			// first message in batch
+			first = msg
+		} else if first.UnitsTimestamp.AsTime() != msg.UnitsTimestamp.AsTime() {
+			// only used if the new timestamp is newer
+			if first.UnitsTimestamp.AsTime().After(msg.UnitsTimestamp.AsTime()) {
+				// not newer so we ignore the message
+				continue
+			}
+			// different batch; restart
+			first = msg
+		}
+		if len(msg.Units) == 0 {
+			// ending match message
+			return first, nil
+		}
+		if first != msg {
+			first.Units = append(first.Units, msg.Units...)
+		}
+	}
 }
 
 func shallowCopyCheckinObserved(msg *proto.CheckinObserved) *proto.CheckinObserved {
@@ -194,8 +232,7 @@ func ChunkedExpected(msg *proto.CheckinExpected, maxSize int, opts ...ChunkOptio
 	}
 
 	// keep adding units until it doesn't fit
-	nextUnit := 1
-	for s < maxSize && nextUnit < len(bySize) {
+	for nextUnit := 1; s < maxSize && nextUnit < len(bySize); nextUnit++ {
 		us := bySize[nextUnit]
 		if s+us.size < maxSize {
 			// unit fits add it
@@ -219,6 +256,45 @@ func ChunkedExpected(msg *proto.CheckinExpected, maxSize int, opts ...ChunkOptio
 	m.Units = make([]*proto.UnitExpected, 0)
 	msgs = append(msgs, m)
 	return msgs, nil
+}
+
+// CheckinExpectedReceiver provides a Recv interface to receive proto.CheckinExpected messages.
+type CheckinExpectedReceiver interface {
+	Recv() (*proto.CheckinExpected, error)
+}
+
+// RecvChunkedExpected handles the receiving of chunked proto.CheckinObjected.
+func RecvChunkedExpected(recv CheckinExpectedReceiver) (*proto.CheckinExpected, error) {
+	var first *proto.CheckinExpected
+	for {
+		msg, err := recv.Recv()
+		if err != nil {
+			return nil, err
+		}
+		if msg.UnitsTimestamp == nil {
+			// all included in a single message
+			return msg, nil
+		}
+		if first == nil {
+			// first message in batch
+			first = msg
+		} else if first.UnitsTimestamp.AsTime() != msg.UnitsTimestamp.AsTime() {
+			// only used if the new timestamp is newer
+			if first.UnitsTimestamp.AsTime().After(msg.UnitsTimestamp.AsTime()) {
+				// not newer so we ignore the message
+				continue
+			}
+			// different batch; restart
+			first = msg
+		}
+		if len(msg.Units) == 0 {
+			// ending match message
+			return first, nil
+		}
+		if first != msg {
+			first.Units = append(first.Units, msg.Units...)
+		}
+	}
 }
 
 func shallowCopyCheckinExpected(msg *proto.CheckinExpected) *proto.CheckinExpected {

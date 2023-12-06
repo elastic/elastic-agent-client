@@ -453,8 +453,8 @@ func (c *clientV2) checkinRoundTrip() {
 	go func() {
 		defer wg.Done()
 		defer close(readerDone)
-		expected, err := recvExpectedChunked(checkinClient, c.opts.chunkingAllowed)
-		for ; err == nil; expected, err = recvExpectedChunked(checkinClient, c.opts.chunkingAllowed) {
+		expected, err := utils.RecvChunkedExpected(checkinClient)
+		for ; err == nil; expected, err = utils.RecvChunkedExpected(checkinClient) {
 			c.applyExpected(expected)
 		}
 		if !errors.Is(err, io.EOF) {
@@ -1082,40 +1082,6 @@ func inExpected(unit *Unit, expected []*proto.UnitExpected) bool {
 		}
 	}
 	return false
-}
-
-func recvExpectedChunked(client proto.ElasticAgent_CheckinV2Client, chunk bool) (*proto.CheckinExpected, error) {
-	if chunk {
-		var initialMsg *proto.CheckinExpected
-		for {
-			msg, err := client.Recv()
-			if err != nil {
-				return nil, err
-			}
-			if msg.UnitsTimestamp == nil {
-				// all included in a single message
-				return msg, nil
-			}
-			if initialMsg == nil {
-				// first message in batch
-				initialMsg = msg
-			} else if initialMsg.UnitsTimestamp.AsTime() != msg.UnitsTimestamp.AsTime() {
-				// only used if the new timestamp is newer
-				if initialMsg.UnitsTimestamp.AsTime().After(msg.UnitsTimestamp.AsTime()) {
-					// not newer so we ignore the message
-					continue
-				}
-				// different batch; restart
-				initialMsg = msg
-			}
-			if len(msg.Units) == 0 {
-				// ending match message
-				return initialMsg, nil
-			}
-			initialMsg.Units = append(initialMsg.Units, msg.Units...)
-		}
-	}
-	return client.Recv()
 }
 
 func sendObservedChunked(client proto.ElasticAgent_CheckinV2Client, msg *proto.CheckinObserved, chunk bool, maxSize int) error {

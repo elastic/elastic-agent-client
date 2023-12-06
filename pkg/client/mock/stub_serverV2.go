@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 	"net"
 	"sync"
 
@@ -104,7 +105,7 @@ func (s *StubServerV2) Checkin(server proto.ElasticAgent_CheckinServer) error {
 // CheckinV2 is the V2 checkin implementation for the mock server
 func (s *StubServerV2) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 	for {
-		checkin, err := server.Recv()
+		checkin, err := utils.RecvChunkedObserved(server)
 		if err != nil {
 			return err
 		}
