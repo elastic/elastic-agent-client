@@ -8,13 +8,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 	"net"
 	"sync"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/gofrs/uuid"
 	"google.golang.org/grpc"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 )
 
 // StubServerCheckinV2 is the checkin function for the V2 controller
@@ -105,7 +106,7 @@ func (s *StubServerV2) Checkin(server proto.ElasticAgent_CheckinServer) error {
 // CheckinV2 is the V2 checkin implementation for the mock server
 func (s *StubServerV2) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 	for {
-		checkin, err := utils.RecvChunkedObserved(server)
+		checkin, err := chunk.RecvObserved(server)
 		if err != nil {
 			return err
 		}

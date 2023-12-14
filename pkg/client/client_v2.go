@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"io"
 	"runtime"
 	"runtime/pprof"
@@ -453,8 +454,8 @@ func (c *clientV2) checkinRoundTrip() {
 	go func() {
 		defer wg.Done()
 		defer close(readerDone)
-		expected, err := utils.RecvChunkedExpected(checkinClient)
-		for ; err == nil; expected, err = utils.RecvChunkedExpected(checkinClient) {
+		expected, err := chunk.RecvExpected(checkinClient)
+		for ; err == nil; expected, err = chunk.RecvExpected(checkinClient) {
 			c.applyExpected(expected)
 		}
 		if !errors.Is(err, io.EOF) {
@@ -1084,12 +1085,12 @@ func inExpected(unit *Unit, expected []*proto.UnitExpected) bool {
 	return false
 }
 
-func sendObservedChunked(client proto.ElasticAgent_CheckinV2Client, msg *proto.CheckinObserved, chunk bool, maxSize int) error {
-	if !chunk {
+func sendObservedChunked(client proto.ElasticAgent_CheckinV2Client, msg *proto.CheckinObserved, chunkingAllowed bool, maxSize int) error {
+	if !chunkingAllowed {
 		// chunking is disabled
 		return client.Send(msg)
 	}
-	msgs, err := utils.ChunkedObserved(msg, maxSize)
+	msgs, err := chunk.Observed(msg, maxSize)
 	if err != nil {
 		return err
 	}
