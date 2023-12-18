@@ -55,7 +55,7 @@ func TestStore(t *testing.T) {
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	storeErrors(ctx, client, &errs, &errsMu)
 
 	var unitsMu sync.Mutex

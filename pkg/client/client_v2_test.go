@@ -50,7 +50,7 @@ func TestRPCErrorRetryTimer(t *testing.T) {
 	defer listener.Close()
 	go rejectingListener(listener)
 
-	client := NewV2(listener.Addr().String(), mock.NewID(), VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	client := NewV2(listener.Addr().String(), mock.NewID(), VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	assert.NoError(t, client.Start(context.Background()))
 
 	// We expect one error each from checkinRoundTrip and actionRoundTrip.
@@ -159,7 +159,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	invalidClient := NewV2(fmt.Sprintf(":%d", srv.Port), mock.NewID(), VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	invalidClient := NewV2(fmt.Sprintf(":%d", srv.Port), mock.NewID(), VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	storeErrors(ctx, invalidClient, &errs, &errsMu)
 	require.NoError(t, invalidClient.Start(ctx))
 	defer invalidClient.Stop()
@@ -186,7 +186,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 		Meta: map[string]string{
 			"key": "value",
 		},
-	}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	storeErrors(ctx, validClient, &errs2, &errs2Mu)
 
 	// receive the units
@@ -378,7 +378,10 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials())).(*clientV2)
+	client := NewV2(
+		fmt.Sprintf(":%d", srv.Port), token, VersionInfo{},
+		WithChunking(true), WithMaxMessageSize(150),
+		WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials()))).(*clientV2)
 	storeErrors(ctx, client, &errs, &errsMu)
 
 	// receive the units
@@ -509,7 +512,7 @@ func TestClientV2_Actions(t *testing.T) {
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	storeErrors(ctx, client, &errs, &errsMu)
 
 	var unitsMu sync.Mutex
@@ -827,7 +830,7 @@ func TestClientV2_Checkin_FeatureFlags(t *testing.T) {
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials())).(*clientV2)
+	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials()))).(*clientV2)
 	client.minCheckTimeout = 100 * time.Millisecond // otherwise the test will run for too long
 	storeErrors(ctx, client, &errs, &errsMu)
 
@@ -987,7 +990,7 @@ func TestClientV2_Checkin_APMConfig(t *testing.T) {
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials())).(*clientV2)
+	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials()))).(*clientV2)
 	storeErrors(ctx, client, &errs, &errsMu)
 
 	var uca unitChangesAccumulator
@@ -1166,7 +1169,7 @@ func TestClientV2_Checkin_Component(t *testing.T) {
 	defer cancel()
 
 	serverAddr := fmt.Sprintf(":%d", srv.Port)
-	client := NewV2(serverAddr, token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials())).(*clientV2)
+	client := NewV2(serverAddr, token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials()))).(*clientV2)
 	client.minCheckTimeout = 100 * time.Millisecond // otherwise the test will run for too long
 	storeErrors(ctx, client, &errs, &errsMu)
 
@@ -1255,7 +1258,7 @@ func setupClientForDiagnostics(ctx context.Context, t *testing.T) (*Unit, V2, mo
 
 	var errsMu sync.Mutex
 	var errs []error
-	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	storeErrors(context.Background(), client, &errs, &errsMu)
 
 	var unitsMu sync.Mutex

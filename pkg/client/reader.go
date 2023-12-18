@@ -63,7 +63,7 @@ func NewFromReader(reader io.Reader, impl StateInterface, actions ...Action) (Cl
 }
 
 // NewV2FromReader creates a new V2 client reading the connection information from the io.Reader.
-func NewV2FromReader(reader io.Reader, ver VersionInfo, opts ...grpc.DialOption) (V2, []Service, error) {
+func NewV2FromReader(reader io.Reader, ver VersionInfo, opts ...V2ClientOption) (V2, []Service, error) {
 	connInfo := &proto.ConnInfo{}
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
@@ -87,11 +87,20 @@ func NewV2FromReader(reader io.Reader, ver VersionInfo, opts ...grpc.DialOption)
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caCertPool,
 	})
+	for _, s := range connInfo.Supports {
+		if s == proto.ConnectionSupports_CheckinChunking {
+			opts = append(opts, WithChunking(true))
+		}
+	}
+	if connInfo.MaxMessageSize > 0 {
+		opts = append(opts, WithMaxMessageSize(int(connInfo.MaxMessageSize)))
+	}
+	opts = append(opts, WithGRPCDialOptions(grpc.WithTransportCredentials(trans)))
 	client := NewV2(
 		connInfo.Addr,
 		connInfo.Token,
 		ver,
-		append(opts, grpc.WithTransportCredentials(trans))...,
+		opts...,
 	)
 	services := make([]Service, 0, len(connInfo.Services))
 	for _, srv := range connInfo.Services {

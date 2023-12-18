@@ -38,7 +38,7 @@ service ElasticAgent {
     //
     // Use of the source field allows the input configurations to evolve without needing to modify
     // the control protocol itself. In some cases commonly used or important fields are extracted as
-    // a dedicated message type, but these definitions do not comletely define the contents of the
+    // a dedicated message type, but these definitions do not completely define the contents of the
     // source field which is free to contain additional fields.
     rpc CheckinV2(stream CheckinObserved) returns (stream CheckinExpected);
 
@@ -60,6 +60,12 @@ service ElasticAgent {
     //
     // Messages definitions are preserved in elastic-agent-client-deprecated.proto.
     rpc Checkin(stream StateObserved) returns (stream StateExpected);
+}
+
+// Features that the connection between the client and the server supports.
+enum ConnectionSupports {
+    // Checkin chunking support.
+    CheckinChunking = 0;
 }
 
 // State codes for the current state.
@@ -282,6 +288,13 @@ message CheckinExpected {
     // Index or revision of the expected component configuration. When the expected configuration
     // changes the agent will increment this number and the Component field will be populated.
     uint64 component_idx = 6;
+
+    // When a units timestamp is provided then the set of units could not all fit inside this single message
+    // and it was split across multiple messages. Each message chunk must have the same units timestamp, in
+    // the case that the client gets a new message with a different timestamp and its newer than the other
+    // timestamp then it should take that new message chunk as a start of a new message set. To finish the a
+    // set of messages with the same timestamp, the last chunk should be an empty set of units.
+    google.protobuf.Timestamp units_timestamp = 7;
 }
 
 // Observed status for a unit.
@@ -338,6 +351,17 @@ message CheckinObserved {
 
     // Index or revision of the currently component configuration.
     uint64 component_idx = 6;
+
+    // When a units timestamp is provided then the set of units could not all fit inside this single message
+    // and it was split across multiple messages. Each message chunk must have the same units timestamp, in
+    // the case that the client gets a new message with a different timestamp and its newer than the other
+    // timestamp then it should take that new message chunk as a start of a new message set. To finish the a
+    // set of messages with the same timestamp, the last chunk should be an empty set of units.
+    google.protobuf.Timestamp units_timestamp = 7;
+
+    // Supports provides information to the agent about extra features this client supports. Should always be included
+    // on first checkin, and not again unless upon reconnect.
+    repeated ConnectionSupports supports = 8;
 }
 
 // A action request is streamed from the Elastic Agent to the application so an action can be performed
@@ -449,4 +473,8 @@ message ConnInfo {
     bytes peer_key = 6;
     // Allowed services that spawned process can use. (only used in V2)
     repeated ConnInfoServices services = 7;
+    // Supports provides information to the client about extra features this server supports.
+    repeated ConnectionSupports supports = 8;
+    // Maximum message size that the client can use.
+    uint32 max_message_size = 9;
 }
