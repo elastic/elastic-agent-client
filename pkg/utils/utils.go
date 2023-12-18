@@ -4,7 +4,9 @@
 
 package utils
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // JSONMustMarshal marshals the input to JSON []byte and panics if it fails.
 func JSONMustMarshal(input interface{}) []byte {

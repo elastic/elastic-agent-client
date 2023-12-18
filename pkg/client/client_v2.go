@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"io"
 	"runtime"
 	"runtime/pprof"
@@ -23,6 +24,9 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 )
+
+// DefaultMaxMessageSize is the maximum message size that is allowed to be sent.
+const DefaultMaxMessageSize = 1024 * 1024 * 4 // copied from the gRPC default
 
 type (
 	// UnitChangedType defines types for when units are adjusted.
@@ -181,10 +185,49 @@ type V2 interface {
 	RegisterOptionalDiagnosticHook(paramTag string, name string, description string, filename string, contentType string, hook DiagnosticHook)
 }
 
+// v2options hold the client options.
+type v2options struct {
+	maxMessageSize  int
+	chunkingAllowed bool
+	dialOptions     []grpc.DialOption
+}
+
+// DialOptions returns the dial options for the GRPC connection.
+func (o *v2options) DialOptions() []grpc.DialOption {
+	opts := make([]grpc.DialOption, 0, len(o.dialOptions)+1)
+	opts = append(opts, o.dialOptions...)
+	opts = append(opts, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(o.maxMessageSize), grpc.MaxCallSendMsgSize(o.maxMessageSize)))
+	return opts
+}
+
+// V2ClientOption is an option that can be used when creating the client.
+type V2ClientOption func(*v2options)
+
+// WithMaxMessageSize sets the maximum message size.
+func WithMaxMessageSize(size int) V2ClientOption {
+	return func(o *v2options) {
+		o.maxMessageSize = size
+	}
+}
+
+// WithChunking sets if the client can use chunking with the server.
+func WithChunking(enabled bool) V2ClientOption {
+	return func(o *v2options) {
+		o.chunkingAllowed = enabled
+	}
+}
+
+// WithGRPCDialOptions allows the setting of GRPC dial options.
+func WithGRPCDialOptions(opts ...grpc.DialOption) V2ClientOption {
+	return func(o *v2options) {
+		o.dialOptions = append(o.dialOptions, opts...)
+	}
+}
+
 // clientV2 manages the state and communication to the Elastic Agent over the V2 control protocol.
 type clientV2 struct {
 	target string
-	opts   []grpc.DialOption
+	opts   v2options
 	token  string
 
 	agentInfoMu sync.RWMutex
@@ -228,10 +271,16 @@ type clientV2 struct {
 }
 
 // NewV2 creates a client connection to Elastic Agent over the V2 control protocol.
-func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.DialOption) V2 {
+func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2ClientOption) V2 {
+	var options v2options
+	options.maxMessageSize = DefaultMaxMessageSize
+	for _, o := range opts {
+		o(&options)
+	}
+
 	c := &clientV2{
 		target:                target,
-		opts:                  opts,
+		opts:                  options,
 		token:                 token,
 		versionInfo:           versionInfo,
 		stateChangeObservedCh: make(chan struct{}, 1),
@@ -247,7 +296,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...grpc.Di
 // Start starts the connection to Elastic Agent.
 func (c *clientV2) Start(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
-	conn, err := grpc.DialContext(ctx, c.target, c.opts...)
+	conn, err := grpc.DialContext(ctx, c.target, c.opts.DialOptions()...)
 	if err != nil {
 		return err
 	}
@@ -405,8 +454,8 @@ func (c *clientV2) checkinRoundTrip() {
 	go func() {
 		defer wg.Done()
 		defer close(readerDone)
-		expected, err := checkinClient.Recv()
-		for ; err == nil; expected, err = checkinClient.Recv() {
+		expected, err := chunk.RecvExpected(checkinClient)
+		for ; err == nil; expected, err = chunk.RecvExpected(checkinClient) {
 			c.applyExpected(expected)
 		}
 		if !errors.Is(err, io.EOF) {
@@ -432,6 +481,9 @@ func (c *clientV2) checkinWriter(
 ) {
 	t := time.NewTicker(c.minCheckTimeout)
 	defer t.Stop()
+
+	// Always resent the version information on restart of the loop.
+	c.versionInfoSent = false
 
 	// Keep sending until the call returns an error
 	for c.sendObserved(checkinClient) == nil {
@@ -479,8 +531,13 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 			Version: c.versionInfo.Version,
 			Meta:    c.versionInfo.Meta,
 		}
+		// supports information is sent when version information is set,
+		// this ensures that its always sent once per connected loop
+		if c.opts.chunkingAllowed {
+			msg.Supports = []proto.ConnectionSupports{proto.ConnectionSupports_CheckinChunking}
+		}
 	}
-	err := client.Send(msg)
+	err := sendObservedChunked(client, msg, c.opts.chunkingAllowed, c.opts.maxMessageSize)
 	if err != nil && !errors.Is(err, io.EOF) {
 		c.errCh <- err
 	} else {
@@ -1026,4 +1083,21 @@ func inExpected(unit *Unit, expected []*proto.UnitExpected) bool {
 		}
 	}
 	return false
+}
+
+func sendObservedChunked(client proto.ElasticAgent_CheckinV2Client, msg *proto.CheckinObserved, chunkingAllowed bool, maxSize int) error {
+	if !chunkingAllowed {
+		// chunking is disabled
+		return client.Send(msg)
+	}
+	msgs, err := chunk.Observed(msg, maxSize)
+	if err != nil {
+		return err
+	}
+	for _, msg := range msgs {
+		if err := client.Send(msg); err != nil {
+			return err
+		}
+	}
+	return nil
 }
