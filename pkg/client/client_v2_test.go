@@ -144,13 +144,13 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(n string, sc, cc credentials.TransportCredentials) func(t *testing.T) {
 			return func(t *testing.T) {
-				testClientV2_Checkin_Initial(t, n, sc, cc)
+				testClientV2CheckinInitial(t, n, sc, cc)
 			}
 		}(tc.localRPC, tc.serverCreds, tc.clientCreds))
 	}
 }
 
-func testClientV2_Checkin_Initial(t *testing.T, localRPC string, serverCreds, clientCreds credentials.TransportCredentials) {
+func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clientCreds credentials.TransportCredentials) {
 	var m sync.Mutex
 	token := mock.NewID()
 	gotInvalid := false
@@ -349,13 +349,13 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(n string) func(t *testing.T) {
 			return func(t *testing.T) {
-				testClientV2_Checkin_UnitState(t, n)
+				testClientV2CheckinUnitState(t, n)
 			}
 		}(tc.localRPC))
 	}
 }
 
-func testClientV2_Checkin_UnitState(t *testing.T, localRPC string) {
+func testClientV2CheckinUnitState(t *testing.T, localRPC string) {
 	var m sync.Mutex
 	token := mock.NewID()
 	connected := false
@@ -584,13 +584,13 @@ func TestClientV2_Actions(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(n string) func(t *testing.T) {
 			return func(t *testing.T) {
-				testClientV2_Actions(t, n)
+				testClientV2Actions(t, n)
 			}
 		}(tc.localRPC))
 	}
 }
 
-func testClientV2_Actions(t *testing.T, localRPC string) {
+func testClientV2Actions(t *testing.T, localRPC string) {
 	var m sync.Mutex
 	token := mock.NewID()
 	gotInit := false

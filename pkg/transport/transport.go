@@ -9,6 +9,7 @@ package transport
 
 import "net"
 
+// Listen returns net.Listener from net.Listen
 func Listen(network, address string) (net.Listener, error) {
 	return net.Listen(network, address)
 }
