@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-client/v7/pkg/transport"
 	"github.com/gofrs/uuid"
 	"google.golang.org/grpc"
 )
@@ -54,7 +55,7 @@ type StubServer struct {
 
 // Start the sub V2 server
 func (s *StubServer) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", ":0")
+	lis, err := transport.Listen("tcp", ":0")
 	if err != nil {
 		return err
 	}

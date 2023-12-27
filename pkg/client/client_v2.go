@@ -10,13 +10,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"io"
 	"runtime"
 	"runtime/pprof"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -66,6 +67,8 @@ const (
 	// This constant represents a single bit in a bitmask
 	TriggeredAPMChange // apm_config_change_triggered
 )
+
+const schemePipePrefix = "pipe://"
 
 func (t Trigger) String() string {
 	var triggers []string
@@ -271,11 +274,23 @@ type clientV2 struct {
 }
 
 // NewV2 creates a client connection to Elastic Agent over the V2 control protocol.
+// The "target" can be prefixed with scheme as explained here https://github.com/grpc/grpc/blob/master/doc/naming.md.
+// unix://absolute_path for unix domain socket
+// pipe://pipe_name for windows named pipe
 func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2ClientOption) V2 {
 	var options v2options
 	options.maxMessageSize = DefaultMaxMessageSize
 	for _, o := range opts {
 		o(&options)
+	}
+
+	// For compatibility with existing interface the target could contain pipe:// scheme prefix
+	// Set the named pipe dialer option if pipe:// prefix specified on windows
+	if runtime.GOOS == "windows" && strings.HasPrefix(target, schemePipePrefix) {
+		// Trim pipe:// prefix
+		target = strings.TrimPrefix(target, schemePipePrefix)
+		// Set the winio named pipe dialer
+		options.dialOptions = append(options.dialOptions, getOptions()...)
 	}
 
 	c := &clientV2{

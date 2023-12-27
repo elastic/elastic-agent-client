@@ -6,9 +6,14 @@ package mock
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/gofrs/uuid"
@@ -16,6 +21,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-client/v7/pkg/transport"
 )
 
 // StubServerCheckinV2 is the checkin function for the V2 controller
@@ -44,6 +50,14 @@ type StubServerV2 struct {
 	proto.UnimplementedElasticAgentArtifactServer
 	proto.UnimplementedElasticAgentLogServer
 
+	// LocalRPC is unix socket or windows named pipe name
+	//
+	// Given the LocalRPC value "elastic_agent" the getRPCPath creates the platform specific path
+	// Typically something like \\.\pipe\elastic_agent for windows
+	// and /var/run/123456345/elastic_agent.sock for unix
+	LocalRPC string
+
+	// Port for TCP RPC only
 	Port              int
 	CheckinImpl       StubServerCheckin
 	ActionImpl        StubServerAction
@@ -55,15 +69,73 @@ type StubServerV2 struct {
 	server      *grpc.Server
 	ActionsChan chan *PerformAction
 	SentActions map[string]*PerformAction
+
+	// target for gRPC
+	target string
+}
+
+// listen over tcp or local unix socket or named windows pipe
+func (s *StubServerV2) listen(opt ...grpc.ServerOption) (lis net.Listener, cleanup func() error, err error) {
+	cleanup = func() error { return nil }
+	if s.LocalRPC == "" {
+		lis, err := transport.Listen("tcp", fmt.Sprintf(":%d", s.Port))
+		if err != nil {
+			return nil, nil, err
+		}
+		s.Port = lis.Addr().(*net.TCPAddr).Port
+		s.target = fmt.Sprintf(":%d", s.Port)
+		return lis, cleanup, nil
+	}
+
+	if runtime.GOOS == "windows" {
+		rpcPath := fmt.Sprintf("\\\\.\\pipe\\%s", s.LocalRPC)
+		s.target = fmt.Sprintf("pipe://%s", rpcPath)
+		lis, err = transport.Listen("pipe", rpcPath)
+	} else {
+		socketDir := filepath.Join(os.TempDir(), randomString(3))
+		err = os.MkdirAll(socketDir, 0750)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		cleanup = func() error {
+			return os.RemoveAll(socketDir)
+		}
+		// Cleanup in case if transport.Listen fails
+		defer func() {
+			if err != nil {
+				_ = cleanup()
+				cleanup = nil
+			}
+		}()
+		rpcPath := fmt.Sprintf("%s/%s.sock", socketDir, s.LocalRPC)
+		s.target = fmt.Sprintf("unix://%s", rpcPath)
+		lis, err = transport.Listen("unix", rpcPath)
+	}
+
+	return lis, cleanup, err
+}
+
+func randomString(length int) string {
+	r := make([]byte, length)
+	_, err := rand.Read(r)
+	if err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(r)
+}
+
+// GetTarget returns full target for gRPC with prefix for local transport, depending on the current platform and the s.LocalRPC value
+func (s *StubServerV2) GetTarget() string {
+	return s.target
 }
 
 // Start the mock server
 func (s *StubServerV2) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
+	lis, cleanup, err := s.listen()
 	if err != nil {
 		return err
 	}
-	s.Port = lis.Addr().(*net.TCPAddr).Port
 	srv := grpc.NewServer(opt...)
 	s.server = srv
 	proto.RegisterElasticAgentServer(s.server, s)
@@ -72,6 +144,7 @@ func (s *StubServerV2) Start(opt ...grpc.ServerOption) error {
 	proto.RegisterElasticAgentLogServer(s.server, s)
 	go func() {
 		srv.Serve(lis)
+		defer cleanup()
 	}()
 	return nil
 }

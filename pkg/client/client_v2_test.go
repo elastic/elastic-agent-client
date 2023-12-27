@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,11 +25,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	gproto "google.golang.org/protobuf/proto"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent-client/v7/pkg/transport"
 )
 
 func TestClientV2_DialError(t *testing.T) {
@@ -45,7 +49,7 @@ func TestClientV2_DialError(t *testing.T) {
 func TestRPCErrorRetryTimer(t *testing.T) {
 	// Create a TCP listener that rejects all incoming connections, to
 	// induce an RPC error when the client starts.
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	listener, err := transport.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	defer listener.Close()
 	go rejectingListener(listener)
@@ -89,6 +93,64 @@ func rejectingListener(listener net.Listener) {
 }
 
 func TestClientV2_Checkin_Initial(t *testing.T) {
+	ca, err := NewCA()
+	require.NoError(t, err)
+	peer, err := ca.GeneratePair()
+	require.NoError(t, err)
+	peerCert, err := peer.Certificate()
+	require.NoError(t, err)
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(ca.caPEM)
+	serverCreds := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{peerCert},
+		ClientCAs:    caCertPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	})
+
+	clientCreds := credentials.NewTLS(&tls.Config{
+		ServerName:   "localhost", // important(!): should match the cert settings, otherwise fails on windows
+		Certificates: []tls.Certificate{peerCert},
+		RootCAs:      caCertPool,
+	})
+
+	// Test without and with TLS over tcp, unix/pipe
+	tests := []struct {
+		name        string
+		serverCreds credentials.TransportCredentials
+		clientCreds credentials.TransportCredentials
+		localRPC    string
+	}{
+		{
+			name: "tcp",
+		},
+		{
+			name:     "local",
+			localRPC: "elagtes",
+		},
+		{
+			name:        "tcp",
+			serverCreds: serverCreds,
+			clientCreds: clientCreds,
+		},
+		{
+			name:        "local",
+			localRPC:    "elagtes",
+			serverCreds: serverCreds,
+			clientCreds: clientCreds,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(n string, sc, cc credentials.TransportCredentials) func(t *testing.T) {
+			return func(t *testing.T) {
+				testClientV2_Checkin_Initial(t, n, sc, cc)
+			}
+		}(tc.localRPC, tc.serverCreds, tc.clientCreds))
+	}
+}
+
+func testClientV2_Checkin_Initial(t *testing.T, localRPC string, serverCreds, clientCreds credentials.TransportCredentials) {
 	var m sync.Mutex
 	token := mock.NewID()
 	gotInvalid := false
@@ -150,16 +212,28 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 			return nil
 		},
 		ActionsChan: make(chan *mock.PerformAction, 100),
+		LocalRPC:    localRPC,
 	}
-	require.NoError(t, srv.Start())
+	var gops []grpc.ServerOption
+	if serverCreds != nil {
+		gops = append(gops, grpc.Creds(serverCreds))
+	}
+	require.NoError(t, srv.Start(gops...))
 	defer srv.Stop()
+
+	var dops []grpc.DialOption
+	if clientCreds != nil {
+		dops = append(dops, grpc.WithTransportCredentials(clientCreds))
+	} else {
+		dops = append(dops, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
 
 	// connect with an invalid token
 	var errsMu sync.Mutex
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	invalidClient := NewV2(fmt.Sprintf(":%d", srv.Port), mock.NewID(), VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
+	invalidClient := NewV2(srv.GetTarget(), mock.NewID(), VersionInfo{}, WithGRPCDialOptions(dops...))
 	storeErrors(ctx, invalidClient, &errs, &errsMu)
 	require.NoError(t, invalidClient.Start(ctx))
 	defer invalidClient.Stop()
@@ -180,13 +254,15 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	var errs2 []error
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-	validClient := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{
+
+	validClient := NewV2(srv.GetTarget(), token, VersionInfo{
 		Name:    "program",
 		Version: "v1.0.0",
 		Meta: map[string]string{
 			"key": "value",
 		},
-	}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
+	}, WithGRPCDialOptions(dops...))
+
 	storeErrors(ctx, validClient, &errs2, &errs2Mu)
 
 	// receive the units
@@ -257,6 +333,29 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 }
 
 func TestClientV2_Checkin_UnitState(t *testing.T) {
+	tests := []struct {
+		name     string
+		localRPC string
+	}{
+		{
+			name: "tcp",
+		},
+		{
+			name:     "local",
+			localRPC: "elagtes",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(n string) func(t *testing.T) {
+			return func(t *testing.T) {
+				testClientV2_Checkin_UnitState(t, n)
+			}
+		}(tc.localRPC))
+	}
+}
+
+func testClientV2_Checkin_UnitState(t *testing.T, localRPC string) {
 	var m sync.Mutex
 	token := mock.NewID()
 	connected := false
@@ -264,6 +363,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	unitTwo := newUnit(mock.NewID(), UnitTypeInput, UnitStateStarting, UnitLogLevelInfo, nil, 0, nil, nil, nil)
 	wantFQDN := true
 	srv := mock.StubServerV2{
+		LocalRPC: localRPC,
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			m.Lock()
 			defer m.Unlock()
@@ -379,7 +479,7 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	client := NewV2(
-		fmt.Sprintf(":%d", srv.Port), token, VersionInfo{},
+		srv.GetTarget(), token, VersionInfo{},
 		WithChunking(true), WithMaxMessageSize(150),
 		WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials()))).(*clientV2)
 	storeErrors(ctx, client, &errs, &errsMu)
@@ -468,10 +568,34 @@ func TestClientV2_Checkin_UnitState(t *testing.T) {
 }
 
 func TestClientV2_Actions(t *testing.T) {
+	tests := []struct {
+		name     string
+		localRPC string
+	}{
+		{
+			name: "tcp",
+		},
+		{
+			name:     "local",
+			localRPC: "elagtes",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(n string) func(t *testing.T) {
+			return func(t *testing.T) {
+				testClientV2_Actions(t, n)
+			}
+		}(tc.localRPC))
+	}
+}
+
+func testClientV2_Actions(t *testing.T, localRPC string) {
 	var m sync.Mutex
 	token := mock.NewID()
 	gotInit := false
 	srv := mock.StubServerV2{
+		LocalRPC: localRPC,
 		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
 			if observed.Token == token {
 				return &proto.CheckinExpected{
@@ -512,7 +636,7 @@ func TestClientV2_Actions(t *testing.T) {
 	var errs []error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
+	client := NewV2(srv.GetTarget(), token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())))
 	storeErrors(ctx, client, &errs, &errsMu)
 
 	var unitsMu sync.Mutex
