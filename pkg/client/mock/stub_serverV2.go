@@ -21,7 +21,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-client/v7/pkg/transport"
 )
 
 // StubServerCheckinV2 is the checkin function for the V2 controller
@@ -78,7 +77,7 @@ type StubServerV2 struct {
 func (s *StubServerV2) listen(opt ...grpc.ServerOption) (lis net.Listener, cleanup func() error, err error) {
 	cleanup = func() error { return nil }
 	if s.LocalRPC == "" {
-		lis, err := transport.Listen("tcp", fmt.Sprintf(":%d", s.Port))
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -88,9 +87,8 @@ func (s *StubServerV2) listen(opt ...grpc.ServerOption) (lis net.Listener, clean
 	}
 
 	if runtime.GOOS == "windows" {
-		rpcPath := fmt.Sprintf("\\\\.\\pipe\\%s", s.LocalRPC)
-		s.target = fmt.Sprintf("pipe://%s", rpcPath)
-		lis, err = transport.Listen("pipe", rpcPath)
+		s.target = fmt.Sprintf("\\\\.\\pipe\\%s", s.LocalRPC)
+		lis, err = newNPipeListener(s.target, "")
 	} else {
 		socketDir := filepath.Join(os.TempDir(), randomString(3))
 		err = os.MkdirAll(socketDir, 0750)
@@ -110,7 +108,7 @@ func (s *StubServerV2) listen(opt ...grpc.ServerOption) (lis net.Listener, clean
 		}()
 		rpcPath := fmt.Sprintf("%s/%s.sock", socketDir, s.LocalRPC)
 		s.target = fmt.Sprintf("unix://%s", rpcPath)
-		lis, err = transport.Listen("unix", rpcPath)
+		lis, err = net.Listen("unix", rpcPath)
 	}
 
 	return lis, cleanup, err

@@ -11,14 +11,17 @@ import (
 	"context"
 	"net"
 
-	"github.com/Microsoft/go-winio"
+	"github.com/elastic/elastic-agent-libs/api/npipe"
 	"google.golang.org/grpc"
 )
 
 func getOptions() []grpc.DialOption {
 	return []grpc.DialOption{
 		grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
-			return winio.DialPipeContext(ctx, s)
+			// Awkward call of what's exposed from elastic-agent-libs/api/npipe
+			// in order to replace the direct use of winio.DialPipeContext
+			// elastic-agent-libs/api/npipe does the same under the hood anyways
+			return npipe.DialContext(s)(ctx, "", "")
 		}),
 	}
 }

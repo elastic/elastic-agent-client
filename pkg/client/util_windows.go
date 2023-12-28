@@ -2,14 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License;
 // you may not use this file except in compliance with the Elastic License.
 
-//go:build !windows
-// +build !windows
+//go:build windows
+// +build windows
 
-package transport
+package client
 
-import "net"
-
-// Listen returns net.Listener from net.Listen
-func Listen(network, address string) (net.Listener, error) {
-	return net.Listen(network, address)
+// transformNPipeUrl converts npipe:/// url to the local named pipe name
+func transformNPipeUrl(s string) string {
+	return npipe.TransformString(s)
 }

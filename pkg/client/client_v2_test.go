@@ -31,7 +31,6 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-client/v7/pkg/transport"
 )
 
 func TestClientV2_DialError(t *testing.T) {
@@ -49,7 +48,7 @@ func TestClientV2_DialError(t *testing.T) {
 func TestRPCErrorRetryTimer(t *testing.T) {
 	// Create a TCP listener that rejects all incoming connections, to
 	// induce an RPC error when the client starts.
-	listener, err := transport.Listen("tcp", "127.0.0.1:0")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	defer listener.Close()
 	go rejectingListener(listener)
