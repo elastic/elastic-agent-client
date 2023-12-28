@@ -7,8 +7,8 @@
 
 package client
 
-// transformNPipeUrl is noop on non-windows platforms.
+// transformNPipeURL is noop on non-windows platforms.
 // The npipe.TransformString is windows only in github.com/elastic/elastic-agent-libs/api/npipe
-func transformNPipeUrl(s string) string {
+func transformNPipeURL(s string) string {
 	return s
 }

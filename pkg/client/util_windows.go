@@ -7,7 +7,7 @@
 
 package client
 
-// transformNPipeUrl converts npipe:/// url to the local named pipe name
-func transformNPipeUrl(s string) string {
+// transformNPipeURL converts npipe:/// url to the local named pipe name
+func transformNPipeURL(s string) string {
 	return npipe.TransformString(s)
 }
