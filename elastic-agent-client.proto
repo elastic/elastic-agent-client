@@ -323,10 +323,12 @@ message UnitObserved {
 message CheckinObservedVersionInfo {
     // Name of the binary.
     string name = 1;
-    // Version of the binary.
+    // Agent package version sent by the agent.
     string version = 2;
     // Additional metadata about the binary.
     map<string, string> meta = 3;
+    // VCS commit hash of the binary.
+    string build_hash = 4;
 }
 
 // Observed statuses and configuration for defined units.
@@ -477,4 +479,7 @@ message ConnInfo {
     repeated ConnectionSupports supports = 8;
     // Maximum message size that the client can use.
     uint32 max_message_size = 9;
+    // Version of the agent package that should be presented in user visible
+    // fields and messages instead of the build version of the running component.
+    string package_version = 10;
 }

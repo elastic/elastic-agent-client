@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"io"
 	"runtime"
 	"runtime/pprof"
@@ -21,6 +20,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
 )
@@ -174,6 +174,9 @@ type V2 interface {
 	//
 	// nil can be returned when the client has never connected.
 	AgentInfo() *AgentInfo
+	// PackageVersion returns the version of the agent package that should be
+	// presented in user visible fields and messages.
+	PackageVersion() string
 	// RegisterDiagnosticHook registers a diagnostic hook function that will get called when diagnostics is called for
 	// a specific unit. Registering the hook at the client level means it will be called for every unit that has
 	// diagnostics requested.
@@ -291,6 +294,10 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2Clien
 	}
 	c.registerDefaultDiagnostics()
 	return c
+}
+
+func (c *clientV2) PackageVersion() string {
+	return c.versionInfo.Version
 }
 
 // Start starts the connection to Elastic Agent.
