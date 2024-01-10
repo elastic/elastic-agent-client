@@ -108,7 +108,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 				reportedVersion.Version = observed.VersionInfo.Version
 				reportedVersion.Meta = observed.VersionInfo.Meta
 				return &proto.CheckinExpected{
-					AgentInfo: &proto.CheckinAgentInfo{
+					AgentInfo: &proto.AgentInfo{
 						Id:       "elastic-agent-id",
 						Version:  "8.5.0",
 						Snapshot: true,

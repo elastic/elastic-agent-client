@@ -197,7 +197,7 @@ message UnitExpected {
 // Only provided on first checkin expected response to the component.
 //
 // Includes the agent information that the component might want to use for its events.
-message CheckinAgentInfo {
+message AgentInfo {
     // ID is the Elastic Agent's unique ID.
     string id = 1;
     // Version is the version of the running Elastic Agent.
@@ -269,7 +269,7 @@ message CheckinExpected {
     // once their observed state has also been repoted as STOPPED to allow for graceful shutdown.
     repeated UnitExpected units = 1;
     // Agent info is provided only on first CheckinExpected response to the component.
-    CheckinAgentInfo agent_info = 2;
+    AgentInfo agent_info = 2;
 
     // Features are the expected feature flags configurations. Can apply to either components or
     // individual units depending on the flag and its implementation. Omitted if the client reports
@@ -481,5 +481,5 @@ message ConnInfo {
     uint32 max_message_size = 9;
     // Version of the agent package that should be presented in user visible
     // fields and messages instead of the build version of the running component.
-    string package_version = 10;
+    AgentInfo agent_info = 10;
 }
