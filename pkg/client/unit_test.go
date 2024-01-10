@@ -79,8 +79,7 @@ func TestUnitUpdateState(t *testing.T) {
 }
 
 func TestUnitUpdateAPMConfig(t *testing.T) {
-
-	var initialUnitNoAPM = Unit{
+	initialUnitNoAPM := &Unit{
 		expectedState: UnitStateHealthy,
 		logLevel:      UnitLogLevelDebug,
 		featuresIdx:   0,
@@ -106,7 +105,7 @@ func TestUnitUpdateAPMConfig(t *testing.T) {
 
 	type testcase struct {
 		name         string
-		initialState Unit
+		initialState *Unit
 		update       struct {
 			apmConfig *proto.APMConfig
 		}
