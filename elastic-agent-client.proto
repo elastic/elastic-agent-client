@@ -194,13 +194,16 @@ message UnitExpected {
     UnitLogLevel log_level = 6;
 }
 
-// Only provided on first checkin expected response to the component.
+// Agent information information that the component might want to use for its
+// events, including the package version, which components should report instead
+// of their own version.
 //
-// Includes the agent information that the component might want to use for its events.
+// Only provided on first checkin expected response to the component and as part
+// of the connection information (ConnInfo) sent when starting up the component.
 message AgentInfo {
     // ID is the Elastic Agent's unique ID.
     string id = 1;
-    // Version is the version of the running Elastic Agent.
+    // Version is the package version of the running Elastic Agent.
     string version = 2;
     // Snapshot is true when the running Elastic Agent is a snapshot version.
     bool snapshot = 3;
@@ -457,9 +460,11 @@ enum ConnInfoServices {
     Log = 4;
 }
 
-// Connection information sent to the application on startup so it knows how to connect back to the Elastic Agent.
+// Connection information and Agent information sent to the component on startup
+// so it knows how to connect back to the Elastic Agent and the agent details.
 //
-// This is normally sent through stdin and should never be sent across a network un-encrypted.
+// This is normally sent through stdin and should never be sent across a network
+// un-encrypted.
 message ConnInfo {
     // GRPC connection address.
     string addr = 1;
@@ -477,9 +482,15 @@ message ConnInfo {
     repeated ConnInfoServices services = 7;
     // Supports provides information to the client about extra features this server supports.
     repeated ConnectionSupports supports = 8;
-    // Maximum message size that the client can use.
+    // Maximum message size that the client can use (in bytes).
     uint32 max_message_size = 9;
-    // Version of the agent package that should be presented in user visible
-    // fields and messages instead of the build version of the running component.
+    // Agent information, including the agent package version, which should be
+    // presented in user-visible fields and messages instead of the build
+    // version of the running component.
     AgentInfo agent_info = 10;
+}
+
+message StartupInfo {
+    ConnInfo conn_info = 1;
+    AgentInfo agent_info = 2;
 }
