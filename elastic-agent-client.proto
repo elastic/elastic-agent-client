@@ -484,13 +484,12 @@ message ConnInfo {
     repeated ConnectionSupports supports = 8;
     // Maximum message size that the client can use (in bytes).
     uint32 max_message_size = 9;
-    // Agent information, including the agent package version, which should be
-    // presented in user-visible fields and messages instead of the build
-    // version of the running component.
-    AgentInfo agent_info = 10;
 }
 
 message StartupInfo {
     ConnInfo conn_info = 1;
+    // Agent information, including the agent package version, which should be
+    // presented in user-visible fields and messages instead of the build
+    // version of the running component.
     AgentInfo agent_info = 2;
 }
