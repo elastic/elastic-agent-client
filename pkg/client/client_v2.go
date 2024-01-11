@@ -286,6 +286,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2Clien
 	}
 
 	c := &clientV2{
+		agentInfo:             options.agentInfo,
 		target:                target,
 		opts:                  options,
 		token:                 token,
