@@ -460,12 +460,12 @@ enum ConnInfoServices {
     Log = 4;
 }
 
-// Connection information and Agent information sent to the component on startup
-// so it knows how to connect back to the Elastic Agent and the agent details.
+// Information sent to component on startup containing the necessary information
+// for the component to connect back to the Elastic Agent and the agent details.
 //
 // This is normally sent through stdin and should never be sent across a network
 // un-encrypted.
-message ConnInfo {
+message StartUpInfo {
     // GRPC connection address.
     string addr = 1;
     // Server name to use when connecting over TLS.
@@ -484,12 +484,8 @@ message ConnInfo {
     repeated ConnectionSupports supports = 8;
     // Maximum message size that the client can use (in bytes).
     uint32 max_message_size = 9;
-}
-
-message StartupInfo {
-    ConnInfo conn_info = 1;
     // Agent information, including the agent package version, which should be
     // presented in user-visible fields and messages instead of the build
     // version of the running component.
-    AgentInfo agent_info = 2;
+    AgentInfo agent_info = 10;
 }

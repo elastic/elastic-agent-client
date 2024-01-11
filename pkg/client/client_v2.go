@@ -190,6 +190,7 @@ type v2options struct {
 	maxMessageSize  int
 	chunkingAllowed bool
 	dialOptions     []grpc.DialOption
+	agentInfo       *AgentInfo
 }
 
 // DialOptions returns the dial options for the GRPC connection.
@@ -221,6 +222,12 @@ func WithChunking(enabled bool) V2ClientOption {
 func WithGRPCDialOptions(opts ...grpc.DialOption) V2ClientOption {
 	return func(o *v2options) {
 		o.dialOptions = append(o.dialOptions, opts...)
+	}
+}
+
+func WithAgentInfo(agentInfo AgentInfo) V2ClientOption {
+	return func(o *v2options) {
+		o.agentInfo = &agentInfo
 	}
 }
 

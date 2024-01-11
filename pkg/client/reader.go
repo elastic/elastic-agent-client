@@ -39,7 +39,7 @@ const (
 
 // NewFromReader creates a new client reading the connection information from the io.Reader.
 func NewFromReader(reader io.Reader, impl StateInterface, actions ...Action) (Client, error) {
-	connInfo := &proto.ConnInfo{}
+	connInfo := &proto.StartUpInfo{}
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return nil, err
@@ -64,8 +64,8 @@ func NewFromReader(reader io.Reader, impl StateInterface, actions ...Action) (Cl
 
 // NewV2FromReader creates a new V2 client reading the connection information from the io.Reader.
 func NewV2FromReader(reader io.Reader, ver VersionInfo, opts ...V2ClientOption) (V2, []Service, error) {
-	info := &proto.StartupInfo{}
-	data, err := ioutil.ReadAll(reader)
+	info := &proto.StartUpInfo{}
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -74,41 +74,46 @@ func NewV2FromReader(reader io.Reader, ver VersionInfo, opts ...V2ClientOption) 
 		return nil, nil, err
 	}
 
-	if info.AgentInfo!=nil{
-		ver.Version=info.AgentInfo.Version
+	if info.AgentInfo != nil {
+		ver.Version = info.AgentInfo.Version
+		opts = append(opts, WithAgentInfo(AgentInfo{
+			ID:       info.AgentInfo.Id,
+			Version:  info.AgentInfo.Version,
+			Snapshot: info.AgentInfo.Snapshot,
+		}))
 	}
 
-	if info.ConnInfo.Services == nil {
+	if info.Services == nil {
 		return nil, []Service{ServiceCheckin}, ErrV2Unavailable
 	}
-	cert, err := tls.X509KeyPair(info.ConnInfo.PeerCert, info.ConnInfo.PeerKey)
+	cert, err := tls.X509KeyPair(info.PeerCert, info.PeerKey)
 	if err != nil {
 		return nil, nil, err
 	}
 	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(info.ConnInfo.CaCert)
+	caCertPool.AppendCertsFromPEM(info.CaCert)
 	trans := credentials.NewTLS(&tls.Config{
-		ServerName:   info.ConnInfo.ServerName,
+		ServerName:   info.ServerName,
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caCertPool,
 	})
-	for _, s := range info.ConnInfo.Supports {
+	for _, s := range info.Supports {
 		if s == proto.ConnectionSupports_CheckinChunking {
 			opts = append(opts, WithChunking(true))
 		}
 	}
-	if info.ConnInfo.MaxMessageSize > 0 {
-		opts = append(opts, WithMaxMessageSize(int(info.ConnInfo.MaxMessageSize)))
+	if info.MaxMessageSize > 0 {
+		opts = append(opts, WithMaxMessageSize(int(info.MaxMessageSize)))
 	}
 	opts = append(opts, WithGRPCDialOptions(grpc.WithTransportCredentials(trans)))
 	client := NewV2(
-		info.ConnInfo.Addr,
-		info.ConnInfo.Token,
+		info.Addr,
+		info.Token,
 		ver,
 		opts...,
 	)
-	services := make([]Service, 0, len(info.ConnInfo.Services))
-	for _, srv := range info.ConnInfo.Services {
+	services := make([]Service, 0, len(info.Services))
+	for _, srv := range info.Services {
 		services = append(services, Service(srv))
 	}
 	return client, services, nil

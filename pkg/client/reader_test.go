@@ -84,7 +84,7 @@ func TestNewFromReader_Connects(t *testing.T) {
 	require.NoError(t, srv.Start(grpc.Creds(creds)))
 	defer srv.Stop()
 
-	connInfo := &proto.ConnInfo{
+	connInfo := &proto.StartUpInfo{
 		Addr:       fmt.Sprintf(":%d", srv.Port),
 		ServerName: "localhost",
 		Token:      token,
@@ -131,7 +131,7 @@ func TestNewV2FromReader_Services(t *testing.T) {
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(ca.caPEM)
 
-	connInfo := &proto.ConnInfo{
+	connInfo := &proto.StartUpInfo{
 		Addr:       ":7777",
 		ServerName: "localhost",
 		Token:      token,
