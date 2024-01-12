@@ -227,6 +227,8 @@ func WithGRPCDialOptions(opts ...grpc.DialOption) V2ClientOption {
 	}
 }
 
+// WithAgentInfo sets the AgentInfo and updates the client's VersionInfo.Version
+// to match the given agentInfo.Version.
 func WithAgentInfo(agentInfo AgentInfo) V2ClientOption {
 	return func(o *v2options) {
 		o.agentInfo = &agentInfo
