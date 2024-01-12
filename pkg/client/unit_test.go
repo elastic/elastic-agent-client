@@ -78,9 +78,8 @@ func TestUnitUpdateState(t *testing.T) {
 	assert.Equal(t, TriggeredStateChange, got)
 }
 
-func TestUnitUpdateAPMConfig(t *testing.T) {
-
-	var initialUnitNoAPM = Unit{
+func createInitialUnit() *Unit {
+	return &Unit{
 		expectedState: UnitStateHealthy,
 		logLevel:      UnitLogLevelDebug,
 		featuresIdx:   0,
@@ -89,7 +88,9 @@ func TestUnitUpdateAPMConfig(t *testing.T) {
 		config:        &proto.UnitExpectedConfig{},
 		apm:           nil,
 	}
+}
 
+func TestUnitUpdateAPMConfig(t *testing.T) {
 	notEmptyAPMCfg := &proto.APMConfig{
 		Elastic: &proto.ElasticAPM{
 			Environment: "test",
@@ -106,7 +107,7 @@ func TestUnitUpdateAPMConfig(t *testing.T) {
 
 	type testcase struct {
 		name         string
-		initialState Unit
+		initialState *Unit
 		update       struct {
 			apmConfig *proto.APMConfig
 		}
@@ -115,7 +116,7 @@ func TestUnitUpdateAPMConfig(t *testing.T) {
 	testcases := []testcase{
 		{
 			name:         "Updated APM config from nil",
-			initialState: initialUnitNoAPM,
+			initialState: createInitialUnit(),
 			update: struct {
 				apmConfig *proto.APMConfig
 			}{apmConfig: notEmptyAPMCfg},
@@ -123,7 +124,7 @@ func TestUnitUpdateAPMConfig(t *testing.T) {
 		},
 		{
 			name:         "Updated APM config from nil with empty",
-			initialState: initialUnitNoAPM,
+			initialState: createInitialUnit(),
 			update: struct {
 				apmConfig *proto.APMConfig
 			}{
@@ -133,7 +134,7 @@ func TestUnitUpdateAPMConfig(t *testing.T) {
 		},
 		{
 			name:         "Updated APM config from nil with nil",
-			initialState: initialUnitNoAPM,
+			initialState: createInitialUnit(),
 			update: struct {
 				apmConfig *proto.APMConfig
 			}{

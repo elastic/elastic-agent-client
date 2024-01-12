@@ -9,3 +9,6 @@ with_mage
 
 echo "--- Run linter"
 mage -debug check
+
+echo "--- Run Go Vet"
+go vet ./...
