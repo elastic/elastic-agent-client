@@ -949,8 +949,8 @@ func (x *UnitExpected) GetLogLevel() UnitLogLevel {
 	return UnitLogLevel_ERROR
 }
 
-// Agent information information that the component might want to use for its
-// events, including the package version, which components should report instead
+// Agent information that the component might want to use for its events,
+// including the package version, which components should report instead
 // of their own version.
 //
 // Only provided on first checkin expected response to the component and as part
