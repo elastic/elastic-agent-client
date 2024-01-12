@@ -539,9 +539,10 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 	}
 	if !c.versionInfoSent {
 		msg.VersionInfo = &proto.CheckinObservedVersionInfo{
-			Name:    c.versionInfo.Name,
-			Version: c.versionInfo.Version,
-			Meta:    c.versionInfo.Meta,
+			Name:      c.versionInfo.Name,
+			Version:   c.versionInfo.Version,
+			Meta:      c.versionInfo.Meta,
+			BuildHash: c.versionInfo.BuildHash,
 		}
 		// supports information is sent when version information is set,
 		// this ensures that its always sent once per connected loop
@@ -569,6 +570,8 @@ func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
 		}
 		c.agentInfoMu.Unlock()
 	}
+
+	c.versionInfo.Version = c.agentInfo.Version
 
 	c.syncComponent(expected)
 	c.syncUnits(expected)
