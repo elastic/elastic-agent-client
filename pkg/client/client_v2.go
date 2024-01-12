@@ -152,6 +152,8 @@ type VersionInfo struct {
 	Version string
 	// Meta is any extra metadata information about the version.
 	Meta map[string]string
+	// BuildHash is the VCS commit hash the program was built from.
+	BuildHash string
 }
 
 // V2 manages the state and communication to the Elastic Agent over the V2 control protocol.
@@ -568,10 +570,9 @@ func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
 			Version:  expected.AgentInfo.Version,
 			Snapshot: expected.AgentInfo.Snapshot,
 		}
+		c.versionInfo.Version = c.agentInfo.Version
 		c.agentInfoMu.Unlock()
 	}
-
-	c.versionInfo.Version = c.agentInfo.Version
 
 	c.syncComponent(expected)
 	c.syncUnits(expected)
