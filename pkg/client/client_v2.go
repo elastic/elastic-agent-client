@@ -284,7 +284,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2Clien
 	}
 
 	// For compatibility with existing interface the target could contain npipe:// scheme prefix
-	// Set the named pipe dialer option if pipe:// prefix specified on windows
+	// Set the named pipe dialer option if npipe:// prefix specified on windows
 	if runtime.GOOS == "windows" && npipe.IsNPipe(target) {
 		target = transformNPipeURL(target)
 		// Set the winio named pipe dialer
