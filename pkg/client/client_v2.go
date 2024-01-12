@@ -285,6 +285,10 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2Clien
 		o(&options)
 	}
 
+	if options.agentInfo != nil {
+		versionInfo.Version = options.agentInfo.Version
+	}
+
 	c := &clientV2{
 		agentInfo:             options.agentInfo,
 		target:                target,
