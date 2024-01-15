@@ -105,7 +105,6 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 			if observed.Token == token {
 				gotValid = true
 				reportedVersion.Name = observed.VersionInfo.Name
-				reportedVersion.Version = observed.VersionInfo.Version
 				reportedVersion.Meta = observed.VersionInfo.Meta
 				return &proto.CheckinExpected{
 					AgentInfo: &proto.AgentInfo{
@@ -250,7 +249,6 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	assert.Equal(t, units[1].Type(), UnitTypeInput)
 
 	assert.Equal(t, reportedVersion.Name, "program")
-	assert.Equal(t, reportedVersion.Version, "v1.0.0")
 	assert.Equal(t, reportedVersion.Meta, map[string]string{
 		"key": "value",
 	})

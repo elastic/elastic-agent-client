@@ -326,8 +326,6 @@ message UnitObserved {
 message CheckinObservedVersionInfo {
     // Name of the binary.
     string name = 1;
-    // Agent package version received at start up.
-    string version = 2;
     // Additional metadata about the binary.
     map<string, string> meta = 3;
     // VCS commit hash of the binary.

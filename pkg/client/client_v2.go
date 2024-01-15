@@ -544,7 +544,6 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 	if !c.versionInfoSent {
 		msg.VersionInfo = &proto.CheckinObservedVersionInfo{
 			Name:      c.versionInfo.Name,
-			Version:   c.versionInfo.Version,
 			Meta:      c.versionInfo.Meta,
 			BuildHash: c.versionInfo.BuildHash,
 		}
@@ -572,7 +571,6 @@ func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
 			Version:  expected.AgentInfo.Version,
 			Snapshot: expected.AgentInfo.Snapshot,
 		}
-		c.versionInfo.Version = c.agentInfo.Version
 		c.agentInfoMu.Unlock()
 	}
 
