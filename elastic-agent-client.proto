@@ -198,8 +198,8 @@ message UnitExpected {
 // including the package version, which components should report instead
 // of their own version.
 //
-// Only provided on first checkin expected response to the component and as part
-// of the connection information (ConnInfo) sent when starting up the component.
+// Sent on component start up as part of StartUpInfo and on the first checkin
+// expected response to the component.
 message AgentInfo {
     // ID is the Elastic Agent's unique ID.
     string id = 1;
@@ -326,7 +326,7 @@ message UnitObserved {
 message CheckinObservedVersionInfo {
     // Name of the binary.
     string name = 1;
-    // Agent package version sent by the agent.
+    // Agent package version received at start up.
     string version = 2;
     // Additional metadata about the binary.
     map<string, string> meta = 3;

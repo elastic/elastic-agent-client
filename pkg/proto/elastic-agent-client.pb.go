@@ -953,8 +953,8 @@ func (x *UnitExpected) GetLogLevel() UnitLogLevel {
 // including the package version, which components should report instead
 // of their own version.
 //
-// Only provided on first checkin expected response to the component and as part
-// of the connection information (ConnInfo) sent when starting up the component.
+// Sent on component start up as part of StartUpInfo and on the first checkin
+// expected response to the component.
 type AgentInfo struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1670,7 +1670,7 @@ type CheckinObservedVersionInfo struct {
 
 	// Name of the binary.
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	// Agent package version sent by the agent.
+	// Agent package version received at start up.
 	Version string `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
 	// Additional metadata about the binary.
 	Meta map[string]string `protobuf:"bytes,3,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
