@@ -5,7 +5,9 @@
 package chunk
 
 import (
+	"fmt"
 	"golang.org/x/exp/slices"
+	gproto "google.golang.org/protobuf/proto"
 	"strings"
 	"testing"
 	"time"
@@ -331,6 +333,53 @@ func TestRecvExpected_Timestamp_Restart(t *testing.T) {
 
 	diff := cmp.Diff(second, assembled, protocmp.Transform())
 	assert.Empty(t, diff)
+}
+
+func TestRecvExpected_RepeatPadding(t *testing.T) {
+	const grpcMaxSize = 1024 * 1024 * 4 // GRPC default max message size
+
+	// build the units to ensure that there is more than double the units required for the GRPC configuration
+	minimumMsgSize := grpcMaxSize * 2 // double it
+	var units []*proto.UnitExpected
+	var unitsSize int
+	var nextUnitID int
+	for {
+		unit := &proto.UnitExpected{
+			Id:             fmt.Sprintf("fake-input-%d", nextUnitID),
+			Type:           proto.UnitType_INPUT,
+			State:          proto.State_HEALTHY,
+			ConfigStateIdx: 1,
+			Config: &proto.UnitExpectedConfig{
+				Id:   "testing",
+				Type: "testing",
+				Name: "testing",
+			},
+			LogLevel: proto.UnitLogLevel_ERROR,
+		}
+		units = append(units, unit)
+		unitsSize += gproto.Size(unit)
+		nextUnitID++
+
+		if unitsSize > minimumMsgSize {
+			break
+		}
+	}
+
+	chunked, err := Expected(&proto.CheckinExpected{
+		FeaturesIdx:  2,
+		ComponentIdx: 3,
+		Units:        units,
+	}, grpcMaxSize, WithRepeatPadding(0))
+	require.NoError(t, err)
+	require.Greater(t, gproto.Size(chunked[0]), grpcMaxSize)
+
+	chunked, err = Expected(&proto.CheckinExpected{
+		FeaturesIdx:  2,
+		ComponentIdx: 3,
+		Units:        units,
+	}, grpcMaxSize)
+	require.NoError(t, err)
+	require.Greater(t, grpcMaxSize, gproto.Size(chunked[0]))
 }
 
 func sortExpectedUnits(a *proto.UnitExpected, b *proto.UnitExpected) int {

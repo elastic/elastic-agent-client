@@ -6,8 +6,11 @@ package chunk
 
 import "time"
 
+const DefaultRepeatPadding = 3 // 3 bytes
+
 type options struct {
-	timestamp time.Time
+	timestamp     time.Time
+	repeatPadding int
 }
 
 // Option is an option for adjusting chunking.
@@ -19,5 +22,15 @@ type Option func(opts *options)
 func WithTimestamp(t time.Time) Option {
 	return func(opts *options) {
 		opts.timestamp = t
+	}
+}
+
+// WithRepeatPadding adjusts the padding used on each repeated structure.
+//
+// Note: Mainly used for testing to validate that without padding that message
+// size will be too large.
+func WithRepeatPadding(padding int) Option {
+	return func(opts *options) {
+		opts.repeatPadding = padding
 	}
 }
