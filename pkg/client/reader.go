@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"io"
+	"io/ioutil"
 
 	protobuf "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"

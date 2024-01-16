@@ -17,15 +17,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
-	"github.com/elastic/elastic-agent-libs/api/npipe"
-
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
+	"github.com/elastic/elastic-agent-libs/api/npipe"
 )
 
 // DefaultMaxMessageSize is the maximum message size that is allowed to be sent.
