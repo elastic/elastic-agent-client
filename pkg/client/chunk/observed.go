@@ -20,6 +20,7 @@ import (
 func Observed(msg *proto.CheckinObserved, maxSize int, opts ...Option) ([]*proto.CheckinObserved, error) {
 	var options options
 	options.timestamp = time.Now() // timestamp used for chunk set
+	options.repeatPadding = defaultRepeatPadding
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -71,10 +72,10 @@ func Observed(msg *proto.CheckinObserved, maxSize int, opts ...Option) ([]*proto
 	// keep adding units until it doesn't fit
 	for nextUnit := 1; s < maxSize && nextUnit < len(bySize); nextUnit++ {
 		us := bySize[nextUnit]
-		if s+us.size < maxSize {
+		if s+us.size+options.repeatPadding < maxSize {
 			// unit fits add it
 			m.Units = append(m.Units, us.unit)
-			s += us.size
+			s += us.size + options.repeatPadding
 		} else {
 			// doesn't fit, create a new chunk
 			msgs = append(msgs, m)
