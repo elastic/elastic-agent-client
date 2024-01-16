@@ -148,8 +148,6 @@ type AgentInfo struct {
 type VersionInfo struct {
 	// Name is the name of the program.
 	Name string
-	// Version is the current version of the program.
-	Version string
 	// Meta is any extra metadata information about the version.
 	Meta map[string]string
 	// BuildHash is the VCS commit hash the program was built from.
@@ -287,10 +285,6 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2Clien
 	options.maxMessageSize = DefaultMaxMessageSize
 	for _, o := range opts {
 		o(&options)
-	}
-
-	if options.agentInfo != nil {
-		versionInfo.Version = options.agentInfo.Version
 	}
 
 	c := &clientV2{

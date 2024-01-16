@@ -75,7 +75,6 @@ func NewV2FromReader(reader io.Reader, ver VersionInfo, opts ...V2ClientOption) 
 	}
 
 	if info.AgentInfo != nil {
-		ver.Version = info.AgentInfo.Version
 		opts = append(opts, WithAgentInfo(AgentInfo{
 			ID:       info.AgentInfo.Id,
 			Version:  info.AgentInfo.Version,

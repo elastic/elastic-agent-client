@@ -180,8 +180,7 @@ func TestClientV2_Checkin_Initial(t *testing.T) {
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 	validClient := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{
-		Name:    "program",
-		Version: "v1.0.0",
+		Name: "program",
 		Meta: map[string]string{
 			"key": "value",
 		},
