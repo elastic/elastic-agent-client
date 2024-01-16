@@ -166,10 +166,9 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 			if observed.Token == token {
 				gotValid = true
 				reportedVersion.Name = observed.VersionInfo.Name
-				reportedVersion.Version = observed.VersionInfo.Version
 				reportedVersion.Meta = observed.VersionInfo.Meta
 				return &proto.CheckinExpected{
-					AgentInfo: &proto.CheckinAgentInfo{
+					AgentInfo: &proto.AgentInfo{
 						Id:       "elastic-agent-id",
 						Version:  "8.5.0",
 						Snapshot: true,
@@ -253,10 +252,8 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 	var errs2 []error
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
-
 	validClient := NewV2(srv.GetTarget(), token, VersionInfo{
-		Name:    "program",
-		Version: "v1.0.0",
+		Name: "program",
 		Meta: map[string]string{
 			"key": "value",
 		},
@@ -325,7 +322,6 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 	assert.Equal(t, units[1].Type(), UnitTypeInput)
 
 	assert.Equal(t, reportedVersion.Name, "program")
-	assert.Equal(t, reportedVersion.Version, "v1.0.0")
 	assert.Equal(t, reportedVersion.Meta, map[string]string{
 		"key": "value",
 	})

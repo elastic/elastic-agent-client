@@ -17,14 +17,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
-	"github.com/elastic/elastic-agent-libs/api/npipe"
-
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
+	"github.com/elastic/elastic-agent-libs/api/npipe"
 )
 
 // DefaultMaxMessageSize is the maximum message size that is allowed to be sent.
@@ -150,10 +149,10 @@ type AgentInfo struct {
 type VersionInfo struct {
 	// Name is the name of the program.
 	Name string
-	// Version is the current version of the program.
-	Version string
 	// Meta is any extra metadata information about the version.
 	Meta map[string]string
+	// BuildHash is the VCS commit hash the program was built from.
+	BuildHash string
 }
 
 // V2 manages the state and communication to the Elastic Agent over the V2 control protocol.
@@ -192,6 +191,7 @@ type v2options struct {
 	maxMessageSize  int
 	chunkingAllowed bool
 	dialOptions     []grpc.DialOption
+	agentInfo       *AgentInfo
 }
 
 // DialOptions returns the dial options for the GRPC connection.
@@ -223,6 +223,14 @@ func WithChunking(enabled bool) V2ClientOption {
 func WithGRPCDialOptions(opts ...grpc.DialOption) V2ClientOption {
 	return func(o *v2options) {
 		o.dialOptions = append(o.dialOptions, opts...)
+	}
+}
+
+// WithAgentInfo sets the AgentInfo and updates the client's VersionInfo.Version
+// to match the given agentInfo.Version.
+func WithAgentInfo(agentInfo AgentInfo) V2ClientOption {
+	return func(o *v2options) {
+		o.agentInfo = &agentInfo
 	}
 }
 
@@ -292,6 +300,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2Clien
 	}
 
 	c := &clientV2{
+		agentInfo:             options.agentInfo,
 		target:                target,
 		opts:                  options,
 		token:                 token,
@@ -540,9 +549,9 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 	}
 	if !c.versionInfoSent {
 		msg.VersionInfo = &proto.CheckinObservedVersionInfo{
-			Name:    c.versionInfo.Name,
-			Version: c.versionInfo.Version,
-			Meta:    c.versionInfo.Meta,
+			Name:      c.versionInfo.Name,
+			Meta:      c.versionInfo.Meta,
+			BuildHash: c.versionInfo.BuildHash,
 		}
 		// supports information is sent when version information is set,
 		// this ensures that its always sent once per connected loop

@@ -117,11 +117,11 @@ func newUnit(expected *proto.UnitExpectedConfig, rules RulesCfg) (Unit, error) {
 	return Unit{State: expectedStart, Rules: rules}, nil
 }
 
-// Checkin checkin is called every time the Mock V2 server performs a client checkin.
+// Checkin is called every time the Mock V2 server performs a client checkin.
 // It updates the units based on the current state, and returns a new expected config
 func (in *InputManager) Checkin(observed *proto.CheckinObserved, started time.Time) *proto.CheckinExpected {
 	base := &proto.CheckinExpected{
-		AgentInfo: &proto.CheckinAgentInfo{
+		AgentInfo: &proto.AgentInfo{
 			Id:       "test-agent",
 			Version:  "8.4.0",
 			Snapshot: true,
@@ -230,7 +230,7 @@ func generateUnitExpected(cfg *proto.UnitExpectedConfig) *proto.UnitExpected {
 // helper to form an entire CheckinExpected structure
 func createUnitsWithState(state proto.State, input *proto.UnitExpectedConfig, inID string, stateIndex uint64) *proto.CheckinExpected {
 	return &proto.CheckinExpected{
-		AgentInfo: &proto.CheckinAgentInfo{
+		AgentInfo: &proto.AgentInfo{
 			Id:       "test-agent",
 			Version:  "8.4.0",
 			Snapshot: true,
