@@ -6,7 +6,7 @@ package chunk
 
 import "time"
 
-const DefaultRepeatPadding = 3 // 3 bytes
+const defaultRepeatPadding = 3 // 3 bytes
 
 type options struct {
 	timestamp     time.Time

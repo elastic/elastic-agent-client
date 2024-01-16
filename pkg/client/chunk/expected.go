@@ -20,7 +20,7 @@ import (
 func Expected(msg *proto.CheckinExpected, maxSize int, opts ...Option) ([]*proto.CheckinExpected, error) {
 	var options options
 	options.timestamp = time.Now() // timestamp used for chunk set
-	options.repeatPadding = DefaultRepeatPadding
+	options.repeatPadding = defaultRepeatPadding
 	for _, opt := range opts {
 		opt(&options)
 	}
