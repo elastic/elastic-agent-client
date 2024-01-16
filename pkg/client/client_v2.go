@@ -10,13 +10,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"io"
 	"runtime"
 	"runtime/pprof"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
+	"github.com/elastic/elastic-agent-libs/api/npipe"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -271,11 +273,22 @@ type clientV2 struct {
 }
 
 // NewV2 creates a client connection to Elastic Agent over the V2 control protocol.
+// The "target" can be prefixed with scheme as explained here https://github.com/grpc/grpc/blob/master/doc/naming.md.
+// unix://absolute_path for unix domain socket
+// npipe:///pipe_name for windows named pipe
 func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2ClientOption) V2 {
 	var options v2options
 	options.maxMessageSize = DefaultMaxMessageSize
 	for _, o := range opts {
 		o(&options)
+	}
+
+	// For compatibility with existing interface the target could contain npipe:// scheme prefix
+	// Set the named pipe dialer option if npipe:// prefix specified on windows
+	if runtime.GOOS == "windows" && npipe.IsNPipe(target) {
+		target = transformNPipeURL(target)
+		// Set the winio named pipe dialer
+		options.dialOptions = append(options.dialOptions, getOptions()...)
 	}
 
 	c := &clientV2{
