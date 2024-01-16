@@ -343,7 +343,7 @@ func TestRecvExpected_RepeatPadding(t *testing.T) {
 	var units []*proto.UnitExpected
 	var unitsSize int
 	var nextUnitID int
-	for {
+	for unitsSize < minimumMsgSize {
 		unit := &proto.UnitExpected{
 			Id:             fmt.Sprintf("fake-input-%d", nextUnitID),
 			Type:           proto.UnitType_INPUT,
@@ -359,10 +359,6 @@ func TestRecvExpected_RepeatPadding(t *testing.T) {
 		units = append(units, unit)
 		unitsSize += gproto.Size(unit)
 		nextUnitID++
-
-		if unitsSize > minimumMsgSize {
-			break
-		}
 	}
 
 	chunked, err := Expected(&proto.CheckinExpected{
