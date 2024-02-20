@@ -82,7 +82,7 @@ func (s *StubServerV2) listen(opt ...grpc.ServerOption) (lis net.Listener, clean
 			return nil, nil, err
 		}
 		s.Port = lis.Addr().(*net.TCPAddr).Port
-		s.target = fmt.Sprintf(":%d", s.Port)
+		s.target = lis.Addr().String()
 		return lis, cleanup, nil
 	}
 
