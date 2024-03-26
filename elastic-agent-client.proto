@@ -365,6 +365,10 @@ message CheckinObserved {
     // Supports provides information to the agent about extra features this client supports. Should always be included
     // on first checkin, and not again unless upon reconnect.
     repeated ConnectionSupports supports = 8;
+
+    // Optional field allowing the client to report its own PID. This is useful for applications like endpoint,
+    // where agent has less control over the binary.
+    uint64 pid = 9;
 }
 
 // A action request is streamed from the Elastic Agent to the application so an action can be performed
