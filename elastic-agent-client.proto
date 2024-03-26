@@ -368,7 +368,7 @@ message CheckinObserved {
 
     // Optional field allowing the client to report its own PID. This is useful for applications like endpoint,
     // where agent has less control over the binary.
-    uint64 checkin_pid = 9;
+    uint64 pid = 9;
 }
 
 // A action request is streamed from the Elastic Agent to the application so an action can be performed
