@@ -331,6 +331,29 @@ func (u *Unit) updateState(
 		}
 	}
 
+	switch {
+	case u.config != nil && cfg == nil:
+		u.config = cfg
+		triggers |= TriggeredConfigChange
+	case u.config == nil && cfg != nil:
+		u.config = cfg
+		triggers |= TriggeredConfigChange
+	case u.config != nil && cfg != nil:
+		if len(u.config.Streams) != len(cfg.Streams) {
+			u.config = cfg
+			triggers |= TriggeredConfigChange
+			break
+		}
+
+		for idx, stream := range cfg.Streams {
+			if !gproto.Equal(stream, cfg.Streams[idx]) {
+				u.config = cfg
+				triggers |= TriggeredConfigChange
+				break
+			}
+		}
+	}
+
 	if !gproto.Equal(u.apm, expAPM) {
 		u.apm = expAPM
 		triggers |= TriggeredAPMChange
