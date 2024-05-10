@@ -331,7 +331,14 @@ func (u *Unit) updateState(
 		}
 	}
 
+	if u.config.GetRevision() != cfg.GetRevision() {
+		u.config = cfg
+		triggers |= TriggeredConfigChange
+	}
+
 	switch {
+	case u.config == cfg:
+		break
 	case u.config != nil && cfg == nil:
 		u.config = cfg
 		triggers |= TriggeredConfigChange
