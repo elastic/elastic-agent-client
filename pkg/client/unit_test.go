@@ -38,9 +38,13 @@ func TestUnitUpdateWithSameMap(t *testing.T) {
 	_, err = gproto.Marshal(newUnit)
 	require.NoError(t, err)
 
+	// This should return TriggeredNothing, as the configIdx hasn't changed
+	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, 0, nil, newUnit, 1, nil)
+	assert.Equal(t, TriggeredNothing, got)
+
 	// This should return TriggeredConfigChange, as the configIdx has changed (this is our criteria)
 	// no matter if the actual map is the same
-	got := defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, 0, nil, newUnit, 2, nil)
+	got = defaultTest.updateState(UnitStateHealthy, UnitLogLevelDebug, 0, nil, newUnit, 2, nil)
 	assert.Equal(t, TriggeredConfigChange, got)
 }
 
