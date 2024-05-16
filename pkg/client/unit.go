@@ -325,10 +325,8 @@ func (u *Unit) updateState(
 
 	if u.configIdx != cfgIdx {
 		u.configIdx = cfgIdx
-		if !gproto.Equal(u.config.GetSource(), cfg.GetSource()) {
-			u.config = cfg
-			triggers |= TriggeredConfigChange
-		}
+		u.config = cfg
+		triggers |= TriggeredConfigChange
 	}
 
 	if !gproto.Equal(u.apm, expAPM) {
