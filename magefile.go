@@ -47,7 +47,7 @@ type Check mg.Namespace
 
 // InstallGoLicenser install go-licenser to check license of the files.
 func (Prepare) InstallGoLicenser() error {
-	return GoGet(goLicenserRepo)
+	return GoInstall(fmt.Sprintf("%s@latest", goLicenserRepo))
 }
 
 // InstallGoLint for the code.
@@ -162,7 +162,7 @@ func (Check) License() error {
 
 // GoGet fetch a remote dependencies.
 func GoGet(link string) error {
-	_, err := sh.Exec(map[string]string{"GO111MODULE": "off"}, os.Stdout, os.Stderr, "go", "get", link)
+	_, err := sh.Exec(map[string]string{}, os.Stdout, os.Stderr, "go", "get", link)
 	return err
 }
 
