@@ -52,7 +52,7 @@ func (Prepare) InstallGoLicenser() error {
 
 // InstallGoLint for the code.
 func (Prepare) InstallGoLint() error {
-	GoInstall(fmt.Sprintf("%s@latest", goLintRepo))
+	return GoInstall(fmt.Sprintf("%s@latest", goLintRepo))
 }
 
 // All runs prepare:installGoLicenser and prepare:installGoLint.
