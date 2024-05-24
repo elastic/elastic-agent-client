@@ -107,6 +107,12 @@ enum UnitLogLevel {
     TRACE = 4;
 }
 
+// Reports the mode agent is running in
+enum AgentManagedMode {
+    MANAGED = 0;
+    STANDALONE = 1;
+}
+
 // Package metadata provided in the meta field of a unit.
 message Package {
     // Source is the original configuration of this Package in the agent policy. Only standard
@@ -207,6 +213,8 @@ message AgentInfo {
     string version = 2;
     // Snapshot is true when the running Elastic Agent is a snapshot version.
     bool snapshot = 3;
+    // AgentManagedMode reports what config mode agent is running in.
+    AgentManagedMode mode = 4;
 }
 
 // Feature flags configurations.
