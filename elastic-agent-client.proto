@@ -109,8 +109,8 @@ enum UnitLogLevel {
 
 // Reports the mode agent is running in
 enum AgentManagedMode {
-    FLEET = 0;
-    SELFMANAGED = 1;
+    MANAGED = 0;
+    STANDALONE = 1;
 }
 
 // Package metadata provided in the meta field of a unit.
