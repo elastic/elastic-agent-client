@@ -158,9 +158,10 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 	packageVersion := "8.13.0+build20060102"
 	wantBuildHash := "build_hash"
 	wantAgentInfo := AgentInfo{
-		ID:       "elastic-agent-id",
-		Version:  packageVersion,
-		Snapshot: true,
+		ID:          "elastic-agent-id",
+		Version:     packageVersion,
+		Snapshot:    true,
+		ManagedMode: proto.AgentManagedMode_STANDALONE,
 	}
 	vInfo := VersionInfo{
 		Name:      "program",
@@ -185,6 +186,7 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 					Id:       wantAgentInfo.ID,
 					Version:  wantAgentInfo.Version,
 					Snapshot: wantAgentInfo.Snapshot,
+					Mode:     wantAgentInfo.ManagedMode,
 				},
 				Features: &proto.Features{
 					Fqdn: &proto.FQDNFeature{Enabled: wantFQDN},
@@ -303,8 +305,9 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 		assert.Equal(t, wantAgentInfo.ID, agentInfo.ID)
 		assert.Equal(t, wantAgentInfo.Version, agentInfo.Version)
 		assert.True(t, wantAgentInfo.Snapshot, agentInfo.Snapshot)
+		assert.Equal(t, wantAgentInfo.ManagedMode, agentInfo.ManagedMode)
 	}
-	
+
 	assert.Truef(t, gotFQDN, "FQND should be true")
 
 	if assert.Lenf(t, units, 2, "should have received 2 units") {

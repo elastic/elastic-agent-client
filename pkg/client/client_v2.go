@@ -143,6 +143,8 @@ type AgentInfo struct {
 	Version string
 	// Snapshot is true when the running version of the Elastic Agent is a snapshot.
 	Snapshot bool
+	// IsStandalone reports if the agent is running in standalone or managed mode
+	ManagedMode proto.AgentManagedMode
 }
 
 // VersionInfo is the version information for the connecting client.
@@ -573,9 +575,10 @@ func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
 	if expected.AgentInfo != nil {
 		c.agentInfoMu.Lock()
 		c.agentInfo = &AgentInfo{
-			ID:       expected.AgentInfo.Id,
-			Version:  expected.AgentInfo.Version,
-			Snapshot: expected.AgentInfo.Snapshot,
+			ID:          expected.AgentInfo.Id,
+			Version:     expected.AgentInfo.Version,
+			Snapshot:    expected.AgentInfo.Snapshot,
+			ManagedMode: expected.AgentInfo.Mode,
 		}
 		c.agentInfoMu.Unlock()
 	}
