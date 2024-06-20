@@ -5,9 +5,9 @@
 package chunk
 
 import (
+	"slices"
 	"time"
 
-	"golang.org/x/exp/slices"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	protobuf "google.golang.org/protobuf/proto"

@@ -10,7 +10,6 @@ require (
 	github.com/google/pprof v0.0.0-20230426061923-93006964c1fc
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.8.2
-	golang.org/x/exp v0.0.0-20231127185646-65229373498e
 	google.golang.org/grpc v1.56.3
 	google.golang.org/protobuf v1.33.0
 )
