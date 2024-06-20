@@ -11,7 +11,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.8.2
-	golang.org/x/exp v0.0.0-20231127185646-65229373498e
 	google.golang.org/grpc v1.56.3
 	google.golang.org/protobuf v1.33.0
 )
