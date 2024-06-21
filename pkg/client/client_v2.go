@@ -145,6 +145,8 @@ type AgentInfo struct {
 	Snapshot bool
 	// IsStandalone reports if the agent is running in standalone or managed mode
 	ManagedMode proto.AgentManagedMode
+	// Unprivileged reports if the agent is running in unprivileged mode.
+	Unprivileged bool
 }
 
 // VersionInfo is the version information for the connecting client.
@@ -575,10 +577,11 @@ func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
 	if expected.AgentInfo != nil {
 		c.agentInfoMu.Lock()
 		c.agentInfo = &AgentInfo{
-			ID:          expected.AgentInfo.Id,
-			Version:     expected.AgentInfo.Version,
-			Snapshot:    expected.AgentInfo.Snapshot,
-			ManagedMode: expected.AgentInfo.Mode,
+			ID:           expected.AgentInfo.Id,
+			Version:      expected.AgentInfo.Version,
+			Snapshot:     expected.AgentInfo.Snapshot,
+			ManagedMode:  expected.AgentInfo.Mode,
+			Unprivileged: expected.AgentInfo.Unprivileged,
 		}
 		c.agentInfoMu.Unlock()
 	}
