@@ -158,10 +158,11 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 	packageVersion := "8.13.0+build20060102"
 	wantBuildHash := "build_hash"
 	wantAgentInfo := AgentInfo{
-		ID:          "elastic-agent-id",
-		Version:     packageVersion,
-		Snapshot:    true,
-		ManagedMode: proto.AgentManagedMode_STANDALONE,
+		ID:           "elastic-agent-id",
+		Version:      packageVersion,
+		Snapshot:     true,
+		ManagedMode:  proto.AgentManagedMode_STANDALONE,
+		Unprivileged: true,
 	}
 	vInfo := VersionInfo{
 		Name:      "program",
@@ -183,10 +184,11 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 
 			return &proto.CheckinExpected{
 				AgentInfo: &proto.AgentInfo{
-					Id:       wantAgentInfo.ID,
-					Version:  wantAgentInfo.Version,
-					Snapshot: wantAgentInfo.Snapshot,
-					Mode:     wantAgentInfo.ManagedMode,
+					Id:           wantAgentInfo.ID,
+					Version:      wantAgentInfo.Version,
+					Snapshot:     wantAgentInfo.Snapshot,
+					Mode:         wantAgentInfo.ManagedMode,
+					Unprivileged: wantAgentInfo.Unprivileged,
 				},
 				Features: &proto.Features{
 					Fqdn: &proto.FQDNFeature{Enabled: wantFQDN},
@@ -306,6 +308,7 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 		assert.Equal(t, wantAgentInfo.Version, agentInfo.Version)
 		assert.True(t, wantAgentInfo.Snapshot, agentInfo.Snapshot)
 		assert.Equal(t, wantAgentInfo.ManagedMode, agentInfo.ManagedMode)
+		assert.Equal(t, wantAgentInfo.Unprivileged, agentInfo.Unprivileged)
 	}
 
 	assert.Truef(t, gotFQDN, "FQND should be true")
