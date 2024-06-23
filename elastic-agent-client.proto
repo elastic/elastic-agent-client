@@ -215,6 +215,8 @@ message AgentInfo {
     bool snapshot = 3;
     // AgentManagedMode reports what config mode agent is running in.
     AgentManagedMode mode = 4;
+    // Unprivileged reports if agent is running in Unprivileged mode
+    bool Unprivileged = 5;
 }
 
 // Feature flags configurations.
