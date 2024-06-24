@@ -8,11 +8,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
@@ -118,7 +118,7 @@ func (Format) All() {
 // License applies the right license header.
 func (Format) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
-	return combineErr(
+	return errors.Join(
 		sh.RunV("go-licenser", "-license", "Elastic"),
 		sh.RunV("go-licenser", "-license", "Elastic", "-ext", ".proto"),
 	)
@@ -137,6 +137,7 @@ func (Check) GoLint() error {
 		return err
 	}
 
+	var errs []error
 	packages := strings.Split(packagesString, "\n")
 	for _, pkg := range packages {
 		if strings.Contains(pkg, "/vendor/") {
@@ -144,18 +145,18 @@ func (Check) GoLint() error {
 		}
 
 		if e := sh.RunV("golint", "-set_exit_status", pkg); e != nil {
-			err = multierror.Append(err, e)
+			errs = append(errs, e)
 		}
 	}
 
-	return err
+	return errors.Join(errs...)
 }
 
 // License makes sure that all the Golang files have the appropriate license header.
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return combineErr(
+	return errors.Join(
 		sh.RunV("go-licenser", "-d", "-license", "Elastic"),
 	)
 }
@@ -170,15 +171,4 @@ func GoGet(link string) error {
 func GoInstall(link string) error {
 	_, err := sh.Exec(map[string]string{}, os.Stdout, os.Stderr, "go", "install", link)
 	return err
-}
-
-func combineErr(errors ...error) error {
-	var e error
-	for _, err := range errors {
-		if err == nil {
-			continue
-		}
-		e = multierror.Append(e, err)
-	}
-	return e
 }

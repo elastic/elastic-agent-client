@@ -8,7 +8,6 @@ require (
 	github.com/golang/protobuf v1.5.3
 	github.com/google/go-cmp v0.5.9
 	github.com/google/pprof v0.0.0-20230426061923-93006964c1fc
-	github.com/hashicorp/go-multierror v1.1.1
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.8.2
 	google.golang.org/grpc v1.56.3
@@ -18,7 +17,6 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/net v0.23.0 // indirect
