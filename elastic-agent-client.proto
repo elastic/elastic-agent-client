@@ -259,6 +259,7 @@ message APMConfig {
 message Component {
     ComponentLimits limits = 1;
     optional APMConfig apm_config = 2;
+    optional GlobalProcessorsConfig processors = 3;
 }
 
 // Limits to configure for the currently running component.
@@ -272,6 +273,20 @@ message ComponentLimits {
   // Should be ignored by non-Go components.
   // If set to `0` the client should use all the available CPUs.
   uint64 go_max_procs = 2;
+}
+
+// A processor config. Enabled flag is a separate field to check easily activation/deactivation. All the rest of the config
+// is in the generic Struct config field
+message ProcessorConfig {
+    google.protobuf.Struct source = 1;
+    bool enabled = 2;
+    google.protobuf.Struct config = 3;
+}
+
+// Configure some global processors for event data at component level
+message GlobalProcessorsConfig {
+    google.protobuf.Struct source = 1;
+    map<string, ProcessorConfig> configs = 2;
 }
 
 // A set of units and their expected states and configuration.
