@@ -192,10 +192,11 @@ type V2 interface {
 
 // v2options hold the client options.
 type v2options struct {
-	maxMessageSize  int
-	chunkingAllowed bool
-	dialOptions     []grpc.DialOption
-	agentInfo       *AgentInfo
+	maxMessageSize       int
+	chunkingAllowed      bool
+	dialOptions          []grpc.DialOption
+	agentInfo            *AgentInfo
+	emitComponentChanges bool
 }
 
 // DialOptions returns the dial options for the GRPC connection.
@@ -238,6 +239,12 @@ func WithAgentInfo(agentInfo AgentInfo) V2ClientOption {
 	}
 }
 
+func WithEmitComponentChanges(emitComponentChanges bool) V2ClientOption {
+	return func(o *v2options) {
+		o.emitComponentChanges = emitComponentChanges
+	}
+}
+
 // clientV2 manages the state and communication to the Elastic Agent over the V2 control protocol.
 type clientV2 struct {
 	target string
@@ -255,8 +262,9 @@ type clientV2 struct {
 	wg     sync.WaitGroup
 	client proto.ElasticAgentClient
 
-	errCh     chan error
-	changesCh chan UnitChanged
+	errCh              chan error
+	changesCh          chan UnitChanged
+	componentChangesCh chan *proto.Component
 
 	// stateChangeObservedCh is an internal channel that notifies checkinWriter
 	// that a unit state has changed. To trigger it, call unitsStateChanged.
@@ -642,6 +650,18 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 		} else {
 			_ = runtime.GOMAXPROCS(newGoMaxProcs)
 		}
+	}
+
+	if c.opts.emitComponentChanges {
+		// we have to publish the new component config
+		select {
+		case c.componentChangesCh <- expected.Component:
+		// all good we managed to process the component config
+		case <-time.After(500 * time.Millisecond):
+			//TODO something went wrong, log and drop
+			return
+		}
+
 	}
 
 	// Technically we should wait until the APM config is also applied, but the syncUnits is called after this and
