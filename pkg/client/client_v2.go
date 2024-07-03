@@ -169,6 +169,11 @@ type V2 interface {
 	//
 	// User of this client must read from this channel, or it will block the client.
 	UnitChanges() <-chan UnitChanged
+	// ComponentChanges returns the channel where the client will publish Component configuration changes
+	//
+	// Support for this changes must be opted in (in order to maintain  backward compatibility, refer to the actual implementation for details)
+	// Component changes (if present) will be published *before* any unit change coming from the same message.
+	ComponentChanges() <-chan Component
 	// Errors returns channel of errors that occurred during communication.
 	//
 	// User of this client must read from this channel, or it will block the client.
@@ -264,7 +269,7 @@ type clientV2 struct {
 
 	errCh              chan error
 	changesCh          chan UnitChanged
-	componentChangesCh chan *proto.Component
+	componentChangesCh chan Component
 
 	// stateChangeObservedCh is an internal channel that notifies checkinWriter
 	// that a unit state has changed. To trigger it, call unitsStateChanged.
@@ -319,6 +324,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2Clien
 		versionInfo:           versionInfo,
 		stateChangeObservedCh: make(chan struct{}, 1),
 		errCh:                 make(chan error),
+		componentChangesCh:    make(chan Component),
 		changesCh:             make(chan UnitChanged),
 		diagHooks:             make(map[string]diagHook),
 		minCheckTimeout:       CheckinMinimumTimeout,
@@ -351,6 +357,11 @@ func (c *clientV2) Stop() {
 		c.ctx = nil
 		c.cancel = nil
 	}
+}
+
+// ComponentChanges returns channel client will publish component change notifications to.
+func (c *clientV2) ComponentChanges() <-chan Component {
+	return c.componentChangesCh
 }
 
 // UnitChanges returns channel client send unit change notifications to.
@@ -654,14 +665,18 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 
 	if c.opts.emitComponentChanges {
 		// we have to publish the new component config
-		select {
-		case c.componentChangesCh <- expected.Component:
-		// all good we managed to process the component config
-		case <-time.After(500 * time.Millisecond):
-			//TODO something went wrong, log and drop
-			return
-		}
+		component := MapComponent(expected.Component)
 
+		if component != nil && expected.ComponentIdx != c.componentIdx {
+			const publishTimeout = 500 * time.Millisecond
+			select {
+			case c.componentChangesCh <- *component:
+			// all good we managed to process the component config
+			case <-time.After(publishTimeout):
+				c.errCh <- fmt.Errorf("timed out after %s writing component config to publish channel, dropping component config index %d", publishTimeout, component.ConfigIdx)
+				return
+			}
+		}
 	}
 
 	// Technically we should wait until the APM config is also applied, but the syncUnits is called after this and

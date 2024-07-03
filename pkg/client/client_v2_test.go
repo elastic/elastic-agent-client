@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent-libs/atomic"
 	"github.com/google/pprof/profile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	gproto "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -1138,12 +1140,12 @@ func TestClientV2_Checkin_APMConfig(t *testing.T) {
 	}
 }
 
-type componentConfigServerValidation struct {
-	componentIdx uint64
-	goMaxProcs   int
-}
-
 func TestClientV2_Checkin_Component(t *testing.T) {
+	type componentConfigServerValidation struct {
+		componentIdx uint64
+		goMaxProcs   int
+	}
+
 	var m sync.Mutex
 	token := mock.NewID()
 	connected := false
@@ -1332,6 +1334,121 @@ func TestClientV2_Checkin_Component(t *testing.T) {
 	}
 }
 
+func TestClientV2_Checkin_OptInComponent(t *testing.T) {
+
+	type args struct {
+		checkinExpectedGenerator mock.StubServerCheckinV2
+	}
+
+	type expected struct {
+		componentExpected        *proto.Component
+		expectedComponentIdx     uint64
+		unitsExpected            []Unit
+		numberOfComponentConfigs uint
+	}
+
+	testcases := []struct {
+		name     string
+		args     args
+		expected expected
+	}{
+		{
+			name: "Simple component config",
+			args: args{
+				checkinExpectedGenerator: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+
+					expectedComponentIdx := uint64(1)
+
+					if observed.ComponentIdx != expectedComponentIdx {
+
+						return &proto.CheckinExpected{
+							ComponentIdx: expectedComponentIdx,
+							Component: &proto.Component{
+								Processors: &proto.GlobalProcessorsConfig{
+									Configs: map[string]*proto.ProcessorConfig{
+										"provider1": {Enabled: true, Config: mustStructFromMap(t, nil)},
+									},
+								},
+							},
+							Units: []*proto.UnitExpected{},
+						}
+					}
+					// disconnect otherwise
+					return nil
+				},
+			},
+			expected: expected{
+				componentExpected: &proto.Component{
+					Processors: &proto.GlobalProcessorsConfig{
+						Configs: map[string]*proto.ProcessorConfig{
+							"provider1": {Enabled: true, Config: mustStructFromMap(t, nil)},
+						},
+					},
+				},
+				expectedComponentIdx:     1,
+				unitsExpected:            nil,
+				numberOfComponentConfigs: 1,
+			},
+		},
+	}
+
+	for _, tt := range testcases {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := mock.StubServerV2{
+				CheckinV2Impl: tt.args.checkinExpectedGenerator,
+				ActionImpl: func(response *proto.ActionResponse) error {
+					// actions not tested here
+					t.Logf("handling action response %v", response)
+					return nil
+				},
+				ActionsChan: make(chan *mock.PerformAction, 100),
+			}
+			require.NoError(t, srv.Start())
+			defer srv.Stop()
+
+			var errsMu sync.Mutex
+			var errs []error
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+
+			serverAddr := fmt.Sprintf(":%d", srv.Port)
+			token := mock.NewID()
+			v2Client := NewV2(serverAddr, token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())), WithEmitComponentChanges(true)).(*clientV2)
+			v2Client.minCheckTimeout = 100 * time.Millisecond // otherwise the test will run for too long
+			storeErrors(ctx, v2Client, &errs, &errsMu)
+			require.NoError(t, v2Client.Start(ctx))
+			defer v2Client.Stop()
+
+			componentConfigsReceived := atomic.MakeUint(0)
+
+			go func() {
+				t.Log("consumer goroutine started...")
+				for {
+					select {
+					case <-ctx.Done():
+						t.Log("consumer goroutine exiting...")
+						return
+					case cc := <-v2Client.ComponentChanges():
+						t.Logf("component received: %+v", cc)
+						componentConfigsReceived.Inc()
+					case <-v2Client.UnitChanges(): // otherwise the v2Client can block forever
+						// we don't need to react to units since we test the component-level change
+						t.Logf("unit received")
+					}
+				}
+			}()
+
+			// wait until we processed the target componentIdx
+			assert.Eventually(t, func() bool {
+				return v2Client.componentIdx == tt.expected.expectedComponentIdx
+			}, 10*time.Second, 500*time.Millisecond, "didn't process up to the expected componentIdx")
+
+			assert.Equal(t, tt.expected.numberOfComponentConfigs, componentConfigsReceived.Load(), "didn't receive the expected number of component configs")
+			assert.True(t, gproto.Equal(tt.expected.componentExpected, v2Client.componentConfig), "last component stored by client \n%s\n is different from expected\n%s", v2Client.componentConfig, tt.expected.componentExpected)
+		})
+	}
+}
+
 func setupClientForDiagnostics(ctx context.Context, t *testing.T) (*Unit, V2, mock.StubServerV2) {
 	var m sync.Mutex
 	token := mock.NewID()
@@ -1452,4 +1569,10 @@ func updateUnits(t *testing.T, observed *proto.CheckinObserved, units ...*Unit) 
 			}
 		}
 	}
+}
+
+func mustStructFromMap(t *testing.T, m map[string]any) *structpb.Struct {
+	newStruct, err := structpb.NewStruct(m)
+	require.NoErrorf(t, err, "unable to create struct from %s", m)
+	return newStruct
 }
