@@ -15,7 +15,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	protobuf "google.golang.org/protobuf/proto"

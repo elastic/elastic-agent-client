@@ -16,7 +16,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"google.golang.org/grpc"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
