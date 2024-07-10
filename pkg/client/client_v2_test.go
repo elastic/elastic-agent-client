@@ -554,6 +554,8 @@ func testClientV2CheckinUnitState(t *testing.T, localRPC string) {
 
 	assert.Equal(t, wantFQDN, gotFQDN)
 	assert.Equal(t, gotTriggers&TriggeredFeatureChange, TriggeredFeatureChange)
+	m.Lock()
+	defer m.Unlock()
 	assert.Equal(t, UnitStateHealthy, unitOne.state)
 	assert.Equal(t, "Healthy", unitOne.stateMsg)
 	assert.Equal(t, UnitStateStopped, unitTwo.state)
