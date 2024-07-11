@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"google.golang.org/grpc"
 )
 

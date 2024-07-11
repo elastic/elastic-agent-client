@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/elastic/elastic-agent-libs v0.7.2
-	github.com/gofrs/uuid v4.4.0+incompatible
+	github.com/gofrs/uuid/v5 v5.2.0
 	github.com/golang/protobuf v1.5.3
 	github.com/google/go-cmp v0.5.9
 	github.com/google/pprof v0.0.0-20230426061923-93006964c1fc

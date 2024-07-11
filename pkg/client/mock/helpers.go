@@ -4,7 +4,7 @@
 
 package mock
 
-import "github.com/gofrs/uuid"
+import "github.com/gofrs/uuid/v5"
 
 // NewID is a small wrapper that returns a UUID used for agent client IDs
 func NewID() string {
