@@ -667,6 +667,9 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 		// we have to publish the new component config
 		component := MapComponent(expected.Component)
 
+		// Set ComponentIdx
+		component.ConfigIdx = expected.ComponentIdx
+
 		if component != nil && expected.ComponentIdx != c.componentIdx {
 			const publishTimeout = 500 * time.Millisecond
 			select {
