@@ -7,7 +7,11 @@
 
 package mock
 
-import "net"
+import (
+	"net"
+
+	"github.com/elastic/elastic-agent-libs/api/npipe"
+)
 
 func newNPipeListener(name, sd string) (net.Listener, error) {
 	return npipe.NewListener(name, sd)
