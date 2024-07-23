@@ -169,6 +169,11 @@ type V2 interface {
 	//
 	// User of this client must read from this channel, or it will block the client.
 	UnitChanges() <-chan UnitChanged
+	// ComponentChanges returns the channel where the client will publish Component configuration changes
+	//
+	// Support for this changes must be opted in (in order to maintain  backward compatibility, refer to the actual implementation for details)
+	// Component changes (if present) will be published *before* any unit change coming from the same message.
+	ComponentChanges() <-chan Component
 	// Errors returns channel of errors that occurred during communication.
 	//
 	// User of this client must read from this channel, or it will block the client.
@@ -192,10 +197,11 @@ type V2 interface {
 
 // v2options hold the client options.
 type v2options struct {
-	maxMessageSize  int
-	chunkingAllowed bool
-	dialOptions     []grpc.DialOption
-	agentInfo       *AgentInfo
+	maxMessageSize       int
+	chunkingAllowed      bool
+	dialOptions          []grpc.DialOption
+	agentInfo            *AgentInfo
+	emitComponentChanges bool
 }
 
 // DialOptions returns the dial options for the GRPC connection.
@@ -238,6 +244,12 @@ func WithAgentInfo(agentInfo AgentInfo) V2ClientOption {
 	}
 }
 
+func WithEmitComponentChanges(emitComponentChanges bool) V2ClientOption {
+	return func(o *v2options) {
+		o.emitComponentChanges = emitComponentChanges
+	}
+}
+
 // clientV2 manages the state and communication to the Elastic Agent over the V2 control protocol.
 type clientV2 struct {
 	target string
@@ -255,8 +267,9 @@ type clientV2 struct {
 	wg     sync.WaitGroup
 	client proto.ElasticAgentClient
 
-	errCh     chan error
-	changesCh chan UnitChanged
+	errCh              chan error
+	changesCh          chan UnitChanged
+	componentChangesCh chan Component
 
 	// stateChangeObservedCh is an internal channel that notifies checkinWriter
 	// that a unit state has changed. To trigger it, call unitsStateChanged.
@@ -311,6 +324,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2Clien
 		versionInfo:           versionInfo,
 		stateChangeObservedCh: make(chan struct{}, 1),
 		errCh:                 make(chan error),
+		componentChangesCh:    make(chan Component),
 		changesCh:             make(chan UnitChanged),
 		diagHooks:             make(map[string]diagHook),
 		minCheckTimeout:       CheckinMinimumTimeout,
@@ -343,6 +357,11 @@ func (c *clientV2) Stop() {
 		c.ctx = nil
 		c.cancel = nil
 	}
+}
+
+// ComponentChanges returns channel client will publish component change notifications to.
+func (c *clientV2) ComponentChanges() <-chan Component {
+	return c.componentChangesCh
 }
 
 // UnitChanges returns channel client send unit change notifications to.
@@ -641,6 +660,25 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 			_ = runtime.GOMAXPROCS(runtime.NumCPU())
 		} else {
 			_ = runtime.GOMAXPROCS(newGoMaxProcs)
+		}
+	}
+
+	if c.opts.emitComponentChanges {
+		// we have to publish the new component config
+		component := MapComponent(expected.Component)
+
+		// Set ComponentIdx
+		component.ConfigIdx = expected.ComponentIdx
+
+		if component != nil && expected.ComponentIdx != c.componentIdx {
+			const publishTimeout = 500 * time.Millisecond
+			select {
+			case c.componentChangesCh <- *component:
+			// all good we managed to process the component config
+			case <-time.After(publishTimeout):
+				c.errCh <- fmt.Errorf("timed out after %s writing component config to publish channel, dropping component config index %d", publishTimeout, component.ConfigIdx)
+				return
+			}
 		}
 	}
 
