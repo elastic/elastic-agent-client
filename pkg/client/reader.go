@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"io"
-	"io/ioutil"
 
 	protobuf "github.com/golang/protobuf/proto"
 	"google.golang.org/grpc"
@@ -40,7 +39,7 @@ const (
 // NewFromReader creates a new client reading the connection information from the io.Reader.
 func NewFromReader(reader io.Reader, impl StateInterface, actions ...Action) (Client, error) {
 	connInfo := &proto.StartUpInfo{}
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}
