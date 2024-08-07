@@ -31,6 +31,7 @@ func TestUnitUpdateWithSameMap(t *testing.T) {
 	defaultTest.config.Source = pbStruct
 
 	pbStructNew, err := structpb.NewStruct(sameMap)
+	require.NoError(t, err)
 	newUnit := &proto.UnitExpectedConfig{
 		Source: pbStructNew,
 	}

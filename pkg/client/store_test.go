@@ -133,7 +133,7 @@ func TestStore(t *testing.T) {
 		newTx, err := storeClient.BeginTx(ctx, false)
 		require.NoError(t, err)
 		defer newTx.Discard(ctx)
-		res, ok, err = newTx.GetKey(ctx, "test")
+		_, ok, err = newTx.GetKey(ctx, "test")
 		require.NoError(t, err)
 		require.False(t, ok)
 
@@ -142,7 +142,7 @@ func TestStore(t *testing.T) {
 		require.NoError(t, err)
 
 		// get value in one opened before commit (should still fail)
-		res, ok, err = newTx.GetKey(ctx, "test")
+		_, ok, err = newTx.GetKey(ctx, "test")
 		require.NoError(t, err)
 		require.False(t, ok)
 		newTx.Commit(ctx)
