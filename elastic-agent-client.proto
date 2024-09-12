@@ -248,6 +248,7 @@ message ElasticAPM {
     string secret_token = 4;
     repeated string hosts = 5;
     string global_labels = 6;
+    optional float sampling_rate = 7;
 }
 
 // APM configuration
