@@ -5,7 +5,6 @@
 package client
 
 import (
-	"reflect"
 	"sync"
 
 	gproto "google.golang.org/protobuf/proto"
@@ -206,7 +205,7 @@ func (u *Unit) UpdateState(state UnitState, message string, payload map[string]i
 	}
 	if (u.statePayload == nil && statePayload != nil) ||
 		(u.statePayload != nil && statePayload == nil) ||
-		!reflect.DeepEqual(u.statePayload, statePayload) {
+		!gproto.Equal(u.statePayload, statePayload) {
 		u.statePayload = statePayload
 		changed = true
 	}
