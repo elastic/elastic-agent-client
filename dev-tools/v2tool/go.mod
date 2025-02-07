@@ -10,7 +10,7 @@ require (
 	github.com/elastic/elastic-agent v0.0.0-20221124053612-cc9f1a66a4e5
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20221121201703-4b23a52d0ebe
 	github.com/elastic/elastic-agent-libs v0.7.2
-	github.com/gofrs/uuid v4.4.0+incompatible
+	github.com/gofrs/uuid/v5 v5.2.0
 	github.com/spf13/cobra v1.7.0
 	google.golang.org/grpc v1.56.3
 	google.golang.org/protobuf v1.33.0
