@@ -10,7 +10,7 @@ require (
 	github.com/elastic/elastic-agent v0.0.0-20221124053612-cc9f1a66a4e5
 	github.com/elastic/elastic-agent-client/v7 v7.0.0-20221121201703-4b23a52d0ebe
 	github.com/elastic/elastic-agent-libs v0.7.2
-	github.com/gofrs/uuid v4.4.0+incompatible
+	github.com/gofrs/uuid/v5 v5.2.0
 	github.com/spf13/cobra v1.7.0
 	google.golang.org/grpc v1.56.3
 	google.golang.org/protobuf v1.33.0
@@ -37,9 +37,9 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/net v0.23.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/net v0.34.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 	howett.net/plist v1.0.0 // indirect
 )
