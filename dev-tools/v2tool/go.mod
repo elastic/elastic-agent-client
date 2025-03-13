@@ -1,8 +1,7 @@
 module github.com/elastic/elastic-agent-client/v7/dev-tools/v2tool
 
 go 1.21
-
-toolchain go1.21.1
+toolchain go1.23.7
 
 replace github.com/elastic/elastic-agent-client/v7 => ../../
 
@@ -37,9 +36,9 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/net v0.34.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 	howett.net/plist v1.0.0 // indirect
 )
