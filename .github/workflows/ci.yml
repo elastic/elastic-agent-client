@@ -19,7 +19,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go install github.com/magefile/mage
+      - name: install mage
+        run: go install github.com/magefile/mage
       - run: |
           mage -debug check
           go vet ./...
@@ -32,11 +33,15 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go install github.com/magefile/mage
-      - run: |
+      - name: install mage
+        run: go install github.com/magefile/mage
+      - name: install protoc
+        run: |
           curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.19.4/protoc-3.19.4-linux-x86_64.zip
-          unzip -o protoc.zip -d /usr/local
-          mage -debug update
+          mkdir -p $GITHUB_WORKSPACE/.protoc
+          unzip -o protoc.zip -d $GITHUB_WORKSPACE/.protoc
+          echo "$GITHUB_WORKSPACE/.protoc" >> $GITHUB_PATH
+      - run: mage -debug update
 
   test:
     strategy:
