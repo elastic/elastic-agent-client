@@ -40,7 +40,7 @@ jobs:
           curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.19.4/protoc-3.19.4-linux-x86_64.zip
           mkdir -p $GITHUB_WORKSPACE/.protoc
           unzip -o protoc.zip -d $GITHUB_WORKSPACE/.protoc
-          echo "$GITHUB_WORKSPACE/.protoc" >> $GITHUB_PATH
+          echo "$GITHUB_WORKSPACE/.protoc/bin" >> $GITHUB_PATH
       - run: mage -debug update
 
   test:
