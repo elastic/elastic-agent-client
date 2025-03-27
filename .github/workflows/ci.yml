@@ -51,7 +51,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        if: runner.os != 'Windows'
         with:
           go-version-file: go.mod
           cache: true
