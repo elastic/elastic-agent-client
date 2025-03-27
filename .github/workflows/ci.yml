@@ -57,7 +57,7 @@ jobs:
       - run: go test -v -race ./...
 
   test-windows:
-    runs-on: 'windows-latest'
+    runs-on: 'windows-2022'
     steps:
       - uses: actions/checkout@v4
       # See https://github.com/actions/setup-go/pull/515
