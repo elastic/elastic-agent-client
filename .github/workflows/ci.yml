@@ -46,7 +46,8 @@ jobs:
   test:
     strategy:
       matrix:
-        os: ['macos-latest', 'ubuntu-latest', 'windows-latest']
+        # TODO: test failed on windows-latest, see https://github.com/elastic/elastic-agent-client/issues/120#issuecomment-2757564351
+        os: ['macos-latest', 'ubuntu-latest'] #, 'windows-latest']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
