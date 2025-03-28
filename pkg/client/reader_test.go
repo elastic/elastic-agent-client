@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	protobuf "github.com/golang/protobuf/proto"
+	protobuf "google.golang.org/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
