@@ -6,6 +6,7 @@ package chunk
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -260,6 +261,9 @@ func TestObserved(t *testing.T) {
 }
 
 func TestRecvObserved_Timestamp_Restart(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping test on Windows for now. See https://github.com/elastic/elastic-agent-client/issues/120#issuecomment-2757564351")
+	}
 	firstTimestamp := time.Now()
 	first := &proto.CheckinObserved{
 		Token:        "token",
