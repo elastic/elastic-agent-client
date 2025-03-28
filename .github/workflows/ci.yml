@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  merge_group:
+
+# limit the access of the generated GITHUB_TOKEN
+permissions:
+  contents: read
+
+jobs:
+
+  lint:
+    strategy:
+      matrix:
+        os: ['ubuntu-latest', 'windows-latest']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: |
+          mage -debug check
+          go vet ./...
+
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: install protoc
+        run: |
+          curl -sSfL -o protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v3.19.4/protoc-3.19.4-linux-x86_64.zip
+          mkdir -p $GITHUB_WORKSPACE/.protoc
+          unzip -o protoc.zip -d $GITHUB_WORKSPACE/.protoc
+          echo "$GITHUB_WORKSPACE/.protoc/bin" >> $GITHUB_PATH
+
+      - run: mage -debug update
+
+  test:
+    strategy:
+      matrix:
+        os: ['ubuntu-latest', 'windows-latest']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: go test -v -race ./...
