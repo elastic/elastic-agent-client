@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent-client/v7
 
-go 1.24
+go 1.23
 
 require (
 	github.com/elastic/elastic-agent-libs v0.7.2
