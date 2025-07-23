@@ -1,3 +1,3 @@
 * @elastic/elastic-agent-control-plane
-/.github/actions @elastic/observablt-ci
-/.github/workflows @elastic/observablt-ci
+/.github/actions @elastic/observablt-ci @elastic/observablt-ci-contractors
+/.github/workflows @elastic/observablt-ci @elastic/observablt-ci-contractors
