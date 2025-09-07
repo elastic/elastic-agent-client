@@ -5,7 +5,7 @@ description: Common tasks for preparing the environment
 runs:
   using: "composite"
   steps:
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         if: runner.os != 'Windows'
         with:
           go-version-file: go.mod
