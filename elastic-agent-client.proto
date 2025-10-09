@@ -226,10 +226,16 @@ message Features {
     google.protobuf.Struct source = 1;
 
     FQDNFeature fqdn = 2;
+    FeatureFlag LogRunAsFilestream = 3;
 }
 
 // FQDN feature flag indicates to use FQDN for host.name instead of hostname.
 message FQDNFeature {
+    bool enabled = 1;
+}
+
+// FeatureFlag allows a feature flag to be enabled/disabled
+message FeatureFlag {
     bool enabled = 1;
 }
 
