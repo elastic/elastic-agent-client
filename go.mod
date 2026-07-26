@@ -9,8 +9,8 @@ require (
 	github.com/google/pprof v0.0.0-20230426061923-93006964c1fc
 	github.com/magefile/mage v1.13.0
 	github.com/stretchr/testify v1.8.2
-	google.golang.org/grpc v1.79.3
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/grpc v1.82.1
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
