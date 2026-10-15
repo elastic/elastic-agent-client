@@ -217,6 +217,8 @@ message AgentInfo {
     AgentManagedMode mode = 4;
     // Unprivileged reports if agent is running in Unprivileged mode
     bool Unprivileged = 5;
+    // Tags are the tags of the Elastic Agent.
+    repeated string tags = 6;
 }
 
 // Feature flags configurations.

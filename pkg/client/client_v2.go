@@ -13,6 +13,7 @@ import (
 	"io"
 	"runtime"
 	"runtime/pprof"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -66,6 +67,9 @@ const (
 	// TriggeredAPMChange indicates that the APM configuration has changed
 	// This constant represents a single bit in a bitmask
 	TriggeredAPMChange // apm_config_change_triggered
+	// TriggeredAgentInfoChange indicates that the agent info has changed.
+	// This constant represents a single bit in a bitmask. @see Trigger.
+	TriggeredAgentInfoChange // agent_info_change_triggered
 )
 
 func (t Trigger) String() string {
@@ -95,6 +99,10 @@ func (t Trigger) String() string {
 	if current&TriggeredAPMChange == TriggeredAPMChange {
 		current &= ^TriggeredAPMChange
 		triggers = append(triggers, "apm_config_change_triggered")
+	}
+	if current&TriggeredAgentInfoChange == TriggeredAgentInfoChange {
+		current &= ^TriggeredAgentInfoChange
+		triggers = append(triggers, "agent_info_change_triggered")
 	}
 	if current != 0 {
 		return fmt.Sprintf("invalid trigger value: %d", t)
@@ -147,6 +155,36 @@ type AgentInfo struct {
 	ManagedMode proto.AgentManagedMode
 	// Unprivileged reports if the agent is running in unprivileged mode.
 	Unprivileged bool
+	// Tags are the tags of the Elastic Agent.
+	Tags []string
+}
+
+// AgentInfoFromProto creates an AgentInfo from the proto AgentInfo.
+func AgentInfoFromProto(p *proto.AgentInfo) *AgentInfo {
+	if p == nil {
+		return nil
+	}
+	return &AgentInfo{
+		ID:           p.Id,
+		Version:      p.Version,
+		Snapshot:     p.Snapshot,
+		ManagedMode:  p.Mode,
+		Unprivileged: p.Unprivileged,
+		Tags:         slices.Clone(p.Tags),
+	}
+}
+
+// Equal reports if both AgentInfo have the same values.
+func (a *AgentInfo) Equal(b *AgentInfo) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.ID == b.ID &&
+		a.Version == b.Version &&
+		a.Snapshot == b.Snapshot &&
+		a.ManagedMode == b.ManagedMode &&
+		a.Unprivileged == b.Unprivileged &&
+		slices.Equal(a.Tags, b.Tags)
 }
 
 // VersionInfo is the version information for the connecting client.
@@ -366,7 +404,12 @@ func (c *clientV2) Artifacts() ArtifactsClient {
 func (c *clientV2) AgentInfo() *AgentInfo {
 	c.agentInfoMu.RLock()
 	defer c.agentInfoMu.RUnlock()
-	return c.agentInfo
+	if c.agentInfo == nil {
+		return nil
+	}
+	info := *c.agentInfo
+	info.Tags = slices.Clone(info.Tags)
+	return &info
 }
 
 // RegisterDiagnosticHook registers a diagnostic hook function that will get called when diagnostics is called for
@@ -574,20 +617,27 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 
 // applyExpected syncs the expected state with the current state.
 func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
-	if expected.AgentInfo != nil {
-		c.agentInfoMu.Lock()
-		c.agentInfo = &AgentInfo{
-			ID:           expected.AgentInfo.Id,
-			Version:      expected.AgentInfo.Version,
-			Snapshot:     expected.AgentInfo.Snapshot,
-			ManagedMode:  expected.AgentInfo.Mode,
-			Unprivileged: expected.AgentInfo.Unprivileged,
-		}
-		c.agentInfoMu.Unlock()
+	agentInfoTriggers := c.syncAgentInfo(expected)
+	c.syncComponent(expected)
+	c.syncUnits(expected, agentInfoTriggers)
+}
+
+// syncAgentInfo stores the expected agent info. It returns TriggeredAgentInfoChange
+// when the agent info replaces a different stored value.
+func (c *clientV2) syncAgentInfo(expected *proto.CheckinExpected) Trigger {
+	if expected.AgentInfo == nil {
+		return TriggeredNothing
 	}
 
-	c.syncComponent(expected)
-	c.syncUnits(expected)
+	next := AgentInfoFromProto(expected.AgentInfo)
+	c.agentInfoMu.Lock()
+	defer c.agentInfoMu.Unlock()
+	previous := c.agentInfo
+	c.agentInfo = next
+	if previous == nil || previous.Equal(next) {
+		return TriggeredNothing
+	}
+	return TriggeredAgentInfoChange
 }
 
 // Remove from the client any units not in the given expected list,
@@ -650,7 +700,9 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 	c.componentIdx = expected.ComponentIdx
 }
 
-func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
+// syncUnits adds, modifies, and removes units to match the expected units.
+// It adds extraTriggers to the triggers of each existing unit.
+func (c *clientV2) syncUnits(expected *proto.CheckinExpected, extraTriggers Trigger) {
 	c.unitsMu.Lock()
 	defer c.unitsMu.Unlock()
 
@@ -714,7 +766,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 			)
 
 			changed := UnitChanged{
-				Triggers: triggers,
+				Triggers: triggers | extraTriggers,
 				Type:     UnitChangedModified,
 				Unit:     unit,
 			}
