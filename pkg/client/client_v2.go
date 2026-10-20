@@ -622,27 +622,8 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 
 // applyExpected syncs the expected state with the current state.
 func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
-	agentInfoTriggers := c.syncAgentInfo(expected)
 	c.syncComponent(expected)
-	c.syncUnits(expected, agentInfoTriggers)
-}
-
-// syncAgentInfo stores the expected agent info. It returns TriggeredAgentInfoChange
-// when the agent info replaces a different stored value.
-func (c *clientV2) syncAgentInfo(expected *proto.CheckinExpected) Trigger {
-	if expected.AgentInfo == nil {
-		return TriggeredNothing
-	}
-
-	next := AgentInfoFromProto(expected.AgentInfo)
-	c.agentInfoMu.Lock()
-	defer c.agentInfoMu.Unlock()
-	previous := c.agentInfo
-	c.agentInfo = next
-	if previous.Equal(next) {
-		return TriggeredNothing
-	}
-	return TriggeredAgentInfoChange
+	c.syncUnits(expected)
 }
 
 // Remove from the client any units not in the given expected list,
@@ -706,7 +687,7 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 }
 
 // syncUnits adds, modifies and removes units to match the expected units.
-func (c *clientV2) syncUnits(expected *proto.CheckinExpected, agentInfoTriggers Trigger) {
+func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 	c.unitsMu.Lock()
 	defer c.unitsMu.Unlock()
 
@@ -724,6 +705,17 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected, agentInfoTriggers 
 		defer c.componentMu.RUnlock()
 		if c.componentConfig != nil {
 			apmConfig = c.componentConfig.ApmConfig
+		}
+	}()
+
+	var agentInfoChanged bool
+	func() {
+		c.agentInfoMu.Lock()
+		defer c.agentInfoMu.Unlock()
+		if expected.AgentInfo != nil {
+			agentInfo := AgentInfoFromProto(expected.AgentInfo)
+			agentInfoChanged = !c.agentInfo.Equal(agentInfo)
+			c.agentInfo = agentInfo
 		}
 	}()
 
@@ -770,9 +762,13 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected, agentInfoTriggers 
 			)
 
 			changed := UnitChanged{
-				Triggers: triggers | agentInfoTriggers,
+				Triggers: triggers,
 				Type:     UnitChangedModified,
 				Unit:     unit,
+			}
+
+			if agentInfoChanged {
+				changed.Triggers |= TriggeredAgentInfoChange
 			}
 
 			if changed.Triggers > TriggeredNothing { // a.k.a something changed
