@@ -634,7 +634,7 @@ func (c *clientV2) syncAgentInfo(expected *proto.CheckinExpected) Trigger {
 	defer c.agentInfoMu.Unlock()
 	previous := c.agentInfo
 	c.agentInfo = next
-	if previous == nil || previous.Equal(next) {
+	if previous.Equal(next) {
 		return TriggeredNothing
 	}
 	return TriggeredAgentInfoChange
@@ -700,9 +700,8 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 	c.componentIdx = expected.ComponentIdx
 }
 
-// syncUnits adds, modifies, and removes units to match the expected units.
-// It adds extraTriggers to the triggers of each existing unit.
-func (c *clientV2) syncUnits(expected *proto.CheckinExpected, extraTriggers Trigger) {
+// syncUnits adds, modifies and removes units to match the expected units.
+func (c *clientV2) syncUnits(expected *proto.CheckinExpected, agentInfoTriggers Trigger) {
 	c.unitsMu.Lock()
 	defer c.unitsMu.Unlock()
 
@@ -766,7 +765,7 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected, extraTriggers Trig
 			)
 
 			changed := UnitChanged{
-				Triggers: triggers | extraTriggers,
+				Triggers: triggers | agentInfoTriggers,
 				Type:     UnitChangedModified,
 				Unit:     unit,
 			}

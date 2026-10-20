@@ -1376,29 +1376,34 @@ func TestClientV2_Checkin_AgentInfo(t *testing.T) {
 			checkinCounter++
 			switch checkinCounter {
 			case 1:
-				// first checkin: the unit is added
+				// first checkin: the unit is added without agent info
 				return &proto.CheckinExpected{
-					AgentInfo: &proto.AgentInfo{Id: "elastic-agent-id", Tags: []string{"production"}},
-					Units:     units(1),
+					Units: units(1),
 				}
 			case 2:
-				// same agent info: no change
+				// first agent info for an existing unit: agent info change
 				return &proto.CheckinExpected{
 					AgentInfo: &proto.AgentInfo{Id: "elastic-agent-id", Tags: []string{"production"}},
 					Units:     units(1),
 				}
 			case 3:
+				// same agent info: no change
+				return &proto.CheckinExpected{
+					AgentInfo: &proto.AgentInfo{Id: "elastic-agent-id", Tags: []string{"production"}},
+					Units:     units(1),
+				}
+			case 4:
 				// all tags removed: agent info change
 				return &proto.CheckinExpected{
 					AgentInfo: &proto.AgentInfo{Id: "elastic-agent-id"},
 					Units:     units(1),
 				}
-			case 4:
+			case 5:
 				// no agent info: the client keeps the stored agent info
 				return &proto.CheckinExpected{
 					Units: units(1),
 				}
-			case 5:
+			case 6:
 				// agent info and unit config change: one change with both triggers
 				return &proto.CheckinExpected{
 					AgentInfo: &proto.AgentInfo{Id: "elastic-agent-id", Tags: []string{"staging"}},
@@ -1432,7 +1437,7 @@ func TestClientV2_Checkin_AgentInfo(t *testing.T) {
 	defer client.Stop()
 
 	require.Eventually(t, func() bool {
-		return len(uca.GetAccumulatedChanges()) >= 3
+		return len(uca.GetAccumulatedChanges()) >= 4
 	}, 5*time.Second, 100*time.Millisecond, "client did not emit the expected unit changes")
 
 	require.Empty(t, errs)
@@ -1446,6 +1451,7 @@ func TestClientV2_Checkin_AgentInfo(t *testing.T) {
 	}
 	want := []change{
 		{Type: UnitChangedAdded},
+		{Type: UnitChangedModified, Triggers: TriggeredAgentInfoChange},
 		{Type: UnitChangedModified, Triggers: TriggeredAgentInfoChange},
 		{Type: UnitChangedModified, Triggers: TriggeredConfigChange | TriggeredAgentInfoChange},
 	}
