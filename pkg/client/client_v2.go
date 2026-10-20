@@ -13,6 +13,7 @@ import (
 	"io"
 	"runtime"
 	"runtime/pprof"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -66,6 +67,9 @@ const (
 	// TriggeredAPMChange indicates that the APM configuration has changed
 	// This constant represents a single bit in a bitmask
 	TriggeredAPMChange // apm_config_change_triggered
+	// TriggeredAgentInfoChange indicates that the agent info has changed.
+	// This constant represents a single bit in a bitmask. @see Trigger.
+	TriggeredAgentInfoChange // agent_info_change_triggered
 )
 
 func (t Trigger) String() string {
@@ -95,6 +99,10 @@ func (t Trigger) String() string {
 	if current&TriggeredAPMChange == TriggeredAPMChange {
 		current &= ^TriggeredAPMChange
 		triggers = append(triggers, "apm_config_change_triggered")
+	}
+	if current&TriggeredAgentInfoChange == TriggeredAgentInfoChange {
+		current &= ^TriggeredAgentInfoChange
+		triggers = append(triggers, "agent_info_change_triggered")
 	}
 	if current != 0 {
 		return fmt.Sprintf("invalid trigger value: %d", t)
@@ -147,6 +155,46 @@ type AgentInfo struct {
 	ManagedMode proto.AgentManagedMode
 	// Unprivileged reports if the agent is running in unprivileged mode.
 	Unprivileged bool
+	// Tags are the tags of the Elastic Agent.
+	Tags []string
+}
+
+// AgentInfoFromProto creates an AgentInfo from the proto AgentInfo.
+func AgentInfoFromProto(p *proto.AgentInfo) *AgentInfo {
+	if p == nil {
+		return nil
+	}
+	return &AgentInfo{
+		ID:           p.Id,
+		Version:      p.Version,
+		Snapshot:     p.Snapshot,
+		ManagedMode:  p.Mode,
+		Unprivileged: p.Unprivileged,
+		Tags:         slices.Clone(p.Tags),
+	}
+}
+
+// Clone returns a copy of the AgentInfo that shares no memory with it.
+func (a *AgentInfo) Clone() *AgentInfo {
+	if a == nil {
+		return nil
+	}
+	info := *a
+	info.Tags = slices.Clone(a.Tags)
+	return &info
+}
+
+// Equal reports if both AgentInfo have the same values.
+func (a *AgentInfo) Equal(b *AgentInfo) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.ID == b.ID &&
+		a.Version == b.Version &&
+		a.Snapshot == b.Snapshot &&
+		a.ManagedMode == b.ManagedMode &&
+		a.Unprivileged == b.Unprivileged &&
+		slices.Equal(a.Tags, b.Tags)
 }
 
 // VersionInfo is the version information for the connecting client.
@@ -234,7 +282,7 @@ func WithGRPCDialOptions(opts ...grpc.DialOption) V2ClientOption {
 // to match the given agentInfo.Version.
 func WithAgentInfo(agentInfo AgentInfo) V2ClientOption {
 	return func(o *v2options) {
-		o.agentInfo = &agentInfo
+		o.agentInfo = agentInfo.Clone()
 	}
 }
 
@@ -366,7 +414,7 @@ func (c *clientV2) Artifacts() ArtifactsClient {
 func (c *clientV2) AgentInfo() *AgentInfo {
 	c.agentInfoMu.RLock()
 	defer c.agentInfoMu.RUnlock()
-	return c.agentInfo
+	return c.agentInfo.Clone()
 }
 
 // RegisterDiagnosticHook registers a diagnostic hook function that will get called when diagnostics is called for
@@ -574,18 +622,6 @@ func (c *clientV2) sendObserved(client proto.ElasticAgent_CheckinV2Client) error
 
 // applyExpected syncs the expected state with the current state.
 func (c *clientV2) applyExpected(expected *proto.CheckinExpected) {
-	if expected.AgentInfo != nil {
-		c.agentInfoMu.Lock()
-		c.agentInfo = &AgentInfo{
-			ID:           expected.AgentInfo.Id,
-			Version:      expected.AgentInfo.Version,
-			Snapshot:     expected.AgentInfo.Snapshot,
-			ManagedMode:  expected.AgentInfo.Mode,
-			Unprivileged: expected.AgentInfo.Unprivileged,
-		}
-		c.agentInfoMu.Unlock()
-	}
-
 	c.syncComponent(expected)
 	c.syncUnits(expected)
 }
@@ -650,6 +686,7 @@ func (c *clientV2) syncComponent(expected *proto.CheckinExpected) {
 	c.componentIdx = expected.ComponentIdx
 }
 
+// syncUnits adds, modifies and removes units to match the expected units.
 func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 	c.unitsMu.Lock()
 	defer c.unitsMu.Unlock()
@@ -668,6 +705,17 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 		defer c.componentMu.RUnlock()
 		if c.componentConfig != nil {
 			apmConfig = c.componentConfig.ApmConfig
+		}
+	}()
+
+	var agentInfoChanged bool
+	func() {
+		c.agentInfoMu.Lock()
+		defer c.agentInfoMu.Unlock()
+		if expected.AgentInfo != nil {
+			agentInfo := AgentInfoFromProto(expected.AgentInfo)
+			agentInfoChanged = !c.agentInfo.Equal(agentInfo)
+			c.agentInfo = agentInfo
 		}
 	}()
 
@@ -717,6 +765,10 @@ func (c *clientV2) syncUnits(expected *proto.CheckinExpected) {
 				Triggers: triggers,
 				Type:     UnitChangedModified,
 				Unit:     unit,
+			}
+
+			if agentInfoChanged {
+				changed.Triggers |= TriggeredAgentInfoChange
 			}
 
 			if changed.Triggers > TriggeredNothing { // a.k.a something changed

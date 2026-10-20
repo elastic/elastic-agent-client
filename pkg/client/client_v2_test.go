@@ -163,6 +163,7 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 		Snapshot:     true,
 		ManagedMode:  proto.AgentManagedMode_STANDALONE,
 		Unprivileged: true,
+		Tags:         []string{"production", "team-payments"},
 	}
 	vInfo := VersionInfo{
 		Name:      "program",
@@ -189,6 +190,7 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 					Snapshot:     wantAgentInfo.Snapshot,
 					Mode:         wantAgentInfo.ManagedMode,
 					Unprivileged: wantAgentInfo.Unprivileged,
+					Tags:         wantAgentInfo.Tags,
 				},
 				Features: &proto.Features{
 					Fqdn: &proto.FQDNFeature{Enabled: wantFQDN},
@@ -303,13 +305,10 @@ func testClientV2CheckinInitial(t *testing.T, localRPC string, serverCreds, clie
 	cancel()
 
 	agentInfo := clientv2.AgentInfo()
-	if assert.NotNilf(t, agentInfo, "AgentInfo should not be nil") {
-		assert.Equal(t, wantAgentInfo.ID, agentInfo.ID)
-		assert.Equal(t, wantAgentInfo.Version, agentInfo.Version)
-		assert.True(t, wantAgentInfo.Snapshot, agentInfo.Snapshot)
-		assert.Equal(t, wantAgentInfo.ManagedMode, agentInfo.ManagedMode)
-		assert.Equal(t, wantAgentInfo.Unprivileged, agentInfo.Unprivileged)
-	}
+	require.Equal(t, &wantAgentInfo, agentInfo)
+
+	agentInfo.Tags[0] = "staging"
+	assert.Equal(t, wantAgentInfo.Tags, clientv2.AgentInfo().Tags, "callers must not mutate the agent info of the client")
 
 	assert.Truef(t, gotFQDN, "FQND should be true")
 
@@ -875,6 +874,16 @@ func TestTrigger_String(t *testing.T) {
 			Want:    "feature_change_triggered, apm_config_change_triggered",
 		},
 		{
+			Name:    "one change: agent_info_change_triggered",
+			Trigger: TriggeredAgentInfoChange,
+			Want:    "agent_info_change_triggered",
+		},
+		{
+			Name:    "two changes: config_change_triggered, agent_info_change_triggered",
+			Trigger: TriggeredConfigChange | TriggeredAgentInfoChange,
+			Want:    "config_change_triggered, agent_info_change_triggered",
+		},
+		{
 			Name:    "invalid trigger value",
 			Trigger: 1618,
 			Want:    "invalid trigger value: 1618",
@@ -1332,6 +1341,130 @@ func TestClientV2_Checkin_Component(t *testing.T) {
 			require.Equal(t, sv.expected, sv.actual)
 		})
 	}
+}
+
+func TestClientV2_Checkin_AgentInfo(t *testing.T) {
+	var m sync.Mutex
+	token := mock.NewID()
+	unitID := mock.NewID()
+	checkinCounter := 0
+
+	units := func(configStateIdx uint64) []*proto.UnitExpected {
+		return []*proto.UnitExpected{
+			{
+				Id:             unitID,
+				Type:           proto.UnitType_INPUT,
+				State:          proto.State_HEALTHY,
+				LogLevel:       proto.UnitLogLevel_INFO,
+				ConfigStateIdx: configStateIdx,
+				Config: &proto.UnitExpectedConfig{
+					Id: "config_unit",
+				},
+			},
+		}
+	}
+
+	srv := mock.StubServerV2{
+		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+			m.Lock()
+			defer m.Unlock()
+
+			if observed.Token != token {
+				return nil
+			}
+
+			checkinCounter++
+			switch checkinCounter {
+			case 1:
+				// first checkin: the unit is added without agent info
+				return &proto.CheckinExpected{
+					Units: units(1),
+				}
+			case 2:
+				// first agent info for an existing unit: agent info change
+				return &proto.CheckinExpected{
+					AgentInfo: &proto.AgentInfo{Id: "elastic-agent-id", Tags: []string{"production"}},
+					Units:     units(1),
+				}
+			case 3:
+				// same agent info: no change
+				return &proto.CheckinExpected{
+					AgentInfo: &proto.AgentInfo{Id: "elastic-agent-id", Tags: []string{"production"}},
+					Units:     units(1),
+				}
+			case 4:
+				// all tags removed: agent info change
+				return &proto.CheckinExpected{
+					AgentInfo: &proto.AgentInfo{Id: "elastic-agent-id"},
+					Units:     units(1),
+				}
+			case 5:
+				// no agent info: the client keeps the stored agent info
+				return &proto.CheckinExpected{
+					Units: units(1),
+				}
+			case 6:
+				// agent info and unit config change: one change with both triggers
+				return &proto.CheckinExpected{
+					AgentInfo: &proto.AgentInfo{Id: "elastic-agent-id", Tags: []string{"staging"}},
+					Units:     units(2),
+				}
+			}
+			// disconnect
+			return nil
+		},
+		ActionImpl: func(response *proto.ActionResponse) error {
+			// actions not tested here
+			return nil
+		},
+		ActionsChan: make(chan *mock.PerformAction, 100),
+	}
+	require.NoError(t, srv.Start())
+	defer srv.Stop()
+
+	var errsMu sync.Mutex
+	var errs []error
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client := NewV2(fmt.Sprintf(":%d", srv.Port), token, VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials()))).(*clientV2)
+	client.minCheckTimeout = 100 * time.Millisecond // otherwise the test will run for too long
+	storeErrors(ctx, client, &errs, &errsMu)
+
+	var uca unitChangesAccumulator
+	uca.Start(ctx, t, client.UnitChanges())
+
+	require.NoError(t, client.Start(ctx))
+	defer client.Stop()
+
+	require.Eventually(t, func() bool {
+		return len(uca.GetAccumulatedChanges()) >= 4
+	}, 5*time.Second, 100*time.Millisecond, "client did not emit the expected unit changes")
+
+	require.Empty(t, errs)
+	type change struct {
+		Type     UnitChangedType
+		Triggers Trigger
+	}
+	var got []change
+	for _, c := range uca.GetAccumulatedChanges() {
+		got = append(got, change{Type: c.Type, Triggers: c.Triggers})
+	}
+	want := []change{
+		{Type: UnitChangedAdded},
+		{Type: UnitChangedModified, Triggers: TriggeredAgentInfoChange},
+		{Type: UnitChangedModified, Triggers: TriggeredAgentInfoChange},
+		{Type: UnitChangedModified, Triggers: TriggeredConfigChange | TriggeredAgentInfoChange},
+	}
+	assert.Equal(t, want, got)
+	assert.Equal(t, []string{"staging"}, client.AgentInfo().Tags)
+}
+
+func TestClientV2_WithAgentInfo(t *testing.T) {
+	info := AgentInfo{ID: "elastic-agent-id", Tags: []string{"production"}}
+	client := NewV2(":0", mock.NewID(), VersionInfo{}, WithAgentInfo(info))
+
+	info.Tags[0] = "staging"
+	assert.Equal(t, []string{"production"}, client.AgentInfo().Tags, "callers must not mutate the agent info of the client")
 }
 
 func setupClientForDiagnostics(ctx context.Context, t *testing.T) (*Unit, V2, mock.StubServerV2) {
