@@ -174,6 +174,16 @@ func AgentInfoFromProto(p *proto.AgentInfo) *AgentInfo {
 	}
 }
 
+// Clone returns a copy of the AgentInfo that shares no memory with it.
+func (a *AgentInfo) Clone() *AgentInfo {
+	if a == nil {
+		return nil
+	}
+	info := *a
+	info.Tags = slices.Clone(a.Tags)
+	return &info
+}
+
 // Equal reports if both AgentInfo have the same values.
 func (a *AgentInfo) Equal(b *AgentInfo) bool {
 	if a == nil || b == nil {
@@ -272,7 +282,7 @@ func WithGRPCDialOptions(opts ...grpc.DialOption) V2ClientOption {
 // to match the given agentInfo.Version.
 func WithAgentInfo(agentInfo AgentInfo) V2ClientOption {
 	return func(o *v2options) {
-		o.agentInfo = &agentInfo
+		o.agentInfo = agentInfo.Clone()
 	}
 }
 
@@ -404,12 +414,7 @@ func (c *clientV2) Artifacts() ArtifactsClient {
 func (c *clientV2) AgentInfo() *AgentInfo {
 	c.agentInfoMu.RLock()
 	defer c.agentInfoMu.RUnlock()
-	if c.agentInfo == nil {
-		return nil
-	}
-	info := *c.agentInfo
-	info.Tags = slices.Clone(info.Tags)
-	return &info
+	return c.agentInfo.Clone()
 }
 
 // RegisterDiagnosticHook registers a diagnostic hook function that will get called when diagnostics is called for

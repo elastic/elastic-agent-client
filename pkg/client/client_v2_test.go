@@ -1459,6 +1459,14 @@ func TestClientV2_Checkin_AgentInfo(t *testing.T) {
 	assert.Equal(t, []string{"staging"}, client.AgentInfo().Tags)
 }
 
+func TestClientV2_WithAgentInfo(t *testing.T) {
+	info := AgentInfo{ID: "elastic-agent-id", Tags: []string{"production"}}
+	client := NewV2(":0", mock.NewID(), VersionInfo{}, WithAgentInfo(info))
+
+	info.Tags[0] = "staging"
+	assert.Equal(t, []string{"production"}, client.AgentInfo().Tags, "callers must not mutate the agent info of the client")
+}
+
 func setupClientForDiagnostics(ctx context.Context, t *testing.T) (*Unit, V2, mock.StubServerV2) {
 	var m sync.Mutex
 	token := mock.NewID()
