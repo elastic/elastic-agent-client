@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/mock"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -39,6 +40,40 @@ func TestClient_DialError(t *testing.T) {
 	invalidClient := New(fmt.Sprintf(":%d", srv.Port), "invalid_token", impl, nil)
 	assert.Error(t, invalidClient.Start(context.Background()))
 	defer invalidClient.Stop()
+}
+
+func TestClient_StopClosesConnection(t *testing.T) {
+	var m sync.Mutex
+	gotCheckin := false
+	srv := mock.StubServer{
+		CheckinImpl: func(observed *proto.StateObserved) *proto.StateExpected {
+			m.Lock()
+			defer m.Unlock()
+			gotCheckin = true
+			return &proto.StateExpected{State: proto.StateExpected_RUNNING}
+		},
+		ActionImpl: func(response *proto.ActionResponse) error {
+			return nil
+		},
+		ActionsChan: make(chan *mock.PerformAction, 100),
+	}
+	require.NoError(t, srv.Start())
+	defer srv.Stop()
+
+	client := New(fmt.Sprintf(":%d", srv.Port), "token", &StubClientImpl{}, nil, grpc.WithTransportCredentials(insecure.NewCredentials())).(*client)
+	require.NoError(t, client.Start(context.Background()))
+	require.NoError(t, waitFor(func() error {
+		m.Lock()
+		defer m.Unlock()
+		if !gotCheckin {
+			return fmt.Errorf("server never received a checkin")
+		}
+		return nil
+	}))
+
+	conn := client.conn
+	client.Stop()
+	assert.Equal(t, connectivity.Shutdown, conn.GetState(), "Stop should close the connection")
 }
 
 func TestClient_Status(t *testing.T) {

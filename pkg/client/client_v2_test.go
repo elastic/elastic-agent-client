@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	gproto "google.golang.org/protobuf/proto"
@@ -41,6 +42,45 @@ func TestClientV2_DialError(t *testing.T) {
 	invalidClient := NewV2(fmt.Sprintf(":%d", srv.Port), "invalid_token", VersionInfo{})
 	assert.Error(t, invalidClient.Start(context.Background()))
 	defer invalidClient.Stop()
+}
+
+func TestClientV2_StopClosesConnection(t *testing.T) {
+	var m sync.Mutex
+	gotCheckin := false
+	srv := mock.StubServerV2{
+		CheckinV2Impl: func(observed *proto.CheckinObserved) *proto.CheckinExpected {
+			m.Lock()
+			defer m.Unlock()
+			gotCheckin = true
+			return &proto.CheckinExpected{}
+		},
+		ActionImpl: func(response *proto.ActionResponse) error {
+			return nil
+		},
+		ActionsChan: make(chan *mock.PerformAction, 100),
+	}
+	require.NoError(t, srv.Start())
+	defer srv.Stop()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var errsMu sync.Mutex
+	var errs []error
+	client := NewV2(srv.GetTarget(), mock.NewID(), VersionInfo{}, WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials()))).(*clientV2)
+	storeErrors(ctx, client, &errs, &errsMu)
+	require.NoError(t, client.Start(ctx))
+	require.NoError(t, waitFor(func() error {
+		m.Lock()
+		defer m.Unlock()
+		if !gotCheckin {
+			return fmt.Errorf("server never received a checkin")
+		}
+		return nil
+	}))
+
+	conn := client.conn
+	client.Stop()
+	assert.Equal(t, connectivity.Shutdown, conn.GetState(), "Stop should close the connection")
 }
 
 // Test that RPC errors on client startup delay before retrying instead
