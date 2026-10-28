@@ -76,6 +76,7 @@ type client struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
+	conn   *grpc.ClientConn
 	client proto.ElasticAgentClient
 	cfgMu  sync.RWMutex
 	obsMu  sync.RWMutex
@@ -124,6 +125,7 @@ func (c *client) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	c.conn = conn
 	c.client = proto.NewElasticAgentClient(conn)
 	c.startCheckin()
 	c.startActions()
@@ -137,6 +139,10 @@ func (c *client) Stop() {
 		c.wg.Wait()
 		c.ctx = nil
 		c.cancel = nil
+	}
+	if c.conn != nil {
+		_ = c.conn.Close()
+		c.conn = nil
 	}
 }
 
