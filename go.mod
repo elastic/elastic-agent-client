@@ -3,7 +3,7 @@ module github.com/elastic/elastic-agent-client/v7
 go 1.25.0
 
 require (
-	github.com/elastic/elastic-agent-libs v0.7.2
+	github.com/Microsoft/go-winio v0.5.2
 	github.com/gofrs/uuid/v5 v5.2.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/pprof v0.0.0-20230426061923-93006964c1fc
@@ -14,7 +14,6 @@ require (
 )
 
 require (
-	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

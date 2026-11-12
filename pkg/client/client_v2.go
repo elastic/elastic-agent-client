@@ -24,7 +24,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client/chunk"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-client/v7/pkg/utils"
-	"github.com/elastic/elastic-agent-libs/api/npipe"
 )
 
 // DefaultMaxMessageSize is the maximum message size that is allowed to be sent.
@@ -346,7 +345,7 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2Clien
 
 	// For compatibility with existing interface the target could contain npipe:// scheme prefix
 	// Set the named pipe dialer option if npipe:// prefix specified on windows
-	if runtime.GOOS == "windows" && npipe.IsNPipe(target) {
+	if runtime.GOOS == "windows" && isNPipe(target) {
 		target = transformNPipeURL(target)
 		// Set the winio named pipe dialer
 		options.dialOptions = append(options.dialOptions, getOptions()...)
@@ -366,6 +365,10 @@ func NewV2(target string, token string, versionInfo VersionInfo, opts ...V2Clien
 	}
 	c.registerDefaultDiagnostics()
 	return c
+}
+
+func isNPipe(s string) bool {
+	return strings.HasPrefix(s, "npipe:///") || strings.HasPrefix(s, `\\.\pipe\`)
 }
 
 // Start starts the connection to Elastic Agent.
@@ -567,7 +570,6 @@ func (c *clientV2) checkinWriter(
 
 	// Keep sending until the call returns an error
 	for c.sendObserved(checkinClient) == nil {
-
 		// Wait until the ticker goes off, or we're notified of an update.
 		select {
 		case <-c.stateChangeObservedCh:
