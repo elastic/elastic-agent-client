@@ -8,11 +8,25 @@
 package mock
 
 import (
+	"fmt"
 	"net"
 
-	"github.com/elastic/elastic-agent-libs/api/npipe"
+	"github.com/Microsoft/go-winio"
 )
 
 func newNPipeListener(name, sd string) (net.Listener, error) {
-	return npipe.NewListener(name, sd)
+	return newListener(name, sd)
+}
+
+func newListener(name, sd string) (net.Listener, error) {
+	c := &winio.PipeConfig{
+		SecurityDescriptor: sd,
+	}
+
+	l, err := winio.ListenPipe(name, c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen on the named pipe %s: %w", name, err)
+	}
+
+	return l, nil
 }

@@ -7,9 +7,18 @@
 
 package client
 
-import "github.com/elastic/elastic-agent-libs/api/npipe"
+import "strings"
 
 // transformNPipeURL converts npipe:/// url to the local named pipe name
 func transformNPipeURL(s string) string {
-	return npipe.TransformString(s)
+	return transformString(s)
+}
+
+func transformString(name string) string {
+	if strings.HasPrefix(name, "npipe:///") {
+		path := strings.TrimPrefix(name, "npipe:///")
+		return `\\.\pipe\` + path
+	}
+
+	return name
 }

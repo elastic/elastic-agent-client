@@ -8,7 +8,6 @@
 package client
 
 // transformNPipeURL is noop on non-windows platforms.
-// The npipe.TransformString is windows only in github.com/elastic/elastic-agent-libs/api/npipe
 func transformNPipeURL(s string) string {
 	return s
 }
