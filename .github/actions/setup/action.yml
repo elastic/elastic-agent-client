@@ -5,16 +5,32 @@ description: Common tasks for preparing the environment
 runs:
   using: "composite"
   steps:
+      # go.mod declares the minimum Go version for users of this library
+      # (e.g. 1.26.0). CI should test with the latest patch release of that
+      # minor version instead, so take only major.minor from the go line and
+      # let setup-go resolve the newest matching release.
+      - name: determine Go version
+        id: go-version
+        shell: bash
+        run: |
+          minor=$(sed -nE 's/^go ([0-9]+\.[0-9]+).*/\1/p' go.mod)
+          if [ -z "$minor" ]; then
+            echo "::error file=go.mod::could not read the go directive"
+            exit 1
+          fi
+          echo "version=${minor}.x" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@v7
         if: runner.os != 'Windows'
         with:
-          go-version-file: go.mod
+          go-version: ${{ steps.go-version.outputs.version }}
+          check-latest: true
           cache: true
       # See https://github.com/actions/setup-go/pull/515
       - uses: antontroshin/setup-go@bda02de8887c9946189f81e7e59512914aeb9ea4
         if: runner.os == 'Windows'
         with:
-          go-version-file: go.mod
+          go-version: ${{ steps.go-version.outputs.version }}
+          check-latest: true
           cache: true
       - name: install mage
         run: go install github.com/magefile/mage
