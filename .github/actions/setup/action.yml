@@ -20,13 +20,6 @@ runs:
           fi
           echo "version=${minor}.x" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-go@v7
-        if: runner.os != 'Windows'
-        with:
-          go-version: ${{ steps.go-version.outputs.version }}
-          cache: true
-      # See https://github.com/actions/setup-go/pull/515
-      - uses: antontroshin/setup-go@bda02de8887c9946189f81e7e59512914aeb9ea4
-        if: runner.os == 'Windows'
         with:
           go-version: ${{ steps.go-version.outputs.version }}
           cache: true
