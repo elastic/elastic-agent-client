@@ -6,9 +6,9 @@ runs:
   using: "composite"
   steps:
       # go.mod declares the minimum Go version for users of this library
-      # (e.g. 1.26.0). CI should test with the latest patch release of that
-      # minor version instead, so take only major.minor from the go line and
-      # let setup-go resolve the newest matching release.
+      # (e.g. 1.26.0). CI should not be pinned to that exact patch release,
+      # so take only major.minor from the go line and let setup-go pick a
+      # matching release (e.g. 1.26.x).
       - name: determine Go version
         id: go-version
         shell: bash
@@ -23,14 +23,12 @@ runs:
         if: runner.os != 'Windows'
         with:
           go-version: ${{ steps.go-version.outputs.version }}
-          check-latest: true
           cache: true
       # See https://github.com/actions/setup-go/pull/515
       - uses: antontroshin/setup-go@bda02de8887c9946189f81e7e59512914aeb9ea4
         if: runner.os == 'Windows'
         with:
           go-version: ${{ steps.go-version.outputs.version }}
-          check-latest: true
           cache: true
       - name: install mage
         run: go install github.com/magefile/mage
