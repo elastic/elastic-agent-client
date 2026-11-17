@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent-client/v7/dev-tools/v2tool
 
-go 1.25.0
+go 1.26.0
 
 replace github.com/elastic/elastic-agent-client/v7 => ../../
 
